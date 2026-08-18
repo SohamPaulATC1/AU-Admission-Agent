@@ -1,0 +1,32 @@
+venv/
+.env
+ayan*
+gcp-proj*
+
+# Logs
+*.log
+
+# Python Cache
+__pycache__/
+*.pyc
+
+# Local Databases
+senco_chroma_db/
+
+# Temporary / Output Directories
+call_input_recording/
+graphify-out/
+
+# Backup / Old Script Versions
+app1.py
+app3_1live.py
+db_query_.py
+db_query_1.py
+db_query_2.py
+groqLLM1.py
+prompt1111.txt
+index1.html
+senco_llm.json
+senco_llm1.json
+senco_llm2.json
+senco_llm3.json

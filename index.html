@@ -1,0 +1,970 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Senco AI Outbound Calling Dashboard</title>
+    <link rel="icon" href="favicon.png?v=1" type="image/png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Poppins:wght@300;400;500;600&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #f8f8f6;
+            --bg-secondary: #ffffff;
+            --bg-soft: #f1f1ee;
+            --senco-red: #8b0000;
+            --senco-red-light: #b30000;
+            --gold-primary: #d4af37;
+            --gold-light: #efd177;
+            --text-primary: #17171a;
+            --text-secondary: #505158;
+
+            --gold-accent: var(--gold-light);
+            --bg-dark: var(--bg-primary);
+            --bg-dark-soft: var(--bg-secondary);
+            --text-muted: #66686f;
+            --glass-bg: rgba(255, 255, 255, 0.84);
+            --glass-border: rgba(0, 0, 0, 0.12);
+            --danger: #a20e0e;
+            --success: #a6821f;
+            --nav-height: 76px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            min-height: 100%;
+            margin: 0;
+        }
+
+        body {
+            font-family: "Poppins", sans-serif;
+            color: var(--text-primary);
+            background:
+                radial-gradient(circle at 10% 12%, rgba(139, 0, 0, 0.08), transparent 35%),
+                radial-gradient(circle at 84% 16%, rgba(212, 175, 55, 0.13), transparent 32%),
+                linear-gradient(160deg, var(--bg-primary), var(--bg-secondary) 62%, #fcfcfb);
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        body::before,
+        body::after {
+            content: "";
+            position: fixed;
+            inset: -20%;
+            pointer-events: none;
+            z-index: -2;
+        }
+
+        body::before {
+            background: conic-gradient(from 35deg,
+                    rgba(139, 0, 0, 0.1),
+                    rgba(255, 255, 255, 0.12),
+                    rgba(212, 175, 55, 0.14),
+                    rgba(255, 255, 255, 0.1),
+                    rgba(139, 0, 0, 0.08));
+            filter: blur(35px);
+            animation: gradientShift 14s ease-in-out infinite alternate;
+        }
+
+        body::after {
+            background-image:
+                radial-gradient(circle at 14% 22%, rgba(212, 175, 55, 0.18) 0, rgba(212, 175, 55, 0) 26%),
+                radial-gradient(circle at 82% 70%, rgba(139, 0, 0, 0.12) 0, rgba(139, 0, 0, 0) 28%),
+                radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0.03) 0, rgba(0, 0, 0, 0) 64%);
+            animation: gradientDrift 18s linear infinite;
+            z-index: -1;
+        }
+
+        .sparkles {
+            position: fixed;
+            inset: 0;
+            z-index: -1;
+            pointer-events: none;
+            background-image:
+                radial-gradient(circle, rgba(212, 175, 55, 0.2) 1px, transparent 1px),
+                radial-gradient(circle, rgba(139, 0, 0, 0.12) 1px, transparent 1px);
+            background-size: 40px 40px;
+            background-position: 0 0, 20px 20px;
+            mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.08));
+            animation: sparkleMove 40s linear infinite;
+        }
+
+        .top-nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: var(--nav-height);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 2.2rem;
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.86);
+            border-bottom: 1px solid rgba(139, 0, 0, 0.22);
+            z-index: 30;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            line-height: 0;
+        }
+
+        .brand-logo {
+            display: block;
+            height: 46px;
+            width: auto;
+            object-fit: contain;
+        }
+
+        .top-nav .brand:last-child {
+            margin-left: auto;
+        }
+
+        .dashboard {
+            min-height: 100vh;
+            display: grid;
+            grid-template-columns: 1.06fr 0.94fr;
+            gap: 2rem;
+            padding: calc(var(--nav-height) + 2rem) 2rem 2rem;
+        }
+
+        .left-zone {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 1.6rem;
+        }
+
+        .left-placeholder {
+            width: min(100%, 530px);
+            min-height: 420px;
+            background: rgba(255, 255, 255, 0.7);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            box-shadow: 0 18px 40px rgba(0, 0, 0, 0.12);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 1.5rem;
+            color: var(--text-muted);
+            font-size: 1rem;
+            font-weight: 500;
+            letter-spacing: 0.01em;
+            animation: placeholderGlow 3.6s ease-in-out infinite;
+        }
+
+        .typing-text {
+            display: inline-block;
+            white-space: nowrap;
+            overflow: hidden;
+            border-right: 2px solid rgba(80, 81, 88, 0.75);
+            font-family: "Playfair Display", serif;
+            font-size: 1.35rem;
+            font-weight: 700;
+            animation: typing 4s steps(34, end) infinite, caretBlink 0.8s step-end infinite;
+        }
+
+        .right-zone {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 0.6rem;
+        }
+
+        .call-card {
+            width: min(100%, 530px);
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            backdrop-filter: blur(20px);
+            box-shadow: 0 18px 40px rgba(0, 0, 0, 0.16);
+            padding: 1.8rem;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.25s ease, box-shadow 0.25s ease;
+        }
+
+        .call-card:hover {
+            box-shadow: 0 24px 54px rgba(0, 0, 0, 0.2);
+        }
+
+        .card-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            border-radius: 999px;
+            border: 1px solid rgba(139, 0, 0, 0.45);
+            color: #fff2de;
+            background: linear-gradient(135deg, #8B0000, #D4AF37);
+            font-size: 0.74rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            padding: 0.3rem 0.72rem;
+        }
+
+        .card-tag::before {
+            content: "";
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #39ff66;
+            box-shadow: 0 0 10px rgba(57, 255, 102, 0.78);
+        }
+
+        .call-card h2 {
+            margin: 1rem 0 0.4rem;
+            font-family: "Playfair Display", serif;
+            font-size: clamp(1.6rem, 2.2vw, 2.2rem);
+            line-height: 1.2;
+        }
+
+        .call-card .subtitle {
+            margin: 0;
+            color: var(--text-muted);
+            font-size: 0.94rem;
+            line-height: 1.7;
+        }
+
+        .call-form {
+            margin-top: 1.45rem;
+            display: grid;
+            gap: 1.05rem;
+        }
+
+        .field {
+            position: relative;
+        }
+
+        .field input {
+            width: 100%;
+            border: 1px solid rgba(0, 0, 0, 0.14);
+            background: #ffffff;
+            color: var(--text-primary);
+            border-radius: 12px;
+            height: 56px;
+            padding: 0 0.95rem;
+            font-size: 0.95rem;
+            outline: none;
+            transition: border-color 0.25s ease, box-shadow 0.25s ease;
+        }
+
+        .field input::placeholder {
+            color: transparent;
+        }
+
+        .field label {
+            position: absolute;
+            top: 50%;
+            left: 0.92rem;
+            transform: translateY(-50%);
+            color: rgba(176, 176, 176, 0.82);
+            font-size: 0.89rem;
+            pointer-events: none;
+            transition: all 0.22s ease;
+            background: transparent;
+            padding: 0 0.2rem;
+        }
+
+        .field input:focus {
+            border-color: var(--senco-red-light);
+            box-shadow: 0 0 0 3px rgba(139, 0, 0, 0.14);
+        }
+
+        .field input:focus+label,
+        .field input:not(:placeholder-shown)+label {
+            top: 0;
+            transform: translateY(-50%);
+            font-size: 0.72rem;
+            color: var(--senco-red-light);
+            background: #ffffff;
+        }
+
+        .error-line {
+            min-height: 18px;
+            margin-top: 0.35rem;
+            font-size: 0.76rem;
+            color: var(--danger);
+        }
+
+        .action-row {
+            display: grid;
+            gap: 0.7rem;
+        }
+
+        .call-btn {
+            position: relative;
+            overflow: hidden;
+            border: none;
+            border-radius: 14px;
+            padding: 0.95rem 1rem;
+            color: #fff7ef;
+            font-weight: 600;
+            font-size: 0.96rem;
+            background: linear-gradient(135deg, #8b0000, #b30000);
+            background-size: 220% 220%;
+            cursor: pointer;
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            gap: 0.62rem;
+            transition: transform 0.2s ease, filter 0.25s ease;
+        }
+
+        .call-btn::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: -160%;
+            width: 70%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.52), transparent);
+            transition: left 0.6s ease;
+        }
+
+        .call-btn:hover {
+            transform: translateY(-1px) scale(1.01);
+            filter: brightness(1.03);
+            animation: btnGlow 2s linear infinite;
+        }
+
+        .call-btn:hover::before {
+            left: 170%;
+        }
+
+        .call-btn:active {
+            transform: scale(0.985);
+        }
+
+        .call-btn:disabled {
+            cursor: not-allowed;
+            filter: grayscale(0.12) brightness(0.86);
+            transform: none;
+        }
+
+        .spinner,
+        .checkmark,
+        .btn-wave {
+            display: none;
+        }
+
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255, 243, 227, 0.35);
+            border-top-color: rgba(255, 243, 227, 0.95);
+            border-radius: 50%;
+            animation: spin 0.85s linear infinite;
+        }
+
+        .btn-wave {
+            align-items: flex-end;
+            gap: 3px;
+            height: 14px;
+        }
+
+        .btn-wave span {
+            width: 3px;
+            border-radius: 3px;
+            background: #ffd37c;
+            animation: wave 1s ease-in-out infinite;
+        }
+
+        .btn-wave span:nth-child(1) {
+            height: 5px;
+        }
+
+        .btn-wave span:nth-child(2) {
+            height: 11px;
+            animation-delay: 0.15s;
+        }
+
+        .btn-wave span:nth-child(3) {
+            height: 8px;
+            animation-delay: 0.3s;
+        }
+
+        .checkmark {
+            font-weight: 700;
+            font-size: 0.95rem;
+        }
+
+        .call-btn.state-loading .spinner,
+        .call-btn.state-active .btn-wave,
+        .call-btn.state-completed .checkmark {
+            display: inline-flex;
+        }
+
+        .call-btn.state-active {
+            background: linear-gradient(135deg, #8b0000, #d4af37);
+            color: #fff6e8;
+        }
+
+        .aux-row {
+            display: none;
+        }
+
+
+        .history-drawer {
+            position: fixed;
+            top: 0;
+            right: 0;
+            height: 100vh;
+            width: min(88vw, 360px);
+            background: rgba(255, 255, 255, 0.96);
+            border-left: 1px solid rgba(139, 0, 0, 0.26);
+            backdrop-filter: blur(16px);
+            transform: translateX(100%);
+            transition: transform 0.33s ease;
+            z-index: 50;
+            display: flex;
+            flex-direction: column;
+            padding: 1rem;
+        }
+
+        .history-drawer.open {
+            transform: translateX(0);
+        }
+
+        .drawer-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 0.65rem;
+        }
+
+        .drawer-head h3 {
+            margin: 0;
+            font-family: "Playfair Display", serif;
+            font-size: 1.25rem;
+        }
+
+        .drawer-head button {
+            border: none;
+            border-radius: 8px;
+            width: 34px;
+            height: 34px;
+            background: rgba(0, 0, 0, 0.06);
+            color: #22242a;
+            cursor: pointer;
+        }
+
+        .history-list {
+            margin: 0;
+            padding: 0;
+            list-style: none;
+            display: grid;
+            gap: 0.6rem;
+            overflow: auto;
+        }
+
+        .history-item {
+            border: 1px solid rgba(0, 0, 0, 0.12);
+            background: rgba(255, 255, 255, 0.88);
+            border-radius: 11px;
+            padding: 0.65rem;
+            font-size: 0.8rem;
+            line-height: 1.45;
+        }
+
+        .badge {
+            display: inline-block;
+            margin-top: 0.4rem;
+            font-size: 0.69rem;
+            border-radius: 999px;
+            padding: 0.2rem 0.5rem;
+            border: 1px solid rgba(0, 0, 0, 0.2);
+        }
+
+        .badge.connected,
+        .badge.completed {
+            color: #6d520f;
+            border-color: rgba(212, 175, 55, 0.58);
+            background: rgba(212, 175, 55, 0.2);
+        }
+
+        .badge.missed,
+        .badge.error {
+            color: #7d1212;
+            border-color: rgba(139, 0, 0, 0.52);
+            background: rgba(139, 0, 0, 0.12);
+        }
+
+        .drawer-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.2);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+            z-index: 45;
+        }
+
+        .drawer-overlay.show {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+
+        @keyframes gradientShift {
+            0% {
+                transform: translate3d(-2%, 0, 0) rotate(0deg);
+            }
+
+            100% {
+                transform: translate3d(2%, -1.5%, 0) rotate(7deg);
+            }
+        }
+
+        @keyframes gradientDrift {
+            0% {
+                transform: translate3d(0, 0, 0) scale(1);
+            }
+
+            50% {
+                transform: translate3d(-2.5%, 1.2%, 0) scale(1.03);
+            }
+
+            100% {
+                transform: translate3d(0, 0, 0) scale(1);
+            }
+        }
+
+        @keyframes wave {
+
+            0%,
+            100% {
+                transform: scaleY(0.45);
+            }
+
+            50% {
+                transform: scaleY(1);
+            }
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        @keyframes btnGlow {
+            0% {
+                background-position: 0% 50%;
+            }
+
+            100% {
+                background-position: 100% 50%;
+            }
+        }
+
+
+        @keyframes sparkleMove {
+            0% {
+                transform: translateY(0);
+            }
+
+            100% {
+                transform: translateY(-40px);
+            }
+        }
+
+        @keyframes placeholderGlow {
+
+            0%,
+            100% {
+                color: rgba(80, 81, 88, 0.75);
+                box-shadow: 0 18px 40px rgba(0, 0, 0, 0.12);
+            }
+
+            50% {
+                color: rgba(80, 81, 88, 0.95);
+                box-shadow: 0 22px 46px rgba(0, 0, 0, 0.16);
+            }
+        }
+
+        @keyframes typing {
+            0% {
+                width: 0;
+            }
+
+            60% {
+                width: 34ch;
+            }
+
+            100% {
+                width: 34ch;
+            }
+        }
+
+        @keyframes caretBlink {
+
+            0%,
+            100% {
+                border-color: transparent;
+            }
+
+            50% {
+                border-color: rgba(80, 81, 88, 0.75);
+            }
+        }
+
+        @media (max-width: 1100px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+                gap: 1.2rem;
+                padding-left: 1.25rem;
+                padding-right: 1.25rem;
+            }
+
+            .left-zone {
+                min-height: auto;
+                padding-bottom: 0;
+            }
+
+            .left-placeholder,
+            .call-card {
+                width: 100%;
+                max-width: 640px;
+            }
+
+            .right-zone {
+                padding-top: 0;
+                padding-bottom: 1rem;
+            }
+        }
+
+        @media (max-width: 760px) {
+            :root {
+                --nav-height: 68px;
+            }
+
+            .top-nav {
+                padding: 0 0.85rem;
+            }
+
+            .brand-logo {
+                height: 38px;
+            }
+
+
+            .call-card {
+                padding: 1.15rem;
+                border-radius: 16px;
+            }
+
+            .left-placeholder {
+                min-height: 260px;
+                border-radius: 16px;
+                padding: 1.1rem;
+            }
+
+            .typing-text {
+                font-size: 1.05rem;
+                white-space: normal;
+                border-right: none;
+                animation: none;
+            }
+
+            .call-card:hover {
+                box-shadow: 0 18px 40px rgba(0, 0, 0, 0.16);
+            }
+        }
+
+        @media (max-width: 520px) {
+            .dashboard {
+                padding-left: 0.9rem;
+                padding-right: 0.9rem;
+            }
+
+            .call-btn {
+                width: 100%;
+            }
+
+            .card-tag {
+                font-size: 0.68rem;
+            }
+
+        }
+    </style>
+</head>
+
+<body>
+    <div class="sparkles"></div>
+
+    <nav class="top-nav">
+        <div class="brand">
+            <img src="/senco.png" alt="Senco Gold and Diamonds" class="brand-logo">
+        </div>
+        <div class="brand">
+            <img src="/atc.png" alt="Adamas Tech" class="brand-logo">
+        </div>
+    </nav>
+
+    <main class="dashboard">
+        <section class="right-zone">
+            <div class="call-card" id="callCard">
+                <span class="card-tag">Outbound Calling Assistant</span>
+                <h2>Start AI-Assisted Call</h2>
+                <p class="subtitle">Call Customer with AI through a polished outbound workflow built for precision and
+                    trust.</p>
+
+                <form class="call-form" id="callForm" novalidate>
+                    <div class="field">
+                        <input id="userName" name="userName" type="text" placeholder=" " autocomplete="name" required>
+                        <label for="userName">Customer Name</label>
+                        <div class="error-line" id="nameError"></div>
+                    </div>
+
+                    <div class="field">
+                        <input id="phoneNumber" name="phoneNumber" type="tel" placeholder=" " inputmode="numeric"
+                            autocomplete="tel" required>
+                        <label for="phoneNumber">Phone Number</label>
+                        <div class="error-line" id="phoneError"></div>
+                    </div>
+
+                    <div class="action-row">
+                        <button class="call-btn state-idle" id="callBtn" type="submit">
+                            <span class="btn-text">DISPATCH AGENT</span>
+                            <span class="spinner" aria-hidden="true"></span>
+                            <span class="btn-wave" aria-hidden="true"><span></span><span></span><span></span></span>
+                            <span class="checkmark" aria-hidden="true">&#10003;</span>
+                        </button>
+                    </div>
+                </form>
+
+            </div>
+        </section>
+        <section class="left-zone">
+            <div class="left-placeholder" id="voiceOrb">
+                <span class="typing-text">Call logs will be displayed here soon.....</span>
+            </div>
+        </section>
+    </main>
+
+    <aside class="history-drawer" id="historyDrawer" aria-hidden="true">
+        <div class="drawer-head">
+            <h3>Call History</h3>
+            <button type="button" id="closeDrawerBtn" aria-label="Close history">x</button>
+        </div>
+        <ul class="history-list" id="historyList">
+            <li class="history-item">
+                Riya Sen - 21 Apr, 10:12 AM
+                <div><span class="badge connected">Connected</span></div>
+            </li>
+            <li class="history-item">
+                S. Mukherjee - 20 Apr, 04:40 PM
+                <div><span class="badge completed">Completed</span></div>
+            </li>
+            <li class="history-item">
+                A. Chatterjee - 20 Apr, 03:05 PM
+                <div><span class="badge missed">Missed</span></div>
+            </li>
+        </ul>
+    </aside>
+    <div class="drawer-overlay" id="drawerOverlay"></div>
+
+    <script>
+        const BACKEND_URL = "/trigger-call";
+
+        const callForm = document.getElementById("callForm");
+        const callBtn = document.getElementById("callBtn");
+        const btnText = callBtn.querySelector(".btn-text");
+        const userNameInput = document.getElementById("userName");
+        const phoneInput = document.getElementById("phoneNumber");
+        const nameError = document.getElementById("nameError");
+        const phoneError = document.getElementById("phoneError");
+
+        const closeDrawerBtn = document.getElementById("closeDrawerBtn");
+        const drawer = document.getElementById("historyDrawer");
+        const drawerOverlay = document.getElementById("drawerOverlay");
+        const historyList = document.getElementById("historyList");
+
+        let isCallActive = false;
+        function setCallDisabled(isDisabled) {
+            callBtn.disabled = isDisabled;
+        }
+
+        function cleanPhone(value) {
+            const digits = value.replace(/\D/g, "");
+            return digits.slice(-10);
+        }
+
+        function formatPhoneInput(value) {
+            const digits = cleanPhone(value);
+            if (digits.length <= 5) {
+                return digits;
+            }
+            return `${digits.slice(0, 5)} ${digits.slice(5)}`;
+        }
+
+        phoneInput.addEventListener("input", () => {
+            phoneInput.value = formatPhoneInput(phoneInput.value);
+            phoneError.textContent = "";
+        });
+
+        userNameInput.addEventListener("input", () => {
+            nameError.textContent = "";
+        });
+
+        function validateInputs() {
+            const userName = userNameInput.value.trim();
+            const rawDigits = phoneInput.value.replace(/\D/g, "");
+            const digits = rawDigits.length > 10 ? rawDigits.slice(-10) : rawDigits;
+            let valid = true;
+
+            nameError.textContent = "";
+            phoneError.textContent = "";
+
+            if (!userName) {
+                nameError.textContent = "Please enter customer name.";
+                valid = false;
+            }
+
+            if (!/^\d{10}$/.test(digits)) {
+                phoneError.textContent = "Enter a valid 10-digit phone number.";
+                valid = false;
+            } else {
+                phoneInput.value = formatPhoneInput(digits);
+            }
+
+            return {
+                valid,
+                userName,
+                phoneDigits: digits,
+            };
+        }
+
+        function addHistoryItem(name, phone, status) {
+            const li = document.createElement("li");
+            li.className = "history-item";
+            const stamp = new Date().toLocaleString("en-IN", {
+                day: "2-digit",
+                month: "short",
+                hour: "2-digit",
+                minute: "2-digit",
+            });
+            const badgeClass = status === "Completed" ? "completed" : status === "Connected" ? "connected" : "error";
+            li.innerHTML = `${name} - ${phone}<br>${stamp}<div><span class="badge ${badgeClass}">${status}</span></div>`;
+            historyList.prepend(li);
+        }
+
+        async function triggerBackendCall(name, phoneDigits) {
+            try {
+                const response = await fetch(BACKEND_URL, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        user_name: name,
+                        phone_number: phoneDigits,
+                    }),
+                });
+
+                let payload = {};
+                try {
+                    payload = await response.json();
+                } catch (jsonErr) {
+                    payload = {};
+                }
+
+                if (!response.ok) {
+                    return {
+                        ok: false,
+                        message: payload.message || "Failed to queue outbound call.",
+                    };
+                }
+
+                return {
+                    ok: true,
+                    message: payload.message || "Call queued.",
+                };
+            } catch (error) {
+                return {
+                    ok: false,
+                    message: "Network error while reaching backend.",
+                };
+            }
+        }
+
+        async function simulateCallFlow(name, phoneDigits) {
+            if (isCallActive) {
+                return;
+            }
+
+            isCallActive = true;
+            setCallDisabled(true);
+
+            const backendResult = await triggerBackendCall(name, phoneDigits);
+
+            if (backendResult.ok) {
+                addHistoryItem(name, phoneDigits, "Completed");
+            } else {
+                addHistoryItem(name, phoneDigits, "Missed");
+            }
+
+            setCallDisabled(false);
+            isCallActive = false;
+        }
+
+        callForm.addEventListener("submit", async (event) => {
+            event.preventDefault();
+
+            const result = validateInputs();
+            if (!result.valid || isCallActive) {
+                return;
+            }
+
+            await simulateCallFlow(result.userName, result.phoneDigits);
+        });
+
+        function openDrawer() {
+            drawer.classList.add("open");
+            drawerOverlay.classList.add("show");
+            drawer.setAttribute("aria-hidden", "false");
+        }
+
+        function closeDrawer() {
+            drawer.classList.remove("open");
+            drawerOverlay.classList.remove("show");
+            drawer.setAttribute("aria-hidden", "true");
+        }
+
+        closeDrawerBtn.addEventListener("click", closeDrawer);
+        drawerOverlay.addEventListener("click", closeDrawer);
+
+        const callCard = document.getElementById("callCard");
+        callCard.addEventListener("mousemove", (event) => {
+            if (window.innerWidth < 1040) {
+                return;
+            }
+            const rect = callCard.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+            const rotateY = ((x / rect.width) - 0.5) * 6;
+            const rotateX = -((y / rect.height) - 0.5) * 6;
+            callCard.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+        });
+
+        callCard.addEventListener("mouseleave", () => {
+            callCard.style.transform = "perspective(1000px) rotateX(0deg) rotateY(0deg)";
+        });
+    </script>
+</body>
+
+</html>
