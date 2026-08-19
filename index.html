@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Senco AI Outbound Calling Dashboard</title>
+    <meta name="description" content="AI-powered outbound calling dashboard for Senco Gold and Diamonds. Dispatch and monitor voice agent calls in real-time.">
     <link rel="icon" href="favicon.png?v=1" type="image/png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -22,10 +23,6 @@
             --gold-light: #efd177;
             --text-primary: #17171a;
             --text-secondary: #505158;
-
-            --gold-accent: var(--gold-light);
-            --bg-dark: var(--bg-primary);
-            --bg-dark-soft: var(--bg-secondary);
             --text-muted: #66686f;
             --glass-bg: rgba(255, 255, 255, 0.84);
             --glass-border: rgba(0, 0, 0, 0.12);
@@ -34,15 +31,11 @@
             --nav-height: 76px;
         }
 
-        * {
-            box-sizing: border-box;
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
 
-        html,
-        body {
+        html, body {
             width: 100%;
             min-height: 100%;
-            margin: 0;
         }
 
         body {
@@ -99,6 +92,7 @@
             animation: sparkleMove 40s linear infinite;
         }
 
+        /* ─── Top Nav ─── */
         .top-nav {
             position: fixed;
             top: 0;
@@ -115,79 +109,255 @@
             z-index: 30;
         }
 
-        .brand {
-            display: flex;
-            align-items: center;
-            line-height: 0;
-        }
+        .brand { display: flex; align-items: center; line-height: 0; }
+        .brand-logo { display: block; height: 46px; width: auto; object-fit: contain; }
+        .top-nav .brand:last-child { margin-left: auto; }
 
-        .brand-logo {
-            display: block;
-            height: 46px;
-            width: auto;
-            object-fit: contain;
-        }
-
-        .top-nav .brand:last-child {
-            margin-left: auto;
-        }
-
+        /* ─── Dashboard Grid ─── */
         .dashboard {
             min-height: 100vh;
             display: grid;
-            grid-template-columns: 1.06fr 0.94fr;
-            gap: 2rem;
-            padding: calc(var(--nav-height) + 2rem) 2rem 2rem;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.8rem;
+            padding: calc(var(--nav-height) + 1.6rem) 1.8rem 1.8rem;
         }
 
-        .left-zone {
+        /* ─── Left: Live Feed ─── */
+        .feed-zone {
             display: flex;
             flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            text-align: center;
-            padding: 1.6rem;
+            gap: 1rem;
+            min-height: 0;
         }
 
-        .left-placeholder {
-            width: min(100%, 530px);
-            min-height: 420px;
-            background: rgba(255, 255, 255, 0.7);
-            border: 1px solid var(--glass-border);
-            border-radius: 20px;
-            box-shadow: 0 18px 40px rgba(0, 0, 0, 0.12);
+        .feed-header {
             display: flex;
             align-items: center;
-            justify-content: center;
-            text-align: center;
-            padding: 1.5rem;
-            color: var(--text-muted);
-            font-size: 1rem;
-            font-weight: 500;
-            letter-spacing: 0.01em;
-            animation: placeholderGlow 3.6s ease-in-out infinite;
+            justify-content: space-between;
         }
 
-        .typing-text {
-            display: inline-block;
-            white-space: nowrap;
-            overflow: hidden;
-            border-right: 2px solid rgba(80, 81, 88, 0.75);
+        .feed-header h2 {
             font-family: "Playfair Display", serif;
             font-size: 1.35rem;
-            font-weight: 700;
-            animation: typing 4s steps(34, end) infinite, caretBlink 0.8s step-end infinite;
+            font-weight: 600;
         }
 
-        .right-zone {
+        .active-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            border-radius: 999px;
+            padding: 0.28rem 0.75rem;
+            font-size: 0.72rem;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            color: #fff;
+            background: linear-gradient(135deg, var(--senco-red), var(--gold-primary));
+        }
+
+        .active-badge::before {
+            content: "";
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #39ff66;
+            box-shadow: 0 0 8px rgba(57, 255, 102, 0.7);
+            animation: pulse-dot 1.5s ease-in-out infinite;
+        }
+
+        .feed-scroll {
+            flex: 1;
+            overflow-y: auto;
             display: flex;
+            flex-direction: column;
+            gap: 0.8rem;
+            padding-right: 0.3rem;
+            max-height: calc(100vh - var(--nav-height) - 5rem);
+        }
+
+        .feed-scroll::-webkit-scrollbar { width: 5px; }
+        .feed-scroll::-webkit-scrollbar-track { background: transparent; }
+        .feed-scroll::-webkit-scrollbar-thumb { background: rgba(139, 0, 0, 0.2); border-radius: 10px; }
+
+        .feed-empty {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 320px;
+            background: rgba(255, 255, 255, 0.55);
+            border: 1px dashed rgba(0, 0, 0, 0.15);
+            border-radius: 16px;
+            color: var(--text-muted);
+            font-size: 0.92rem;
+            text-align: center;
+            padding: 2rem;
+            line-height: 1.7;
+        }
+
+        /* ─── Call Card (in feed) ─── */
+        .call-card-live {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 14px;
+            backdrop-filter: blur(14px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+            padding: 1rem 1.15rem;
+            animation: fadeSlideIn 0.35s ease-out;
+            transition: border-color 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .call-card-live.active {
+            border-color: rgba(212, 175, 55, 0.5);
+            box-shadow: 0 8px 24px rgba(212, 175, 55, 0.12);
+        }
+
+        .call-card-live.ended {
+            opacity: 0.72;
+        }
+
+        .call-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 0.6rem;
+        }
+
+        .call-card-name {
+            font-weight: 600;
+            font-size: 0.92rem;
+        }
+
+        .call-card-phone {
+            color: var(--text-muted);
+            font-size: 0.78rem;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .call-status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.32rem;
+            font-size: 0.68rem;
+            font-weight: 600;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+            padding: 0.2rem 0.6rem;
+            border-radius: 999px;
+            border: 1px solid transparent;
+            transition: all 0.25s ease;
+        }
+
+        .call-status-pill.queued {
+            color: var(--text-secondary);
+            border-color: rgba(0, 0, 0, 0.18);
+            background: rgba(0, 0, 0, 0.04);
+        }
+
+        .call-status-pill.ringing {
+            color: #9a6e00;
+            border-color: rgba(212, 175, 55, 0.45);
+            background: rgba(212, 175, 55, 0.12);
+        }
+
+        .call-status-pill.connected {
+            color: #1a6b3a;
+            border-color: rgba(39, 174, 96, 0.4);
+            background: rgba(39, 174, 96, 0.1);
+        }
+
+        .call-status-pill.ended {
+            color: #7d1212;
+            border-color: rgba(139, 0, 0, 0.35);
+            background: rgba(139, 0, 0, 0.08);
+        }
+
+        .call-status-pill.failed {
+            color: #7d1212;
+            border-color: rgba(139, 0, 0, 0.35);
+            background: rgba(139, 0, 0, 0.08);
+        }
+
+        /* ─── Timeline ─── */
+        .call-timeline {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+            padding-left: 0.15rem;
+        }
+
+        .timeline-event {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.55rem;
+            position: relative;
+            padding: 0.25rem 0;
+            animation: fadeSlideIn 0.25s ease-out;
+        }
+
+        .timeline-event:not(:last-child)::before {
+            content: "";
+            position: absolute;
+            left: 5px;
+            top: 18px;
+            bottom: -2px;
+            width: 1px;
+            background: rgba(0, 0, 0, 0.1);
+        }
+
+        .timeline-dot {
+            width: 11px;
+            height: 11px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            margin-top: 3px;
+            border: 2px solid;
+        }
+
+        .timeline-dot.queued { border-color: #aaa; background: #ddd; }
+        .timeline-dot.ringing { border-color: #c9a227; background: #efd177; animation: pulse-dot 1.2s ease-in-out infinite; }
+        .timeline-dot.connected { border-color: #27ae60; background: #6edd9a; }
+        .timeline-dot.user { border-color: #6c5ce7; background: #a29bfe; }
+        .timeline-dot.ai { border-color: #0984e3; background: #74b9ff; }
+        .timeline-dot.tool { border-color: #e17055; background: #fab1a0; }
+        .timeline-dot.transfer { border-color: #fdcb6e; background: #ffeaa7; }
+        .timeline-dot.ended { border-color: #8b0000; background: #c0392b; }
+        .timeline-dot.failed { border-color: #8b0000; background: #c0392b; }
+        .timeline-dot.transcript { border-color: #636e72; background: #b2bec3; }
+
+        .timeline-text {
+            font-size: 0.77rem;
+            line-height: 1.4;
+            color: var(--text-secondary);
+        }
+
+        .timeline-text .time {
+            color: var(--text-muted);
+            font-size: 0.68rem;
+            margin-left: 0.35rem;
+        }
+
+        .timeline-text .transcript-quote {
+            display: block;
+            margin-top: 0.15rem;
+            font-style: italic;
+            color: var(--text-muted);
+            font-size: 0.73rem;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        /* ─── Right: Form Card ─── */
+        .form-zone {
+            display: flex;
+            flex-direction: column;
             justify-content: center;
             align-items: center;
             padding: 0.6rem;
         }
 
         .call-card {
-            width: min(100%, 530px);
+            width: min(100%, 490px);
             background: var(--glass-bg);
             border: 1px solid var(--glass-border);
             border-radius: 20px;
@@ -246,9 +416,7 @@
             gap: 1.05rem;
         }
 
-        .field {
-            position: relative;
-        }
+        .field { position: relative; }
 
         .field input {
             width: 100%;
@@ -259,13 +427,12 @@
             height: 56px;
             padding: 0 0.95rem;
             font-size: 0.95rem;
+            font-family: inherit;
             outline: none;
             transition: border-color 0.25s ease, box-shadow 0.25s ease;
         }
 
-        .field input::placeholder {
-            color: transparent;
-        }
+        .field input::placeholder { color: transparent; }
 
         .field label {
             position: absolute;
@@ -301,10 +468,7 @@
             color: var(--danger);
         }
 
-        .action-row {
-            display: grid;
-            gap: 0.7rem;
-        }
+        .action-row { display: grid; gap: 0.7rem; }
 
         .call-btn {
             position: relative;
@@ -315,6 +479,7 @@
             color: #fff7ef;
             font-weight: 600;
             font-size: 0.96rem;
+            font-family: inherit;
             background: linear-gradient(135deg, #8b0000, #b30000);
             background-size: 220% 220%;
             cursor: pointer;
@@ -336,31 +501,12 @@
             transition: left 0.6s ease;
         }
 
-        .call-btn:hover {
-            transform: translateY(-1px) scale(1.01);
-            filter: brightness(1.03);
-            animation: btnGlow 2s linear infinite;
-        }
+        .call-btn:hover { transform: translateY(-1px) scale(1.01); filter: brightness(1.03); }
+        .call-btn:hover::before { left: 170%; }
+        .call-btn:active { transform: scale(0.985); }
+        .call-btn:disabled { cursor: not-allowed; filter: grayscale(0.12) brightness(0.86); transform: none; }
 
-        .call-btn:hover::before {
-            left: 170%;
-        }
-
-        .call-btn:active {
-            transform: scale(0.985);
-        }
-
-        .call-btn:disabled {
-            cursor: not-allowed;
-            filter: grayscale(0.12) brightness(0.86);
-            transform: none;
-        }
-
-        .spinner,
-        .checkmark,
-        .btn-wave {
-            display: none;
-        }
+        .spinner, .checkmark { display: none; }
 
         .spinner {
             width: 16px;
@@ -371,258 +517,71 @@
             animation: spin 0.85s linear infinite;
         }
 
-        .btn-wave {
-            align-items: flex-end;
-            gap: 3px;
-            height: 14px;
-        }
+        .call-btn.state-loading .spinner { display: inline-flex; }
+        .call-btn.state-loading .btn-text { display: none; }
 
-        .btn-wave span {
-            width: 3px;
-            border-radius: 3px;
-            background: #ffd37c;
-            animation: wave 1s ease-in-out infinite;
-        }
-
-        .btn-wave span:nth-child(1) {
-            height: 5px;
-        }
-
-        .btn-wave span:nth-child(2) {
-            height: 11px;
-            animation-delay: 0.15s;
-        }
-
-        .btn-wave span:nth-child(3) {
-            height: 8px;
-            animation-delay: 0.3s;
-        }
-
-        .checkmark {
-            font-weight: 700;
-            font-size: 0.95rem;
-        }
-
-        .call-btn.state-loading .spinner,
-        .call-btn.state-active .btn-wave,
-        .call-btn.state-completed .checkmark {
-            display: inline-flex;
-        }
-
-        .call-btn.state-active {
-            background: linear-gradient(135deg, #8b0000, #d4af37);
-            color: #fff6e8;
-        }
-
-        .aux-row {
-            display: none;
-        }
-
-
-        .history-drawer {
+        /* ─── SSE Connection Indicator ─── */
+        .sse-status {
             position: fixed;
-            top: 0;
-            right: 0;
-            height: 100vh;
-            width: min(88vw, 360px);
-            background: rgba(255, 255, 255, 0.96);
-            border-left: 1px solid rgba(139, 0, 0, 0.26);
-            backdrop-filter: blur(16px);
-            transform: translateX(100%);
-            transition: transform 0.33s ease;
-            z-index: 50;
-            display: flex;
-            flex-direction: column;
-            padding: 1rem;
-        }
-
-        .history-drawer.open {
-            transform: translateX(0);
-        }
-
-        .drawer-head {
+            bottom: 1rem;
+            right: 1rem;
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            margin-bottom: 0.65rem;
-        }
-
-        .drawer-head h3 {
-            margin: 0;
-            font-family: "Playfair Display", serif;
-            font-size: 1.25rem;
-        }
-
-        .drawer-head button {
-            border: none;
-            border-radius: 8px;
-            width: 34px;
-            height: 34px;
-            background: rgba(0, 0, 0, 0.06);
-            color: #22242a;
-            cursor: pointer;
-        }
-
-        .history-list {
-            margin: 0;
-            padding: 0;
-            list-style: none;
-            display: grid;
-            gap: 0.6rem;
-            overflow: auto;
-        }
-
-        .history-item {
-            border: 1px solid rgba(0, 0, 0, 0.12);
-            background: rgba(255, 255, 255, 0.88);
-            border-radius: 11px;
-            padding: 0.65rem;
-            font-size: 0.8rem;
-            line-height: 1.45;
-        }
-
-        .badge {
-            display: inline-block;
-            margin-top: 0.4rem;
-            font-size: 0.69rem;
+            gap: 0.4rem;
+            padding: 0.3rem 0.7rem;
             border-radius: 999px;
-            padding: 0.2rem 0.5rem;
-            border: 1px solid rgba(0, 0, 0, 0.2);
+            font-size: 0.66rem;
+            font-weight: 500;
+            letter-spacing: 0.03em;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0,0,0,0.1);
+            background: rgba(255,255,255,0.8);
+            color: var(--text-muted);
+            z-index: 20;
+            transition: all 0.3s ease;
         }
 
-        .badge.connected,
-        .badge.completed {
-            color: #6d520f;
-            border-color: rgba(212, 175, 55, 0.58);
-            background: rgba(212, 175, 55, 0.2);
+        .sse-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #aaa;
+            transition: background 0.3s ease;
         }
 
-        .badge.missed,
-        .badge.error {
-            color: #7d1212;
-            border-color: rgba(139, 0, 0, 0.52);
-            background: rgba(139, 0, 0, 0.12);
-        }
+        .sse-status.connected .sse-dot { background: #27ae60; box-shadow: 0 0 6px rgba(39,174,96,0.5); }
+        .sse-status.error .sse-dot { background: #c0392b; }
 
-        .drawer-overlay {
-            position: fixed;
-            inset: 0;
-            background: rgba(0, 0, 0, 0.2);
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.3s ease;
-            z-index: 45;
-        }
-
-        .drawer-overlay.show {
-            opacity: 1;
-            pointer-events: auto;
-        }
-
-
+        /* ─── Animations ─── */
         @keyframes gradientShift {
-            0% {
-                transform: translate3d(-2%, 0, 0) rotate(0deg);
-            }
-
-            100% {
-                transform: translate3d(2%, -1.5%, 0) rotate(7deg);
-            }
+            0% { transform: translate3d(-2%, 0, 0) rotate(0deg); }
+            100% { transform: translate3d(2%, -1.5%, 0) rotate(7deg); }
         }
 
         @keyframes gradientDrift {
-            0% {
-                transform: translate3d(0, 0, 0) scale(1);
-            }
-
-            50% {
-                transform: translate3d(-2.5%, 1.2%, 0) scale(1.03);
-            }
-
-            100% {
-                transform: translate3d(0, 0, 0) scale(1);
-            }
+            0% { transform: translate3d(0, 0, 0) scale(1); }
+            50% { transform: translate3d(-2.5%, 1.2%, 0) scale(1.03); }
+            100% { transform: translate3d(0, 0, 0) scale(1); }
         }
 
-        @keyframes wave {
-
-            0%,
-            100% {
-                transform: scaleY(0.45);
-            }
-
-            50% {
-                transform: scaleY(1);
-            }
-        }
-
-        @keyframes spin {
-            to {
-                transform: rotate(360deg);
-            }
-        }
-
-        @keyframes btnGlow {
-            0% {
-                background-position: 0% 50%;
-            }
-
-            100% {
-                background-position: 100% 50%;
-            }
-        }
-
+        @keyframes spin { to { transform: rotate(360deg); } }
 
         @keyframes sparkleMove {
-            0% {
-                transform: translateY(0);
-            }
-
-            100% {
-                transform: translateY(-40px);
-            }
+            0% { transform: translateY(0); }
+            100% { transform: translateY(-40px); }
         }
 
-        @keyframes placeholderGlow {
-
-            0%,
-            100% {
-                color: rgba(80, 81, 88, 0.75);
-                box-shadow: 0 18px 40px rgba(0, 0, 0, 0.12);
-            }
-
-            50% {
-                color: rgba(80, 81, 88, 0.95);
-                box-shadow: 0 22px 46px rgba(0, 0, 0, 0.16);
-            }
+        @keyframes fadeSlideIn {
+            0% { opacity: 0; transform: translateY(6px); }
+            100% { opacity: 1; transform: translateY(0); }
         }
 
-        @keyframes typing {
-            0% {
-                width: 0;
-            }
-
-            60% {
-                width: 34ch;
-            }
-
-            100% {
-                width: 34ch;
-            }
+        @keyframes pulse-dot {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.4); opacity: 0.7; }
         }
 
-        @keyframes caretBlink {
-
-            0%,
-            100% {
-                border-color: transparent;
-            }
-
-            50% {
-                border-color: rgba(80, 81, 88, 0.75);
-            }
-        }
-
+        /* ─── Responsive ─── */
         @media (max-width: 1100px) {
             .dashboard {
                 grid-template-columns: 1fr;
@@ -631,74 +590,23 @@
                 padding-right: 1.25rem;
             }
 
-            .left-zone {
-                min-height: auto;
-                padding-bottom: 0;
-            }
+            .form-zone { order: -1; }
 
-            .left-placeholder,
-            .call-card {
-                width: 100%;
-                max-width: 640px;
-            }
+            .call-card { width: 100%; max-width: 640px; }
 
-            .right-zone {
-                padding-top: 0;
-                padding-bottom: 1rem;
-            }
+            .feed-scroll { max-height: 50vh; }
         }
 
         @media (max-width: 760px) {
-            :root {
-                --nav-height: 68px;
-            }
-
-            .top-nav {
-                padding: 0 0.85rem;
-            }
-
-            .brand-logo {
-                height: 38px;
-            }
-
-
-            .call-card {
-                padding: 1.15rem;
-                border-radius: 16px;
-            }
-
-            .left-placeholder {
-                min-height: 260px;
-                border-radius: 16px;
-                padding: 1.1rem;
-            }
-
-            .typing-text {
-                font-size: 1.05rem;
-                white-space: normal;
-                border-right: none;
-                animation: none;
-            }
-
-            .call-card:hover {
-                box-shadow: 0 18px 40px rgba(0, 0, 0, 0.16);
-            }
+            :root { --nav-height: 68px; }
+            .top-nav { padding: 0 0.85rem; }
+            .brand-logo { height: 38px; }
+            .call-card { padding: 1.15rem; border-radius: 16px; }
         }
 
         @media (max-width: 520px) {
-            .dashboard {
-                padding-left: 0.9rem;
-                padding-right: 0.9rem;
-            }
-
-            .call-btn {
-                width: 100%;
-            }
-
-            .card-tag {
-                font-size: 0.68rem;
-            }
-
+            .dashboard { padding-left: 0.9rem; padding-right: 0.9rem; }
+            .call-btn { width: 100%; }
         }
     </style>
 </head>
@@ -716,12 +624,30 @@
     </nav>
 
     <main class="dashboard">
-        <section class="right-zone">
+        <!-- Left: Live Call Feed -->
+        <section class="feed-zone">
+            <div class="feed-header">
+                <h2>Live Call Feed</h2>
+                <span class="active-badge" id="activeBadge" style="display: none;">
+                    <span id="activeCount">0</span> Active
+                </span>
+            </div>
+            <div class="feed-scroll" id="feedScroll">
+                <div class="feed-empty" id="feedEmpty">
+                    <div>
+                        <div style="font-size: 2rem; margin-bottom: 0.5rem;">📞</div>
+                        <div>No calls dispatched yet.<br>Use the form to start an AI-assisted call.</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Right: Dispatch Form -->
+        <section class="form-zone">
             <div class="call-card" id="callCard">
                 <span class="card-tag">Outbound Calling Assistant</span>
                 <h2>Start AI-Assisted Call</h2>
-                <p class="subtitle">Call Customer with AI through a polished outbound workflow built for precision and
-                    trust.</p>
+                <p class="subtitle">Call customers with an AI voice agent. Monitor live events in real-time.</p>
 
                 <form class="call-form" id="callForm" novalidate>
                     <div class="field">
@@ -741,46 +667,25 @@
                         <button class="call-btn state-idle" id="callBtn" type="submit">
                             <span class="btn-text">DISPATCH AGENT</span>
                             <span class="spinner" aria-hidden="true"></span>
-                            <span class="btn-wave" aria-hidden="true"><span></span><span></span><span></span></span>
-                            <span class="checkmark" aria-hidden="true">&#10003;</span>
                         </button>
                     </div>
                 </form>
-
-            </div>
-        </section>
-        <section class="left-zone">
-            <div class="left-placeholder" id="voiceOrb">
-                <span class="typing-text">Call logs will be displayed here soon.....</span>
             </div>
         </section>
     </main>
 
-    <aside class="history-drawer" id="historyDrawer" aria-hidden="true">
-        <div class="drawer-head">
-            <h3>Call History</h3>
-            <button type="button" id="closeDrawerBtn" aria-label="Close history">x</button>
-        </div>
-        <ul class="history-list" id="historyList">
-            <li class="history-item">
-                Riya Sen - 21 Apr, 10:12 AM
-                <div><span class="badge connected">Connected</span></div>
-            </li>
-            <li class="history-item">
-                S. Mukherjee - 20 Apr, 04:40 PM
-                <div><span class="badge completed">Completed</span></div>
-            </li>
-            <li class="history-item">
-                A. Chatterjee - 20 Apr, 03:05 PM
-                <div><span class="badge missed">Missed</span></div>
-            </li>
-        </ul>
-    </aside>
-    <div class="drawer-overlay" id="drawerOverlay"></div>
+    <!-- SSE Connection Indicator -->
+    <div class="sse-status" id="sseStatus">
+        <span class="sse-dot"></span>
+        <span id="sseLabel">Connecting…</span>
+    </div>
 
     <script>
-        const BACKEND_URL = "/trigger-call";
+        // ─── State ───
+        const activeCalls = new Map();   // call_id → { name, phone, element, status, startTime }
+        let activeCount = 0;
 
+        // ─── DOM Refs ───
         const callForm = document.getElementById("callForm");
         const callBtn = document.getElementById("callBtn");
         const btnText = callBtn.querySelector(".btn-text");
@@ -788,17 +693,14 @@
         const phoneInput = document.getElementById("phoneNumber");
         const nameError = document.getElementById("nameError");
         const phoneError = document.getElementById("phoneError");
+        const feedScroll = document.getElementById("feedScroll");
+        const feedEmpty = document.getElementById("feedEmpty");
+        const activeBadge = document.getElementById("activeBadge");
+        const activeCountEl = document.getElementById("activeCount");
+        const sseStatus = document.getElementById("sseStatus");
+        const sseLabel = document.getElementById("sseLabel");
 
-        const closeDrawerBtn = document.getElementById("closeDrawerBtn");
-        const drawer = document.getElementById("historyDrawer");
-        const drawerOverlay = document.getElementById("drawerOverlay");
-        const historyList = document.getElementById("historyList");
-
-        let isCallActive = false;
-        function setCallDisabled(isDisabled) {
-            callBtn.disabled = isDisabled;
-        }
-
+        // ─── Helpers ───
         function cleanPhone(value) {
             const digits = value.replace(/\D/g, "");
             return digits.slice(-10);
@@ -806,10 +708,13 @@
 
         function formatPhoneInput(value) {
             const digits = cleanPhone(value);
-            if (digits.length <= 5) {
-                return digits;
-            }
+            if (digits.length <= 5) return digits;
             return `${digits.slice(0, 5)} ${digits.slice(5)}`;
+        }
+
+        function formatPhone(digits) {
+            if (digits.length === 10) return `${digits.slice(0, 5)} ${digits.slice(5)}`;
+            return digits;
         }
 
         phoneInput.addEventListener("input", () => {
@@ -817,9 +722,7 @@
             phoneError.textContent = "";
         });
 
-        userNameInput.addEventListener("input", () => {
-            nameError.textContent = "";
-        });
+        userNameInput.addEventListener("input", () => { nameError.textContent = ""; });
 
         function validateInputs() {
             const userName = userNameInput.value.trim();
@@ -830,129 +733,312 @@
             nameError.textContent = "";
             phoneError.textContent = "";
 
-            if (!userName) {
-                nameError.textContent = "Please enter customer name.";
-                valid = false;
-            }
+            if (!userName) { nameError.textContent = "Please enter customer name."; valid = false; }
+            if (!/^\d{10}$/.test(digits)) { phoneError.textContent = "Enter a valid 10-digit phone number."; valid = false; }
+            else { phoneInput.value = formatPhoneInput(digits); }
 
-            if (!/^\d{10}$/.test(digits)) {
-                phoneError.textContent = "Enter a valid 10-digit phone number.";
-                valid = false;
-            } else {
-                phoneInput.value = formatPhoneInput(digits);
-            }
+            return { valid, userName, phoneDigits: digits };
+        }
 
-            return {
-                valid,
-                userName,
-                phoneDigits: digits,
+        function updateActiveCount() {
+            activeCount = 0;
+            activeCalls.forEach(c => { if (c.status !== "ended" && c.status !== "failed") activeCount++; });
+            activeCountEl.textContent = activeCount;
+            activeBadge.style.display = activeCount > 0 ? "inline-flex" : "none";
+        }
+
+        // ─── Event Icons & Labels ───
+        const EVENT_CONFIG = {
+            call_queued:     { icon: "📤", label: "Call queued",           dot: "queued" },
+            call_failed:     { icon: "❌", label: "Call failed",           dot: "failed" },
+            call_ringing:    { icon: "🔔", label: "Ringing…",             dot: "ringing" },
+            call_connected:  { icon: "✅", label: "Connected — Live",     dot: "connected" },
+            user_speaking:   { icon: "🎤", label: "User speaking",        dot: "user" },
+            user_silent:     { icon: "🔇", label: "User stopped speaking",dot: "user" },
+            ai_speaking:     { icon: "🤖", label: "AI responding",        dot: "ai" },
+            ai_done:         { icon: "🤖", label: "AI finished speaking", dot: "ai" },
+            tool_called:     { icon: "🔧", label: "Tool: ",               dot: "tool" },
+            transfer_started:{ icon: "🔀", label: "Transferring to human",dot: "transfer" },
+            call_ended:      { icon: "📴", label: "Call ended",            dot: "ended" },
+            user_transcript: { icon: "🗣️", label: "User said:",          dot: "transcript" },
+            ai_transcript:   { icon: "💬", label: "AI said:",             dot: "transcript" },
+        };
+
+        // ─── Create Call Card ───
+        function getOrCreateCallCard(callId, name, phone) {
+            if (activeCalls.has(callId)) return activeCalls.get(callId);
+
+            feedEmpty.style.display = "none";
+
+            const card = document.createElement("div");
+            card.className = "call-card-live active";
+            card.id = `call-${callId}`;
+
+            const displayPhone = formatPhone(phone || "");
+
+            card.innerHTML = `
+                <div class="call-card-header">
+                    <div>
+                        <span class="call-card-name">${escapeHtml(name || "Unknown")}</span>
+                        <span class="call-card-phone">&nbsp;·&nbsp;${escapeHtml(displayPhone)}</span>
+                    </div>
+                    <span class="call-status-pill queued" id="pill-${callId}">Queued</span>
+                </div>
+                <div class="call-timeline" id="timeline-${callId}"></div>
+            `;
+
+            feedScroll.prepend(card);
+
+            const callData = {
+                name: name || "Unknown",
+                phone: phone || "",
+                element: card,
+                status: "queued",
+                startTime: Date.now(),
             };
+            activeCalls.set(callId, callData);
+            updateActiveCount();
+
+            return callData;
         }
 
-        function addHistoryItem(name, phone, status) {
-            const li = document.createElement("li");
-            li.className = "history-item";
-            const stamp = new Date().toLocaleString("en-IN", {
-                day: "2-digit",
-                month: "short",
-                hour: "2-digit",
-                minute: "2-digit",
-            });
-            const badgeClass = status === "Completed" ? "completed" : status === "Connected" ? "connected" : "error";
-            li.innerHTML = `${name} - ${phone}<br>${stamp}<div><span class="badge ${badgeClass}">${status}</span></div>`;
-            historyList.prepend(li);
+        function escapeHtml(str) {
+            const d = document.createElement("div");
+            d.textContent = str;
+            return d.innerHTML;
         }
 
+        // ─── Append Timeline Event ───
+        function appendTimelineEvent(callId, eventType, data, timestamp) {
+            const config = EVENT_CONFIG[eventType];
+            if (!config) return;
+
+            const timeline = document.getElementById(`timeline-${callId}`);
+            if (!timeline) return;
+
+            let label = config.label;
+            let transcript = "";
+
+            if (eventType === "tool_called" && data.tool_name) {
+                label += data.tool_name;
+            }
+            if (eventType === "call_ended" && data.cost) {
+                label += ` — ${data.cost}`;
+                if (data.reason) label += ` — ${data.reason}`;
+            }
+            if (eventType === "call_failed" && data.error) {
+                label += ` — ${data.error}`;
+            }
+            if (eventType === "user_transcript" || eventType === "ai_transcript") {
+                transcript = data.text || "";
+            }
+
+            const ev = document.createElement("div");
+            ev.className = "timeline-event";
+            ev.innerHTML = `
+                <span class="timeline-dot ${config.dot}"></span>
+                <div class="timeline-text">
+                    ${config.icon} ${escapeHtml(label)}
+                    <span class="time">${timestamp || ""}</span>
+                    ${transcript ? `<span class="transcript-quote">"${escapeHtml(transcript)}"</span>` : ""}
+                </div>
+            `;
+            timeline.appendChild(ev);
+
+            // Auto-scroll the feed if near bottom
+            const scroll = feedScroll;
+            const isNearBottom = scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight < 120;
+            if (isNearBottom) {
+                ev.scrollIntoView({ behavior: "smooth", block: "end" });
+            }
+        }
+
+        // ─── Update Status Pill ───
+        function updateStatusPill(callId, statusClass, label) {
+            const pill = document.getElementById(`pill-${callId}`);
+            if (!pill) return;
+            pill.className = `call-status-pill ${statusClass}`;
+            pill.textContent = label;
+        }
+
+        // ─── Handle SSE Event ───
+        function handleCallEvent(event) {
+            const callId = event.call_id;
+            const type = event.type;
+            const data = event.data || {};
+            const timestamp = event.timestamp || "";
+
+            // Ensure card exists (keyed by request_uuid for outbound)
+            if (type === "call_queued" || type === "call_failed") {
+                getOrCreateCallCard(callId || `tmp-${Date.now()}`, data.name, data.phone);
+            }
+
+            let callData = activeCalls.get(callId);
+            let effectiveId = callId;
+
+            if (!callData) {
+                // If Plivo emits a true callUuid, try to match it with the queued card by phone number
+                if (data.phone) {
+                    const entry = [...activeCalls.entries()].find(([k, v]) => v.phone === data.phone);
+                    if (entry) {
+                        effectiveId = entry[0];
+                        callData = entry[1];
+                        // Link the true callId to this card for future events
+                        activeCalls.set(callId, callData);
+                    }
+                }
+                
+                // Final fallback (for orphaned events)
+                if (!callData) {
+                    callData = activeCalls.get([...activeCalls.keys()].pop());
+                    effectiveId = callData ? [...activeCalls.entries()].find(([k, v]) => v === callData)?.[0] : null;
+                }
+            }
+
+            if (!effectiveId) return;
+
+            appendTimelineEvent(effectiveId, type, data, timestamp);
+
+            // Update status
+            switch (type) {
+                case "call_ringing":
+                    callData.status = "ringing";
+                    updateStatusPill(effectiveId, "ringing", "Ringing…");
+                    break;
+                case "call_connected":
+                    callData.status = "connected";
+                    updateStatusPill(effectiveId, "connected", "Connected");
+                    break;
+                case "user_speaking":
+                    if (callData.status !== "ended") {
+                        updateStatusPill(effectiveId, "connected", "User Speaking");
+                    }
+                    break;
+                case "ai_speaking":
+                    if (callData.status !== "ended") {
+                        updateStatusPill(effectiveId, "connected", "AI Speaking");
+                    }
+                    break;
+                case "ai_done":
+                case "user_silent":
+                    if (callData.status !== "ended") {
+                        updateStatusPill(effectiveId, "connected", "Connected");
+                    }
+                    break;
+                case "transfer_started":
+                    callData.status = "transfer";
+                    updateStatusPill(effectiveId, "ringing", "Transferring");
+                    break;
+                case "call_ended":
+                    callData.status = "ended";
+                    updateStatusPill(effectiveId, "ended", "Ended");
+                    callData.element.classList.remove("active");
+                    callData.element.classList.add("ended");
+                    break;
+                case "call_failed":
+                    callData.status = "failed";
+                    updateStatusPill(effectiveId, "failed", "Failed");
+                    callData.element.classList.remove("active");
+                    callData.element.classList.add("ended");
+                    break;
+            }
+
+            updateActiveCount();
+        }
+
+        // ─── SSE Connection ───
+        function connectSSE() {
+            const evtSource = new EventSource("/call-events");
+
+            evtSource.onopen = () => {
+                sseStatus.className = "sse-status connected";
+                sseLabel.textContent = "Live";
+            };
+
+            evtSource.onmessage = (e) => {
+                try {
+                    const event = JSON.parse(e.data);
+                    handleCallEvent(event);
+                } catch (err) {
+                    console.error("Failed to parse SSE event:", err);
+                }
+            };
+
+            evtSource.onerror = () => {
+                sseStatus.className = "sse-status error";
+                sseLabel.textContent = "Reconnecting…";
+            };
+
+            return evtSource;
+        }
+
+        connectSSE();
+
+        // ─── Form Submit ───
         async function triggerBackendCall(name, phoneDigits) {
             try {
-                const response = await fetch(BACKEND_URL, {
+                const response = await fetch("/trigger-call", {
                     method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({
-                        user_name: name,
-                        phone_number: phoneDigits,
-                    }),
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ user_name: name, phone_number: phoneDigits }),
                 });
 
                 let payload = {};
-                try {
-                    payload = await response.json();
-                } catch (jsonErr) {
-                    payload = {};
-                }
+                try { payload = await response.json(); } catch (e) { payload = {}; }
 
                 if (!response.ok) {
-                    return {
-                        ok: false,
-                        message: payload.message || "Failed to queue outbound call.",
-                    };
+                    return { ok: false, message: payload.message || "Failed to queue call.", callId: null };
                 }
 
-                return {
-                    ok: true,
-                    message: payload.message || "Call queued.",
-                };
+                return { ok: true, message: payload.message || "Call queued.", callId: payload.call_uuid || null };
             } catch (error) {
-                return {
-                    ok: false,
-                    message: "Network error while reaching backend.",
-                };
+                return { ok: false, message: "Network error.", callId: null };
             }
-        }
-
-        async function simulateCallFlow(name, phoneDigits) {
-            if (isCallActive) {
-                return;
-            }
-
-            isCallActive = true;
-            setCallDisabled(true);
-
-            const backendResult = await triggerBackendCall(name, phoneDigits);
-
-            if (backendResult.ok) {
-                addHistoryItem(name, phoneDigits, "Completed");
-            } else {
-                addHistoryItem(name, phoneDigits, "Missed");
-            }
-
-            setCallDisabled(false);
-            isCallActive = false;
         }
 
         callForm.addEventListener("submit", async (event) => {
             event.preventDefault();
-
             const result = validateInputs();
-            if (!result.valid || isCallActive) {
-                return;
+            if (!result.valid) return;
+
+            callBtn.classList.remove("state-idle");
+            callBtn.classList.add("state-loading");
+            callBtn.disabled = true;
+
+            const backendResult = await triggerBackendCall(result.userName, result.phoneDigits);
+
+            if (backendResult.ok && backendResult.callId) {
+                // The SSE stream will deliver the call_queued event and create the card
+                // But create it immediately as a fallback in case SSE hasn't connected yet
+                getOrCreateCallCard(backendResult.callId, result.userName, result.phoneDigits);
+            } else if (!backendResult.ok) {
+                // Create a failed card directly
+                const tmpId = `failed-${Date.now()}`;
+                getOrCreateCallCard(tmpId, result.userName, result.phoneDigits);
+                appendTimelineEvent(tmpId, "call_failed", { error: backendResult.message }, new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+                updateStatusPill(tmpId, "failed", "Failed");
+                const callData = activeCalls.get(tmpId);
+                if (callData) {
+                    callData.status = "failed";
+                    callData.element.classList.remove("active");
+                    callData.element.classList.add("ended");
+                }
+                updateActiveCount();
             }
 
-            await simulateCallFlow(result.userName, result.phoneDigits);
+            callBtn.classList.remove("state-loading");
+            callBtn.classList.add("state-idle");
+            callBtn.disabled = false;
+
+            // Clear form
+            userNameInput.value = "";
+            phoneInput.value = "";
         });
 
-        function openDrawer() {
-            drawer.classList.add("open");
-            drawerOverlay.classList.add("show");
-            drawer.setAttribute("aria-hidden", "false");
-        }
-
-        function closeDrawer() {
-            drawer.classList.remove("open");
-            drawerOverlay.classList.remove("show");
-            drawer.setAttribute("aria-hidden", "true");
-        }
-
-        closeDrawerBtn.addEventListener("click", closeDrawer);
-        drawerOverlay.addEventListener("click", closeDrawer);
-
+        // ─── 3D Tilt Effect ───
         const callCard = document.getElementById("callCard");
         callCard.addEventListener("mousemove", (event) => {
-            if (window.innerWidth < 1040) {
-                return;
-            }
+            if (window.innerWidth < 1040) return;
             const rect = callCard.getBoundingClientRect();
             const x = event.clientX - rect.left;
             const y = event.clientY - rect.top;
@@ -960,7 +1046,6 @@
             const rotateX = -((y / rect.height) - 0.5) * 6;
             callCard.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
         });
-
         callCard.addEventListener("mouseleave", () => {
             callCard.style.transform = "perspective(1000px) rotateX(0deg) rotateY(0deg)";
         });

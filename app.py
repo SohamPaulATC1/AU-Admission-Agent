@@ -12,6 +12,7 @@ import logging
 import audioop
 import time
 import wave
+import sqlite3
 from pyrnnoise import RNNoise
 import chromadb
 import numpy as np
@@ -69,9 +70,19 @@ GEMINI_MODEL = "gemini-live-2.5-flash-native-audio"
 PUBLIC_BASE_URL = os.getenv('PUBLIC_BASE_URL')
 HUMAN_TRANSFER_NUMBER = "+918335027643"
 PLIVO_PHONE_NUMBER = os.getenv('FROM_NUMBER')
-transfer_context_store = {}
 
 PORT = 8008
+
+PLIVO_START_TIMEOUT_SECONDS = float(os.getenv("PLIVO_START_TIMEOUT_SECONDS", "10"))
+GEMINI_CONNECT_TIMEOUT_SECONDS = float(os.getenv("GEMINI_CONNECT_TIMEOUT_SECONDS", "20"))
+MODEL_RESPONSE_TIMEOUT_SECONDS = float(os.getenv("MODEL_RESPONSE_TIMEOUT_SECONDS", "30"))
+MAX_CALL_DURATION_SECONDS = float(os.getenv("MAX_CALL_DURATION_SECONDS", "900"))
+SILENCE_FOLLOWUP_SECONDS = float(os.getenv("SILENCE_FOLLOWUP_SECONDS", "8"))
+MAX_SILENCE_FOLLOWUPS = int(os.getenv("MAX_SILENCE_FOLLOWUPS", "2"))
+TERMINAL_ACTION_TIMEOUT_SECONDS = float(os.getenv("TERMINAL_ACTION_TIMEOUT_SECONDS", "8"))
+
+TRANSFER_CONTEXT_DB_PATH = os.getenv("TRANSFER_CONTEXT_DB_PATH", "./transfer_context.sqlite3")
+TRANSFER_CONTEXT_TTL_SECONDS = int(os.getenv("TRANSFER_CONTEXT_TTL_SECONDS", "86400"))
 
 # Telephony / model audio formats
 PLIVO_SAMPLE_RATE = 8000
@@ -97,6 +108,63 @@ AGC_SMOOTHING_ALPHA = 0.08         # Slow alpha to prevent volume pumping
 
 with open("prompt.txt", "r", encoding="utf-8") as f:
     RAW_SYSTEM_PROMPT = f.read()
+
+
+def initialize_transfer_context_store():
+    with sqlite3.connect(TRANSFER_CONTEXT_DB_PATH, timeout=5) as conn:
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS transfer_context (
+                call_uuid TEXT PRIMARY KEY,
+                summary TEXT NOT NULL,
+                phone_number TEXT NOT NULL,
+                created_at REAL NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            "DELETE FROM transfer_context WHERE created_at < ?",
+            (time.time() - TRANSFER_CONTEXT_TTL_SECONDS,),
+        )
+
+
+def save_transfer_context(call_uuid, summary, phone_number):
+    with sqlite3.connect(TRANSFER_CONTEXT_DB_PATH, timeout=5) as conn:
+        conn.execute(
+            """
+            INSERT INTO transfer_context (call_uuid, summary, phone_number, created_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(call_uuid) DO UPDATE SET
+                summary = excluded.summary,
+                phone_number = excluded.phone_number,
+                created_at = excluded.created_at
+            """,
+            (call_uuid, summary, phone_number, time.time()),
+        )
+
+
+def load_transfer_context(call_uuid):
+    if not call_uuid:
+        return {}
+
+    with sqlite3.connect(TRANSFER_CONTEXT_DB_PATH, timeout=5) as conn:
+        row = conn.execute(
+            """
+            SELECT summary, phone_number
+            FROM transfer_context
+            WHERE call_uuid = ? AND created_at >= ?
+            """,
+            (call_uuid, time.time() - TRANSFER_CONTEXT_TTL_SECONDS),
+        ).fetchone()
+
+    if not row:
+        return {}
+
+    return {"summary": row[0], "phone_number": row[1]}
+
+
+initialize_transfer_context_store()
     
 def get_indian_time():
     ist = timezone(timedelta(hours=5, minutes=30))
@@ -207,7 +275,17 @@ def execute_transfer_call(summary: str):
 # Define the Function Declarations for the Gemini API
 end_call_tool = types.FunctionDeclaration(
     name="endCall",
-    description="Ends the call immediately when the user says goodbye or wants to end the conversation."
+    description="Ends the call when the user says goodbye or wants to end the conversation.",
+    parameters={
+        "type": "OBJECT",
+        "properties": {
+            "summary_of_whole_call": {
+                "type": "STRING",
+                "description": "A concise English summary of the complete call and its outcome."
+            }
+        },
+        "required": ["summary_of_whole_call"]
+    }
 )
 
 transfer_call_tool = types.FunctionDeclaration(
@@ -275,21 +353,51 @@ SILENCE_FOLLOWUP_PROMPT = (
     "Keep it short, natural, non-pushy, and context-aware."
 )
 
-async def silence_watchdog(session, call_state, delay=6.0):
+SILENCE_FAREWELL_PROMPT = (
+    "The user has been completely unresponsive after multiple follow-ups. "
+    "Please say a brief, polite farewell in the language you have been speaking "
+    "(e.g., 'It seems you are busy right now. I will end the call. Thank you and have a nice day!') "
+    "and then immediately call the endCall tool with a summary of the conversation."
+)
+
+async def silence_watchdog(session, call_state, delay=SILENCE_FOLLOWUP_SECONDS):
     try:
         await asyncio.sleep(delay)
-        if not call_state.get("terminate_session") and not call_state.get("user_activity_open"):
-            logger.info(f"⏱️ [SILENCE] User silent for {delay} seconds. Prompting AI to re-engage.")
+        if call_state.get("terminate_session") or call_state.get("user_activity_open"):
+            return
+        if call_state["silence_followup_count"] >= MAX_SILENCE_FOLLOWUPS:
+            logger.info("Maximum silence follow-ups reached. Sending farewell prompt before ending call.")
+            call_state["closing_audio_phase"] = True
+            call_state["awaiting_model"] = True
+            call_state["model_response_deadline"] = time.monotonic() + MODEL_RESPONSE_TIMEOUT_SECONDS
+            call_state["terminal_action_deadline"] = time.monotonic() + TERMINAL_ACTION_TIMEOUT_SECONDS
             await session.send_client_content(
                 turns=types.Content(
                     role="user",
-                    parts=[types.Part.from_text(text=SILENCE_FOLLOWUP_PROMPT)],
+                    parts=[types.Part.from_text(text=SILENCE_FAREWELL_PROMPT)],
                 ),
                 turn_complete=True,
             )
+            return
+        call_state["silence_followup_count"] += 1
+        call_state["awaiting_model"] = True
+        call_state["model_response_deadline"] = time.monotonic() + MODEL_RESPONSE_TIMEOUT_SECONDS
+        logger.info(f"Prompting AI to re-engage ({call_state['silence_followup_count']}/{MAX_SILENCE_FOLLOWUPS}).")
+        await session.send_client_content(
+            turns=types.Content(
+                role="user",
+                parts=[types.Part.from_text(text=SILENCE_FOLLOWUP_PROMPT)],
+            ),
+            turn_complete=True,
+        )
     except asyncio.CancelledError:
         pass
-    
+    except Exception as e:
+        logger.error(f"Silence watchdog failed: {e}")
+        call_state["pending_end_call"] = True
+        call_state["closing_audio_phase"] = True
+        call_state["terminal_action_deadline"] = time.monotonic() + 1.0
+
 def calculate_rms_db(pcm_data):
     """Converts int16 PCM to float32, calculates RMS in dB, and returns both."""
     samples = np.frombuffer(pcm_data, dtype=np.int16).astype(np.float32) / 32768.0
@@ -298,6 +406,56 @@ def calculate_rms_db(pcm_data):
     return rms_db, samples
 
 app = Quart(__name__)
+
+# --- SSE (Server-Sent Events) Infrastructure for Dashboard ---
+call_event_subscribers = set()
+
+def emit_call_event(call_id, event_type, data=None):
+    """Fire-and-forget: push a JSON event to all connected dashboard browsers."""
+    global call_event_subscribers
+    try:
+        payload = json.dumps({
+            "call_id": str(call_id) if call_id else "",
+            "type": event_type,
+            "data": data or {},
+            "timestamp": datetime.now(ist_tz).strftime("%H:%M:%S"),
+        })
+        dead = set()
+        for q in call_event_subscribers:
+            try:
+                q.put_nowait(payload)
+            except asyncio.QueueFull:
+                dead.add(q)
+        call_event_subscribers -= dead
+    except Exception as e:
+        logger.error(f"SSE Emit Error: {e}")
+        pass  # Never let SSE emission interfere with call processing
+
+@app.route('/call-events')
+async def call_events_stream():
+    """SSE endpoint — the dashboard subscribes to this for real-time call events."""
+    q = asyncio.Queue(maxsize=200)
+    call_event_subscribers.add(q)
+
+    async def event_generator():
+        try:
+            while True:
+                payload = await q.get()
+                yield f"data: {payload}\n\n"
+        except asyncio.CancelledError:
+            pass
+        finally:
+            call_event_subscribers.discard(q)
+
+    return Response(
+        event_generator(),
+        mimetype='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache',
+            'X-Accel-Buffering': 'no',
+            'Connection': 'keep-alive',
+        }
+    )
 
 plivo_client = plivo.RestClient(auth_id=os.getenv('PLIVO_AUTH_ID'), auth_token=os.getenv('PLIVO_AUTH_TOKEN'))
 
@@ -441,19 +599,18 @@ async def dial_action():
     dial_status = dial_status.lower()
     logger.info(f"📲 DialStatus={dial_status}, call_uuid={call_uuid}")
 
-    # Retrieve and remove the stored context
-    context = transfer_context_store.pop(call_uuid, {})
+    context = await asyncio.to_thread(load_transfer_context, call_uuid)
     if not context:
         logger.warning(f"⚠️ No transfer context found for call_uuid={call_uuid}! Proceeding with empty context.")
-        
+
     summary = context.get("summary", "")
-    original_from = context.get("from_number", from_number)
+    original_from = context.get("phone_number", from_number)
 
     logger.info(f"📋 Retrieved summary for re-entry: {summary}")
 
     import urllib.parse
-    encoded_summary  = urllib.parse.quote(summary)
-    encoded_from     = urllib.parse.quote(original_from)
+    encoded_phone = urllib.parse.quote(original_from)
+    encoded_context_id = urllib.parse.quote(call_uuid or "")
     
     # Map Plivo's successful states to 'completed' so handle_media_stream reads it correctly
     is_success = "completed" if dial_status in ["hangup", "answered", "completed"] else "failed"
@@ -469,11 +626,163 @@ async def dial_action():
         <Stream streamTimeout="86400" keepCallAlive="true" bidirectional="true" 
                 noiseCancellation="true" noiseCancellationLevel="85" 
                 contentType="audio/x-mulaw;rate=8000" audioTrack="inbound">
-            wss://{ws_host}/media-stream?from_number={encoded_from}&amp;transfer_summary={encoded_summary}&amp;dial_status={encoded_status}
+            wss://{ws_host}/media-stream?phone_number={encoded_phone}&amp;transfer_context_id={encoded_context_id}&amp;dial_status={encoded_status}&amp;is_transfer_return=1
         </Stream>
     </Response>
     """
     return Response(xml_data, mimetype='application/xml')
+
+def apply_plivo_start(call_state, start_data):
+    logger.info('Plivo Audio stream has started')
+    logger.info(f"Plivo start payload: {json.dumps(start_data)}")
+
+    call_state["stream_id"] = start_data.get("streamId")
+    call_state["call_uuid"] = (
+        start_data.get('callId')
+        or start_data.get('callUuid')
+        or start_data.get('callUUID')
+        or start_data.get('call_id')
+        or start_data.get('call_uuid')
+    )
+    call_state["host"] = (
+        start_data.get('customParameters', {}).get('host')
+        or os.getenv("PUBLIC_HOST")
+    )
+    call_state["call_deadline"] = time.monotonic() + MAX_CALL_DURATION_SECONDS
+
+    logger.info(f'Stream ID: {call_state["stream_id"]}')
+    logger.info(f'Call UUID: {call_state["call_uuid"]}')
+    logger.info(f'From Number: {call_state["from_number"]}')
+    logger.info(f'PUBLIC_BASE_URL: {call_state["public_base_url"]}')
+    emit_call_event(call_state.get("call_uuid"), "call_ringing", {"phone": call_state.get("from_number", "")})
+
+
+async def wait_for_plivo_start(plivo_ws, call_state):
+    async def receive_start():
+        while True:
+            message = await plivo_ws.receive()
+            if message is None:
+                raise ConnectionError("Plivo WebSocket closed before the start event")
+
+            data = json.loads(message)
+            event = data.get("event")
+            if event == "start":
+                apply_plivo_start(call_state, data.get("start", {}))
+                return
+            if event == "stop":
+                raise ConnectionError("Plivo stopped the stream before the start event")
+
+    await asyncio.wait_for(receive_start(), timeout=PLIVO_START_TIMEOUT_SECONDS)
+
+
+async def terminate_plivo_call(plivo_client, call_state, reason):
+    if call_state.get("hangup_started"):
+        call_state["terminate_session"] = True
+        return
+
+    call_state["hangup_started"] = True
+    call_uuid = call_state.get("call_uuid")
+    logger.warning(f"Terminating call: {reason}")
+
+    try:
+        if call_uuid:
+            await asyncio.to_thread(
+                plivo_client.calls.delete,
+                call_uuid=call_uuid,
+            )
+            logger.info(f"Plivo call explicitly terminated for call_uuid={call_uuid}")
+        else:
+            logger.warning("Cannot explicitly terminate Plivo call because call_uuid is unavailable")
+    except Exception as e:
+        logger.error(f"Failed to terminate Plivo call: {e}")
+    finally:
+        call_state["terminal_action_completed"] = True
+        call_state["terminate_session"] = True
+
+
+async def supervise_call(call_state, plivo_client):
+    while not call_state.get("terminate_session"):
+        now = time.monotonic()
+
+        if now >= call_state["call_deadline"]:
+            await terminate_plivo_call(plivo_client, call_state, "maximum call duration reached")
+            return
+
+        response_deadline = call_state.get("model_response_deadline")
+        if (
+            call_state.get("awaiting_model")
+            and response_deadline is not None
+            and now >= response_deadline
+        ):
+            await terminate_plivo_call(plivo_client, call_state, "Gemini response timeout")
+            return
+
+        await asyncio.sleep(0.25)
+
+
+@contextlib.asynccontextmanager
+async def connect_live_with_timeout(client, model, config):
+    live_context = client.aio.live.connect(model=model, config=config)
+    session = await asyncio.wait_for(
+        live_context.__aenter__(),
+        timeout=GEMINI_CONNECT_TIMEOUT_SECONDS,
+    )
+
+    try:
+        yield session
+    except BaseException as exc:
+        suppress_exception = await live_context.__aexit__(
+            type(exc), exc, exc.__traceback__
+        )
+        if not suppress_exception:
+            raise
+    else:
+        await live_context.__aexit__(None, None, None)
+
+
+async def coordinate_call_tasks(task_map, call_state):
+    done, pending = await asyncio.wait(
+        task_map.values(),
+        return_when=asyncio.FIRST_COMPLETED,
+    )
+    completed_names = {
+        name for name, task in task_map.items() if task in done
+    }
+    call_state["terminate_session"] = True
+
+    for task in pending:
+        task.cancel()
+    await asyncio.gather(*pending, return_exceptions=True)
+
+    for task in done:
+        if task.cancelled():
+            continue
+        exception = task.exception()
+        if exception is not None:
+            raise exception
+
+    return completed_names
+
+
+def log_call_stats(call_state):
+    cost_text_in = (call_state["tokens_text_in"] / 1_000_000) * PRICE_TEXT_INPUT
+    cost_text_out = (call_state["tokens_text_out"] / 1_000_000) * PRICE_TEXT_OUTPUT
+    cost_audio_in = (call_state["tokens_audio_in"] / 1_000_000) * PRICE_AUDIO_INPUT
+    cost_audio_out = (call_state["tokens_audio_out"] / 1_000_000) * PRICE_AUDIO_OUTPUT
+    total_cost = cost_text_in + cost_text_out + cost_audio_in + cost_audio_out
+
+    logger.info("=== CALL ENDED : STATS & PRICING ===")
+    logger.info(f"Tokens Used - Text In: {call_state['tokens_text_in']}, Audio In: {call_state['tokens_audio_in']}, Text Out: {call_state['tokens_text_out']}, Audio Out: {call_state['tokens_audio_out']}")
+    logger.info(f"Last usage_metadata.total_token_count seen: {call_state['last_usage_total_token_count']}")
+    logger.info(f"usage_metadata.total_token_count updates: {call_state['usage_total_updates']}, non-monotonic transitions: {call_state['usage_total_non_monotonic_count']}")
+    logger.info(f"Total Call Cost: ${total_cost:.6f}")
+    logger.info("====================================")
+    emit_call_event(call_state.get("call_uuid"), "call_ended", {
+        "reason": call_state.get("end_call_summary", "call completed"),
+        "cost": f"${total_cost:.4f}",
+        "phone": call_state.get("from_number", ""),
+    })
+
 
 async def play_disclaimer(plivo_ws, call_state, disclaimer_finished_event):
     if not DISCLAIMER_ULAW_CHUNKS or call_state.get("is_returning_from_transfer"):
@@ -517,22 +826,39 @@ async def handle_media_stream():
     
     user_name = websocket.args.get("user_name", "Unknown")
     phone_number = websocket.args.get("phone_number", "Unknown")
-    
+
+    transfer_context_id = websocket.args.get("transfer_context_id", "")
     transfer_summary_raw = websocket.args.get("transfer_summary", "")
-    dial_status      = websocket.args.get("dial_status", "")
-    is_returning_from_transfer = bool(transfer_summary_raw)
-    
+    dial_status = websocket.args.get("dial_status", "")
+    is_returning_from_transfer = (
+        websocket.args.get("is_transfer_return") == "1"
+        or bool(dial_status)
+        or bool(transfer_context_id)
+        or bool(transfer_summary_raw)
+    )
+
+    if transfer_context_id:
+        transfer_context = await asyncio.to_thread(
+            load_transfer_context, transfer_context_id
+        )
+        if transfer_context:
+            phone_number = transfer_context.get("phone_number", phone_number)
+            transfer_summary_raw = transfer_context.get("summary", transfer_summary_raw)
+        else:
+            logger.warning(
+                f"No persisted transfer context found for call_uuid={transfer_context_id}"
+            )
+
     call_summary = ""
     user_language = "Bengali"
-    
-    if is_returning_from_transfer:
+
+    if is_returning_from_transfer and transfer_summary_raw:
         try:
             parsed_summary = json.loads(transfer_summary_raw)
             call_summary = parsed_summary.get("call_summary", "")
             user_language = parsed_summary.get("language", "Bengali")
         except json.JSONDecodeError:
-            # Fallback just in case the raw string isn't valid JSON
-            logger.warning("Could not parse transfer_summary as JSON. Falling back to raw string.")
+            logger.warning("Could not parse transfer summary as JSON. Falling back to raw string.")
             call_summary = transfer_summary_raw
     
     logger.info(f'Client connected to Quart WebSocket. Caller: {phone_number}')
@@ -569,6 +895,7 @@ async def handle_media_stream():
         "user_activity_open": False,
         "assistant_speaking": False,
         "awaiting_model": False,
+        "model_response_deadline": None,
         "interrupting": False,
         
         # AI speech timing trackers
@@ -578,6 +905,7 @@ async def handle_media_stream():
         
         # silence handling
         "silence_timer_task": None,
+        "silence_followup_count": 0,
         
         # deferred end-call control
         "pending_end_call": False,
@@ -586,6 +914,12 @@ async def handle_media_stream():
         "closing_audio_started": False,
         "end_call_tool_executed": False,
         "terminate_session": False,
+        "terminal_action_deadline": None,
+        "terminal_action_completed": False,
+        "terminal_action_in_progress": False,
+        "hangup_started": False,
+        "plivo_disconnected": False,
+        "call_deadline": None,
         "end_call_summary": "", 
         
         # unified finally analytics control
@@ -619,19 +953,20 @@ async def handle_media_stream():
     }
     
     disclaimer_finished = asyncio.Event()
-    disclaimer_task = asyncio.create_task(play_disclaimer(plivo_ws, call_state, disclaimer_finished))
-    
-    # Initialize the new SDK client
-    client = genai.Client(
-        vertexai=True, 
-        project=os.getenv('GOOGLE_CLOUD_PROJECT'), 
-        location=os.getenv('GOOGLE_CLOUD_LOCATION')
-    )
-    # client = genai.Client(
-    #     api_key=LIVE_API_KEY
-    # )
+    disclaimer_task = None
 
     try:
+        await wait_for_plivo_start(plivo_ws, call_state)
+        disclaimer_task = asyncio.create_task(
+            play_disclaimer(plivo_ws, call_state, disclaimer_finished)
+        )
+
+        client = genai.Client(
+            vertexai=True,
+            project=os.getenv('GOOGLE_CLOUD_PROJECT'),
+            location=os.getenv('GOOGLE_CLOUD_LOCATION')
+        )
+
         current_time = get_indian_time()
         try:
             system_instruction_text = f"Current Date and Time (India IST): {current_time}\n\n" + RAW_SYSTEM_PROMPT.format(**locals())
@@ -736,15 +1071,13 @@ async def handle_media_stream():
             }
         )
         
-        async with client.aio.live.connect(model=GEMINI_MODEL, config=config) as session:
+        async with connect_live_with_timeout(client, GEMINI_MODEL, config) as session:
             logger.info('Connected to Google GenAI Live API')
-            
-            # --- 1. WAIT FOR DISCLAIMER ---
-            logger.info("⏳ Waiting for disclaimer audio to finish playing...")
+
+            logger.info("Waiting for disclaimer audio to finish playing...")
             await disclaimer_finished.wait()
-            
-            # --- 2. INJECT INITIAL CONTEXT & TRIGGER GREETING ---
-            logger.info("🟢 Disclaimer done. Sending initial context to trigger AI greeting...")
+
+            logger.info("Disclaimer done. Sending initial context to trigger AI greeting...")
             await session.send_client_content(
                 turns=types.Content(
                     role="user",
@@ -752,57 +1085,57 @@ async def handle_media_stream():
                 ),
                 turn_complete=True,
             )
-
-            # Run sending and receiving concurrently
-            plivo_to_gemini_task = asyncio.create_task(
-                stream_plivo_to_gemini(plivo_ws, session, call_state)
-            )
-            gemini_to_plivo_task = asyncio.create_task(
-                stream_gemini_to_plivo(session, plivo_ws, call_state ,plivo_client)
-            )
-            plivo_sender_task = asyncio.create_task(
-                send_plivo_audio(plivo_ws, call_state , session,plivo_client)
+            call_state["awaiting_model"] = True
+            call_state["model_response_deadline"] = (
+                time.monotonic() + MODEL_RESPONSE_TIMEOUT_SECONDS
             )
 
-            try :
-                await asyncio.gather(plivo_to_gemini_task, gemini_to_plivo_task, plivo_sender_task, disclaimer_task)
+            task_map = {
+                "plivo_input": asyncio.create_task(
+                    stream_plivo_to_gemini(plivo_ws, session, call_state)
+                ),
+                "gemini_output": asyncio.create_task(
+                    stream_gemini_to_plivo(session, plivo_ws, call_state, plivo_client)
+                ),
+                "plivo_output": asyncio.create_task(
+                    send_plivo_audio(plivo_ws, call_state, session, plivo_client)
+                ),
+                "supervisor": asyncio.create_task(
+                    supervise_call(call_state, plivo_client)
+                ),
+            }
+
+            try:
+                await coordinate_call_tasks(task_map, call_state)
+                if (
+                    not call_state["plivo_disconnected"]
+                    and not call_state["terminal_action_completed"]
+                ):
+                    await terminate_plivo_call(
+                        plivo_client,
+                        call_state,
+                        "call task ended unexpectedly",
+                    )
             finally:
                 if call_state.get("silence_timer_task") and not call_state["silence_timer_task"].done():
                     call_state["silence_timer_task"].cancel()
                     with contextlib.suppress(asyncio.CancelledError):
                         await call_state["silence_timer_task"]
-                        
-                for task in [plivo_to_gemini_task, gemini_to_plivo_task , plivo_sender_task]:
-                    if not task.done():
-                        task.cancel()
-                        with contextlib.suppress(asyncio.CancelledError):
-                            await task
-                            
-                #--- Calculate and log pricing ---
-                cost_text_in = (call_state["tokens_text_in"] / 1_000_000) * PRICE_TEXT_INPUT
-                cost_text_out = (call_state["tokens_text_out"] / 1_000_000) * PRICE_TEXT_OUTPUT
-                cost_audio_in = (call_state["tokens_audio_in"] / 1_000_000) * PRICE_AUDIO_INPUT
-                cost_audio_out = (call_state["tokens_audio_out"] / 1_000_000) * PRICE_AUDIO_OUTPUT
-                total_cost = cost_text_in + cost_text_out + cost_audio_in + cost_audio_out
-                
-                logger.info("=== CALL ENDED : STATS & PRICING ===")
-                logger.info(f"Tokens Used - Text In: {call_state['tokens_text_in']}, Audio In: {call_state['tokens_audio_in']}, Text Out: {call_state['tokens_text_out']}, Audio Out: {call_state['tokens_audio_out']}")
-                logger.info(f"Last usage_metadata.total_token_count seen: {call_state['last_usage_total_token_count']}")
-                logger.info(f"usage_metadata.total_token_count updates: {call_state['usage_total_updates']}, non-monotonic transitions: {call_state['usage_total_non_monotonic_count']}")
-                logger.info(f"Total Call Cost: ${total_cost:.6f}")
-                logger.info("====================================")
+                log_call_stats(call_state)
 
     except asyncio.CancelledError:
         logger.info('Client disconnected')
-        return
-    except Exception as e:
-        logger.error("🚨 CRITICAL ERROR: Live API TaskGroup Crashed!")
+        raise
+    except Exception:
+        logger.error("Live call lifecycle failed")
         logger.error(traceback.format_exc())
+        await terminate_plivo_call(plivo_client, call_state, "live call lifecycle failure")
     finally:
-        if 'call_state' in locals():
-            call_state["playing_disclaimer"] = False
-        if 'disclaimer_task' in locals() and not disclaimer_task.done():
+        call_state["playing_disclaimer"] = False
+        if disclaimer_task is not None and not disclaimer_task.done():
             disclaimer_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await disclaimer_task
 
 async def stream_plivo_to_gemini(plivo_ws, session, call_state):
     logger.info('Ready to stream audio from Plivo to Gemini')
@@ -813,26 +1146,15 @@ async def stream_plivo_to_gemini(plivo_ws, session, call_state):
                 logger.info("🎬 Terminating Plivo -> Gemini loop")
                 break
             message = await plivo_ws.receive()
+            if message is None:
+                call_state["plivo_disconnected"] = True
+                call_state["terminate_session"] = True
+                break
+
             data = json.loads(message)
 
             if data['event'] == 'start':
-                logger.info('Plivo Audio stream has started')
-                logger.info(f"Plivo start payload: {json.dumps(data['start'])}")
-
-                call_state["stream_id"] = data['start']['streamId']
-                call_state["call_uuid"] = (
-                    data['start'].get('callId')
-                    or data['start'].get('callUuid')
-                    or data['start'].get('callUUID')
-                    or data['start'].get('call_id')
-                    or data['start'].get('call_uuid')
-                )
-                call_state["host"] = data['start'].get('customParameters', {}).get('host') or os.getenv("PUBLIC_HOST")
-
-                logger.info(f'Stream ID: {call_state["stream_id"]}')
-                logger.info(f'Call UUID: {call_state["call_uuid"]}')
-                logger.info(f'From Number: {call_state["from_number"]}')
-                logger.info(f'PUBLIC_BASE_URL: {call_state["public_base_url"]}')
+                apply_plivo_start(call_state, data.get('start', {}))
 
             elif data['event'] == 'media':
                 payload = data.get('media', {}).get('payload')
@@ -942,6 +1264,10 @@ async def stream_plivo_to_gemini(plivo_ws, session, call_state):
 
                 if speech_started:
                     logger.info("🎤 User speech detected")
+                    emit_call_event(call_state.get("call_uuid"), "user_speaking")
+                    call_state["silence_followup_count"] = 0
+                    call_state["awaiting_model"] = False
+                    call_state["model_response_deadline"] = None
                     
                     # Cancel the silence timer if active
                     if call_state.get("silence_timer_task") and not call_state["silence_timer_task"].done():
@@ -980,6 +1306,7 @@ async def stream_plivo_to_gemini(plivo_ws, session, call_state):
                             )
                             call_state["user_activity_open"] = True
                             call_state["awaiting_model"] = False
+                            call_state["model_response_deadline"] = None
                             call_state["turn_complete"] = False
                             logger.info("▶️ Sent activityStart to Gemini")
 
@@ -1004,6 +1331,7 @@ async def stream_plivo_to_gemini(plivo_ws, session, call_state):
                             )
                 if speech_ended and call_state["user_activity_open"]:
                     logger.info(" 🔇 User speech end detected")
+                    emit_call_event(call_state.get("call_uuid"), "user_silent")
 
                     # Flush remainder before ending activity
                     if call_state["gemini_input_buffer"]:
@@ -1020,11 +1348,16 @@ async def stream_plivo_to_gemini(plivo_ws, session, call_state):
                     )
                     call_state["user_activity_open"] = False
                     call_state["awaiting_model"] = True
+                    call_state["model_response_deadline"] = (
+                        time.monotonic() + MODEL_RESPONSE_TIMEOUT_SECONDS
+                    )
                     call_state["interrupting"] = False
                     logger.info("⏹️ Sent activityEnd to Gemini")
 
             elif data['event'] == 'stop':
                 logger.info('Plivo stream stopped')
+                call_state["plivo_disconnected"] = True
+                call_state["terminate_session"] = True
                 break
 
     except asyncio.CancelledError:
@@ -1052,12 +1385,15 @@ async def stream_gemini_to_plivo(session, plivo_ws, call_state,plivo_client):
                 # ==========================================
                 if response.tool_call:
                     call_state["tool_call_in_progress"] = True
+                    call_state["awaiting_model"] = False
+                    call_state["model_response_deadline"] = None
                     
                     try:
                         function_responses_to_send = []
                     
                         for call in response.tool_call.function_calls:
                             logger.info(f"\n[⚙️ Gemini requested tool execution: {call.name}]")
+                            emit_call_event(call_state.get("call_uuid"), "tool_called", {"tool_name": call.name})
                             args_dict = dict(call.args) if call.args else {}
                             logger.info(f"Arguments: {args_dict}")
 
@@ -1068,6 +1404,9 @@ async def stream_gemini_to_plivo(session, plivo_ws, call_state,plivo_client):
                                     logger.info(f"📋 End-call summary captured from Gemini: {end_call_summary}")
                                     call_state["pending_end_call"] = True
                                     call_state["closing_audio_phase"] = True
+                                    call_state["terminal_action_deadline"] = (
+                                        time.monotonic() + TERMINAL_ACTION_TIMEOUT_SECONDS
+                                    )
                                     call_state["end_call_tool_executed"] = False
                                     call_state["terminate_session"] = False
                                     logger.info("📴 Call ending requested by Gemini; MCP endCall will execute after closing audio playback finishes")
@@ -1097,6 +1436,9 @@ async def stream_gemini_to_plivo(session, plivo_ws, call_state,plivo_client):
                                     
                                     call_state["pending_transfer_call"] = True
                                     call_state["closing_audio_phase"] = True
+                                    call_state["terminal_action_deadline"] = (
+                                        time.monotonic() + TERMINAL_ACTION_TIMEOUT_SECONDS
+                                    )
                                     call_state["transfer_call_tool_executed"] = False
                                     call_state["terminate_session"] = False
                                     logger.info("🔀 Call transfer requested by Gemini; MCP transferCall will execute after audio playback finishes")
@@ -1344,12 +1686,13 @@ async def stream_gemini_to_plivo(session, plivo_ws, call_state,plivo_client):
                             
                         call_state["assistant_speaking"] = False
                         call_state["awaiting_model"] = False
+                        call_state["model_response_deadline"] = None
                         call_state["interrupting"] = False
-                        call_state["pending_end_call"] = False
-                        call_state["pending_transfer_call"] = False
-                        call_state["ending_call_phase"] = False
-                        call_state["closing_audio_phase"] = False
-                        call_state["closing_audio_started"] = False
+                        if not call_state["closing_audio_phase"]:
+                            call_state["pending_end_call"] = False
+                            call_state["pending_transfer_call"] = False
+                            call_state["ending_call_phase"] = False
+                            call_state["closing_audio_started"] = False
                         call_state["turn_complete"] = True
                         
                         while not call_state["plivo_output_queue"].empty():
@@ -1367,24 +1710,30 @@ async def stream_gemini_to_plivo(session, plivo_ws, call_state,plivo_client):
                         
                         # Flush the completed AI sentence to the logs
                         if call_state["ai_text_buffer"].strip():
-                            logger.info(f"🤖 [GEMINI]: {call_state['ai_text_buffer'].strip()}")
+                            ai_transcript = call_state["ai_text_buffer"].strip()
+                            logger.info(f"🤖 [GEMINI]: {ai_transcript}")
                             call_state["conversation_log"].append({
                                 "role": "agent",
-                                "text": call_state["ai_text_buffer"].strip()
+                                "text": ai_transcript
                             })
+                            emit_call_event(call_state.get("call_uuid"), "ai_transcript", {"text": ai_transcript})
                             call_state["ai_text_buffer"] = ""
                     
                     model_turn = getattr(server_content, 'model_turn', None)
                     #logger.info("⚡ Gemini Audio Chunk Received!")
                     if model_turn is not None:
+                        call_state["awaiting_model"] = False
+                        call_state["model_response_deadline"] = None
                         
                         # Flush the completed user sentence to the logs now.
                         if call_state["user_text_buffer"].strip() and not call_state["assistant_speaking"]:
-                            logger.info(f"🗣️ [USER]: {call_state['user_text_buffer'].strip()}")
+                            user_transcript = call_state["user_text_buffer"].strip()
+                            logger.info(f"🗣️ [USER]: {user_transcript}")
                             call_state["conversation_log"].append({
                                 "role": "user",
-                                "text": call_state["user_text_buffer"].strip()
+                                "text": user_transcript
                             })
+                            emit_call_event(call_state.get("call_uuid"), "user_transcript", {"text": user_transcript})
                             call_state["user_text_buffer"] = ""
                             
                         for part in model_turn.parts:
@@ -1457,20 +1806,112 @@ async def stream_gemini_to_plivo(session, plivo_ws, call_state,plivo_client):
         from google.genai import errors as genai_errors
         if isinstance(e, genai_errors.APIError) and "1008" in str(e):
             logger.warning(f"⚠️ Gemini Live session closed by API (1008): {e}. Ending call gracefully.")
-            call_state["terminate_session"] = True
-            if call_state.get("call_uuid"):
-                try:
-                    await asyncio.to_thread(
-                        plivo_client.calls.delete,
-                        call_uuid=call_state["call_uuid"]
-                    )
-                    logger.info(f"📞 Call hung up after Gemini 1008 error for call_uuid={call_state['call_uuid']}")
-                except Exception as hangup_err:
-                    logger.error(f"❌ Failed to hang up call after 1008 error: {hangup_err}")
+            await terminate_plivo_call(
+                plivo_client,
+                call_state,
+                "Gemini Live session closed with policy error 1008",
+            )
         else:
             logger.error(f"Error in Gemini -> Plivo stream: {e}")
             raise
     
+async def execute_pending_terminal_action(
+    plivo_ws,
+    call_state,
+    plivo_client,
+    out_buffer,
+):
+    pending_end = call_state.get("pending_end_call")
+    pending_transfer = call_state.get("pending_transfer_call")
+    if not pending_end and not pending_transfer:
+        return False
+    if call_state.get("terminal_action_in_progress") or call_state.get("user_activity_open"):
+        return False
+
+    queue_empty = call_state["plivo_output_queue"].empty()
+    playback_idle = not call_state.get("assistant_speaking")
+    turn_complete = call_state.get("turn_complete", True)
+    deadline = call_state.get("terminal_action_deadline")
+    deadline_expired = deadline is not None and time.monotonic() >= deadline
+
+    if not queue_empty or not playback_idle:
+        return False
+    if not turn_complete and not deadline_expired:
+        return False
+
+    call_state["terminal_action_in_progress"] = True
+    call_state["ending_call_phase"] = True
+    out_buffer.clear()
+    await asyncio.sleep(0.2)
+
+    if not call_state["plivo_output_queue"].empty() or call_state["assistant_speaking"]:
+        call_state["terminal_action_in_progress"] = False
+        call_state["ending_call_phase"] = False
+        return False
+
+    if pending_end:
+        call_state["end_call_tool_executed"] = True
+        call_state["pending_end_call"] = False
+        await terminate_plivo_call(
+            plivo_client,
+            call_state,
+            "endCall tool completed and playback drained",
+        )
+        return True
+
+    call_state["transfer_call_tool_executed"] = True
+    call_uuid = call_state.get("call_uuid")
+    public_base_url = call_state.get("public_base_url")
+    if not call_uuid or not public_base_url:
+        await terminate_plivo_call(
+            plivo_client,
+            call_state,
+            "transfer requested without call UUID or public URL",
+        )
+        return True
+
+    import urllib.parse
+
+    try:
+        await asyncio.to_thread(
+            save_transfer_context,
+            call_uuid,
+            call_state.get("transfer_summary", ""),
+            call_state["from_number"],
+        )
+        logger.info(f"Transfer context persisted for call_uuid={call_uuid}")
+        emit_call_event(call_uuid, "transfer_started")
+
+        transfer_url = (
+            f"{public_base_url}/transfer.xml?call_uuid="
+            f"{urllib.parse.quote(call_uuid)}"
+        )
+        await asyncio.to_thread(
+            plivo_client.calls.transfer,
+            call_uuid=call_uuid,
+            legs="aleg",
+            aleg_url=transfer_url,
+            aleg_method="GET",
+        )
+        logger.info(f"Plivo call transferred via API for call_uuid={call_uuid}")
+    except Exception as e:
+        logger.error(f"Failed to transfer call: {e}")
+        await terminate_plivo_call(
+            plivo_client,
+            call_state,
+            "transfer operation failed",
+        )
+        return True
+
+    call_state["pending_transfer_call"] = False
+    call_state["terminal_action_completed"] = True
+    call_state["terminate_session"] = True
+    await asyncio.sleep(1.0)
+    with contextlib.suppress(Exception):
+        await plivo_ws.close(1000)
+    return True
+
+
 async def send_plivo_audio(plivo_ws, call_state,session,plivo_client):
     logger.info('Ready to send audio to Plivo')
     out_buffer = bytearray()
@@ -1496,6 +1937,7 @@ async def send_plivo_audio(plivo_ws, call_state,session,plivo_client):
                     if call_state["ai_playback_start_time"] is None:
                         call_state["ai_playback_start_time"] = datetime.now(ist_tz)
                         logger.info(f"🎙️ [TIMING] AI Speech Started playing at: {call_state['ai_playback_start_time'].strftime('%H:%M:%S.%f')[:-3]}")
+                        emit_call_event(call_state.get("call_uuid"), "ai_speaking")
                         
                         # Cancel the silence timer when AI starts speaking
                         if call_state.get("silence_timer_task") and not call_state["silence_timer_task"].done():
@@ -1517,129 +1959,57 @@ async def send_plivo_audio(plivo_ws, call_state,session,plivo_client):
 
             except asyncio.TimeoutError:
                 if len(out_buffer) < PLIVO_ULAW_CHUNK_SIZE and call_state["plivo_output_queue"].empty():
-                    if not call_state.get("turn_complete", True):
-                        continue
-                    
-                    # --- TIMING LOGIC: Natural End Calculation ---
                     if call_state["ai_playback_start_time"] is not None and call_state["current_utterance_bytes"] > 0:
-                        # 8000 bytes of mu-law = 1 second of audio
                         duration_seconds = call_state["current_utterance_bytes"] / 8000.0
                         expected_end_time = call_state["ai_playback_start_time"] + timedelta(seconds=duration_seconds)
                         now = datetime.now(ist_tz)
-                        
-                        # NEW: Check if real-time has caught up to the audio duration
+
                         if now < expected_end_time:
-                            # Plivo is still playing the audio buffer to the user!
-                            # We just continue the loop and wait. 
-                            continue 
-                        
-                        # Only execute this once the real-time playback has actually finished
-                        logger.info(f"🎙️ [TIMING] AI Speech Natural End at: {now.strftime('%H:%M:%S.%f')[:-3]} (Calculated Duration: {duration_seconds:.2f}s)")
-                        
+                            continue
+
+                        logger.info(
+                            f"AI speech playback ended at {now.strftime('%H:%M:%S.%f')[:-3]} "
+                            f"(calculated duration: {duration_seconds:.2f}s)"
+                        )
+                        emit_call_event(call_state.get("call_uuid"), "ai_done")
+
                         if not call_state.get("greeting_completed", False):
-                            logger.info("🔓 Initial greeting complete. Microphone is now LIVE!")
+                            logger.info("Initial greeting complete. Microphone is now live.")
                             call_state["greeting_completed"] = True
-                        
-                        # Reset trackers for the next conversational turn
+                            emit_call_event(call_state.get("call_uuid"), "call_connected")
+
                         call_state["ai_playback_start_time"] = None
                         call_state["current_utterance_bytes"] = 0
                         call_state["assistant_speaking"] = False
                         call_state["interrupting"] = False
-                        
-                        # Start the silence watchdog timer (e.g., 8 seconds delay)
-                        if not call_state["pending_end_call"] and not call_state["pending_transfer_call"] and not call_state["closing_audio_phase"]:
+
+                        if (
+                            call_state.get("turn_complete", True)
+                            and not call_state["pending_end_call"]
+                            and not call_state["pending_transfer_call"]
+                            and not call_state["closing_audio_phase"]
+                        ):
                             if call_state.get("silence_timer_task") and not call_state["silence_timer_task"].done():
                                 call_state["silence_timer_task"].cancel()
                             call_state["silence_timer_task"] = asyncio.create_task(
-                                silence_watchdog(session, call_state, delay=8.0)
+                                silence_watchdog(
+                                    session,
+                                    call_state,
+                                    delay=SILENCE_FOLLOWUP_SECONDS,
+                                )
                             )
                     else:
-                        # Fallback if trackers were wiped (e.g., by user barge-in)
                         call_state["assistant_speaking"] = False
                         call_state["interrupting"] = False
-                    # ---------------------------------------------
-                    
-                    if (
-                        call_state["pending_end_call"]
-                        and call_state.get("closing_audio_started")
-                        and not call_state["user_activity_open"]
-                        and not call_state["end_call_tool_executed"]
-                        and not call_state["assistant_speaking"]
-                    ):
-                        logger.info("⏳ Hangup condition met. Waiting 0.5s to ensure audio buffer is completely flushed...")
-                        call_state["ending_call_phase"] = True
-                        await asyncio.sleep(0.4)
-                        if not call_state["plivo_output_queue"].empty() or call_state["assistant_speaking"] or not call_state.get("turn_complete", True):
-                            logger.info("🚫 Hangup aborted: Late audio chunks arrived in the queue. Resuming playback...")
-                            continue
-                        
-                        logger.info("📴 Audio fully cleared; executing Plivo hangup now")
-                        call_state["end_call_tool_executed"] = True
 
-                        if call_state.get("call_uuid"):
-                            try:
-                                await asyncio.to_thread(
-                                    plivo_client.calls.delete,
-                                    call_uuid=call_state["call_uuid"],
-                                )
-                                logger.info(f"📞 Plivo call explicitly terminated for call_uuid={call_state['call_uuid']}")
-                            except Exception as e:
-                                logger.error(f"❌ Failed to hang up call: {e}")
-
-                        call_state["terminate_session"] = True
-                        call_state["pending_end_call"] = False
-                        call_state["ending_call_phase"] = False
+                    terminal_executed = await execute_pending_terminal_action(
+                        plivo_ws,
+                        call_state,
+                        plivo_client,
+                        out_buffer,
+                    )
+                    if terminal_executed:
                         break
-
-                    if (
-                        call_state["pending_transfer_call"]
-                        and call_state.get("closing_audio_started")
-                        and not call_state["user_activity_open"]
-                        and not call_state["transfer_call_tool_executed"]
-                        and not call_state["assistant_speaking"] 
-                    ):
-                        logger.info("⏳ Transfer condition met. Waiting 0.5s to ensure audio buffer is completely flushed...")
-                        call_state["ending_call_phase"] = True 
-                        await asyncio.sleep(0.4)
-                        
-                        if not call_state["plivo_output_queue"].empty() or call_state["assistant_speaking"] or not call_state.get("turn_complete", True):
-                            logger.info("🚫 Transfer aborted: Late audio chunks arrived in the queue. Resuming playback...")
-                            continue
-
-                        logger.info("🔀 Audio fully cleared; executing Plivo transfer now")
-                        call_state["transfer_call_tool_executed"] = True
-
-                        if call_state.get("call_uuid") and call_state.get("public_base_url"):
-                            import urllib.parse
-                            
-                            transfer_context_store[call_state["call_uuid"]] = {
-                                "summary": call_state.get("transfer_summary", ""),
-                                "from_number": call_state["from_number"],
-                            }
-                            logger.info(f"💾 Transfer context stored for call_uuid={call_state['call_uuid']}")
-                            
-                            transfer_url = f"{call_state['public_base_url']}/transfer.xml?call_uuid={urllib.parse.quote(call_state['call_uuid'])}"
-                            
-                            try:
-                                transfer_response = await asyncio.to_thread(
-                                    plivo_client.calls.transfer,
-                                    call_uuid=call_state["call_uuid"],
-                                    legs="aleg",
-                                    aleg_url=transfer_url,
-                                    aleg_method="GET"
-                                )
-                                logger.info(f"📞 Plivo call transferred via API for call_uuid={call_state['call_uuid']}")
-                                call_state["ending_call_phase"] = True
-                                logger.info("⏳ Waiting for Plivo to redirect call before closing WebSocket...")
-                                await asyncio.sleep(3.0)
-                                logger.info("🔌 Closing WebSocket to release Plivo Stream for transfer...")
-                                await plivo_ws.close(1000)
-                            except Exception as e:
-                                logger.error(f"❌ Failed to transfer call: {e}")
-
-                        call_state["pending_transfer_call"] = False
-                        call_state["terminate_session"] = True
-                        break      
 
                 continue
 
@@ -1665,16 +2035,20 @@ async def trigger_call():
     
     try:
         logger.info(f"Initiating outbound call to {target_phone_number} via Dashboard...")
-        call_made = plivo_client.calls.create(
-            from_= PLIVO_PHONE_NUMBER,
-            to_="+91"+target_phone_number,
+        call_made = await asyncio.to_thread(
+            plivo_client.calls.create,
+            from_=PLIVO_PHONE_NUMBER,
+            to_="+91" + target_phone_number,
             answer_url=answer_url,
-            answer_method='GET'
+            answer_method='GET',
         )
         logger.info(f"✅ Outbound call successfully queued: {call_made}")
-        return {"status": "success", "message": "Call queued", "call_uuid": str(getattr(call_made, 'request_uuid', call_made))}, 200
+        call_id = str(getattr(call_made, 'request_uuid', call_made))
+        emit_call_event(call_id, "call_queued", {"name": target_user_name, "phone": target_phone_number})
+        return {"status": "success", "message": "Call queued", "call_uuid": call_id}, 200
     except Exception as e:
         logger.error(f"❌ Failed to initiate outbound call: {e}")
+        emit_call_event("", "call_failed", {"name": target_user_name, "phone": target_phone_number, "error": str(e)})
         return {"status": "error", "message": str(e)}, 500
 
 if __name__ == "__main__":
