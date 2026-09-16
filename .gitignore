@@ -1,5 +1,6 @@
 venv/
 .env
+.*
 transfer_context.sqlite3*
 ayan*
 gcp-proj*
@@ -32,3 +33,4 @@ senco_llm1.json
 senco_llm2.json
 senco_llm3.json
 test*
+call_transcript

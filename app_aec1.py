@@ -15,9 +15,7 @@ import wave
 import sqlite3
 from pyrnnoise import RNNoise
 from aec import AcousticEchoCanceller
-import chromadb
 import numpy as np
-import bisect
 import urllib.parse
 
 # Import the new GenAI SDK
@@ -39,27 +37,6 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
-
-logger.info("Initializing ChromaDB connection...")
-chroma_client = chromadb.PersistentClient(path="./senco_chroma_db")
-senco_collection = chroma_client.get_or_create_collection(name="senco_stores")
-logger.info("✅ ChromaDB ready for searches!")
-
-logger.info("Loading and sorting Pincode Database...")
-try:
-    with open("senco_llm4.json", "r", encoding="utf-8") as f:
-        stores_pincode_data = json.load(f)
-    
-    # Sort once at startup
-    stores_pincode_data.sort(key=lambda x: int(x["pincode"]))
-    
-    # Extract pincodes into a flat list for binary search
-    fast_pincode_index = [int(store["pincode"]) for store in stores_pincode_data]
-    logger.info(f"✅ Loaded {len(stores_pincode_data)} stores for Pincode tool!")
-except Exception as e:
-    logger.error(f"❌ Failed to load senco_llm4.json: {e}")
-    stores_pincode_data = []
-    fast_pincode_index = []
 
 # --- PRICING CONSTANTS (Per 1M Tokens) ---
 PRICE_TEXT_INPUT = 0.50
@@ -308,7 +285,14 @@ end_call_tool = types.FunctionDeclaration(
         "properties": {
             "summary_of_whole_call": {
                 "type": "STRING",
-                "description": "A concise English summary of the complete call and its outcome."
+                "description": (
+                    "A thorough, complete English summary of the ENTIRE admission call for the admission team. "
+                    "Cover: whether you spoke with the student or a parent/guardian, the applicant's name if known, "
+                    "highest qualification, board/university, the exact program(s) of interest, the questions the user "
+                    "asked, the information you shared (fees/eligibility given), their level of interest and intent, "
+                    "any callback preference or concern raised, and the overall outcome of the call. Write several "
+                    "sentences — do not compress it to one line."
+                )
             }
         },
         "required": ["summary_of_whole_call"]
@@ -318,7 +302,8 @@ end_call_tool = types.FunctionDeclaration(
 transfer_call_tool = types.FunctionDeclaration(
     name="transferCall",
     description=(
-        "Handovers the call to a human on the admin side for resolving issues the AI agent couldn't."
+        "Hands the call over to a senior human admission counselor when the user asks to speak with a person "
+        "or asks something beyond the AI agent's knowledge that needs a counselor."
     ),
     parameters={
         "type": "OBJECT",
@@ -336,47 +321,11 @@ transfer_call_tool = types.FunctionDeclaration(
     }
 )
 
-get_store_details_tool = types.FunctionDeclaration(
-    name="getStoreDetails",
-    description=(
-        "Fetches Senco Gold store addresses, names, and phone numbers. "
-        "Call this tool whenever the user asks about store locations, addresses, or contact information."
-    ),
-    parameters={
-        "type": "OBJECT",
-        "properties": {
-            "search_query": {
-                "type": "STRING",
-                "description": "The location to search for, e.g., 'Dhubri Assam', 'stores in Kolkata', or 'Bettiah Bihar'."
-            }
-        },
-        "required": ["search_query"]
-    }
-)
-
-get_nearest_stores_by_pincode_tool = types.FunctionDeclaration(
-    name="getNearestStoresByPincode",
-    description=(
-        "Fetches the top 5 nearest Senco Gold store addresses and details based on a 6-digit Indian pincode (postal code). "
-        "Call this tool whenever the user provides a pincode to find stores near them."
-    ),
-    parameters={
-        "type": "OBJECT",
-        "properties": {
-            "pincode": {
-                "type": "INTEGER",
-                "description": "The 6-digit Indian pincode provided by the user."
-            }
-        },
-        "required": ["pincode"]
-    }
-)
-
-LOCAL_GEMINI_TOOLS = [{"function_declarations": [end_call_tool, transfer_call_tool, get_store_details_tool,get_nearest_stores_by_pincode_tool]}]
+LOCAL_GEMINI_TOOLS = [{"function_declarations": [end_call_tool, transfer_call_tool]}]
     
 SILENCE_FOLLOWUP_PROMPT = (
     "The user has been silent for a few seconds after you spoke with them last."
-    "Please briefly and politely re-engage them in your existing Bengali-English style. "
+    "Please briefly and politely re-engage them in the same language you have been speaking. "
     "Keep it short, natural, non-pushy, and context-aware."
 )
 
@@ -689,6 +638,47 @@ async def wait_for_plivo_start(plivo_ws, call_state):
     await asyncio.wait_for(receive_start(), timeout=PLIVO_START_TIMEOUT_SECONDS)
 
 
+LEADS_DIR = os.getenv("LEADS_DIR", "./leads")
+
+
+def _safe_filename_part(value):
+    """Make a string safe for use in a filename."""
+    keep = "".join(c if c.isalnum() or c in ("-", "_") else "_" for c in str(value).strip())
+    return keep.strip("_") or "unknown"
+
+
+def save_lead(call_state, outcome, summary=None):
+    """Persist an admission lead as JSON keyed by phone + name.
+
+    Idempotent per call: sets call_state['lead_saved'] so the teardown
+    fallback never overwrites a lead already written by endCall/transfer.
+    The summary is the model-generated call summary — we never build it
+    from the (unreliable, non-English) speech transcript buffers.
+    """
+    try:
+        os.makedirs(LEADS_DIR, exist_ok=True)
+        name = call_state.get("user_name", "Unknown")
+        phone = call_state.get("from_number", "Unknown")
+        if summary is None:
+            summary = call_state.get("end_call_summary", "")
+        record = {
+            "name": name,
+            "phone_number": phone,
+            "outcome": outcome,
+            "summary": summary,
+            "call_uuid": call_state.get("call_uuid"),
+            "timestamp": datetime.now(ist_tz).isoformat(),
+        }
+        filename = f"{_safe_filename_part(phone)}_{_safe_filename_part(name)}.json"
+        path = os.path.join(LEADS_DIR, filename)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(record, f, ensure_ascii=False, indent=2)
+        call_state["lead_saved"] = True
+        logger.info(f"📝 Lead saved ({outcome}): {path}")
+    except Exception as e:
+        logger.error(f"❌ Failed to save lead: {e}")
+
+
 async def terminate_plivo_call(plivo_client, call_state, reason):
     if call_state.get("hangup_started"):
         call_state["terminate_session"] = True
@@ -895,6 +885,9 @@ async def handle_media_stream():
      # Dictionary to maintain state without using Python global variables
     call_state = {
         "from_number": phone_number,
+        "user_name": user_name,
+        "lead_saved": False,
+        "end_call_summary": "",
         "is_returning_from_transfer": is_returning_from_transfer,
         "playing_disclaimer": True,
         "stream_id": None,
@@ -1022,18 +1015,18 @@ async def handle_media_stream():
                 
             if dial_status == "completed":
                 initial_prompt = f"""
-                System Event: The user was previously speaking with you (Sia), was then transferred to a human agent,
-                the user and human agent are done now and the human agent has put down the call. The user is back on the line with you.
+                System Event: The user was previously speaking with you (Neha), was then transferred to a human admission counselor,
+                the user and counselor are done now and the counselor has put down the call. The user is back on the line with you.
 
                 {user_context}
 
                 The user's preferred language is: **{user_language}**
 
-                Here is a summary of the conversation before the transfer: 
+                Here is a summary of the conversation before the transfer:
                 {call_summary}
 
                 Instructions:
-                - Greet the user UNMISTAKABLY in {user_language} by saying - "Looks like you have spoken with our store executive , How can I help you now?" in {user_language}
+                - Greet the user UNMISTAKABLY in {user_language} by saying - "Looks like you have spoken with our admission counselor. How can I help you now?" in {user_language}
                 - Let them know you are back and ready to help.
                 - Pick up naturally from where the conversation left off based on the summary above.
                 - Do NOT re-introduce yourself as if this is a fresh call.
@@ -1048,8 +1041,8 @@ async def handle_media_stream():
             else:
                 # busy / no-answer / failed / canceled
                 initial_prompt = f"""
-                System Event: The user was previously speaking with you (Sia) and requested to be transferred
-                to a human agent. However, the human agent was unavailable (DialStatus: {dial_status}).
+                System Event: The user was previously speaking with you (Neha) and requested to be transferred
+                to a human admission counselor. However, the counselor was unavailable (DialStatus: {dial_status}).
                 The user is back on the line with you.
 
                 {user_context}
@@ -1060,7 +1053,7 @@ async def handle_media_stream():
                 {call_summary}
 
                 Instructions:
-                - Apologise UNMISTAKABLY in {user_language} by saying exactly - "Sorry looks like our store executive couldn't connect , let me help you out in case." in {user_language}.
+                - Apologise UNMISTAKABLY in {user_language} by saying exactly - "Sorry, looks like our admission counselor couldn't connect. Let me help you out instead." in {user_language}.
                 - Offer to help them yourself or offer to try the transfer again if they wish.
                 - Pick up naturally from where the conversation left off based on the summary above.
                 - Do NOT re-introduce yourself as if this is a fresh call.
@@ -1076,8 +1069,8 @@ async def handle_media_stream():
             logger.info("Loading standard greeting prompt...")
             initial_prompt = f"""
             System Event: The outbound call to {user_name} has just connected.
-            * **Greeting:** Start every call with "Namaskhar {user_name}" in English, followed by: "I’m Sia, calling from Diamonds, Bowbazar Kolkata showroom. Do you want to continue speaking in English or switch to Hindi or Bengali."
-            * **STOP HERE:** After asking the language question, END YOUR TURN and stay silent. Do NOT mention Akshaya Tritiya, offers, or anything else yet. Wait for the user to state their language preference. Only AFTER the user replies do you continue — in their chosen language — with the offer question in the next step of the flow.
+            * **Greeting:** Start every call with "Namaskar {user_name}" in English, followed by: "I'm Neha, calling from the admissions team at Adamas University, Kolkata. Do you want to continue speaking in English, or switch to Hindi or Bengali?"
+            * **STOP HERE:** After asking the language question, END YOUR TURN and stay silent. Do NOT mention courses, fees, admissions, or anything else yet. Wait for the user to state their language preference. Only AFTER the user replies do you continue — in their chosen language — with the consent question in the next step of the flow.
             """
         
         # === SESSION MANAGEMENT: Reconnection Loop ===
@@ -1248,6 +1241,11 @@ async def handle_media_stream():
             disclaimer_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await disclaimer_task
+        # Fallback lead capture: if the call ended without the model calling
+        # endCall/transferCall (e.g. the user hung up first), no model summary
+        # exists — persist a stub so no lead is lost.
+        if not call_state.get("lead_saved"):
+            save_lead(call_state, "user_hangup")
         log_call_stats(call_state)
 
 async def stream_plivo_to_gemini(plivo_ws, session, call_state):
@@ -1598,169 +1596,6 @@ async def stream_gemini_to_plivo(session, plivo_ws, call_state,plivo_client):
                                         )
                                     )
                                     
-                                elif call.name == "getStoreDetails":
-                                    search_query = args_dict.get("search_query", "")
-                                    logger.info(f"🔍 Searching ChromaDB for: {search_query}")
-                                    
-                                    try:
-                                        # Run synchronous ChromaDB query in a separate thread so it doesn't block audio
-                                        db_results = await asyncio.to_thread(
-                                            senco_collection.query,
-                                            query_texts=[search_query],
-                                            n_results=3
-                                        )
-                                        
-                                        # Stitch text and metadata together exactly like we did previously
-                                        if db_results['documents'] and db_results['documents'][0]:
-                                            context_chunks = []
-                                            for i in range(len(db_results['documents'][0])):
-                                                doc_text  = db_results['documents'][0][i]
-                                                metadata  = db_results['metadatas'][0][i]
-
-                                                # Extract clean address from document string
-                                                address = doc_text.split("Details:")[0].strip()
-                                                
-                                                #Clean pincode
-                                                raw_pincode = metadata.get('pincode', '')
-                                                formatted_pincode = format_digits(raw_pincode)
-                                                
-                                                #Clean phone numbers
-                                                raw_phones = metadata.get('phones', '')
-                                                formatted_phones = " | ".join(
-                                                    format_digits(p.strip()) 
-                                                    for p in raw_phones.split(",") 
-                                                    if p.strip()
-                                                )
-
-                                                chunk = (
-                                                    f"Store Name: {metadata.get('store_name', 'N/A')}\n"
-                                                    f"Address: {address}\n"
-                                                    f"State: {metadata.get('state', 'N/A')}\n"
-                                                    f"District: {metadata.get('district', 'N/A')}\n"
-                                                    f"Pincode: {formatted_pincode}\n"
-                                                    f"Phones: {formatted_phones}"
-                                                )
-
-                                                logger.info(f"Store Result {i+1}:\n{chunk}")
-                                                context_chunks.append(chunk)
-
-                                            retrieved_context = "\n\n---\n\n".join(context_chunks)
-                                        else:
-                                            retrieved_context = "No stores found matching that location."
-                                            
-                                        logger.info(f"✅ ChromaDB returned {len(db_results['documents'][0]) if db_results['documents'] else 0} results.")
-                                        
-                                        # Send the data back to Gemini
-                                        function_responses_to_send.append(
-                                            types.FunctionResponse(
-                                                id=call.id,
-                                                name=call.name,
-                                                response={"result": retrieved_context}
-                                            )
-                                        )
-                                    except Exception as db_err:
-                                        logger.error(f"❌ ChromaDB Search Failed: {db_err}")
-                                        function_responses_to_send.append(
-                                            types.FunctionResponse(
-                                                id=call.id,
-                                                name=call.name,
-                                                response={"error": "Database search failed. Tell the user you are currently unable to fetch the store details."}
-                                            )
-                                        )
-                                        
-                                elif call.name == "getNearestStoresByPincode":
-                                    user_pincode = args_dict.get("pincode")
-                                    logger.info(f"📍 Finding nearest stores for pincode: {user_pincode}")
-
-                                    try:
-                                        user_pincode = int(user_pincode)
-                                        result = []
-                                        
-                                        # Binary search position
-                                        pos = bisect.bisect_left(fast_pincode_index, user_pincode)
-                                        left = pos - 1
-                                        right = pos
-                                        
-                                        # Collect exact matches first
-                                        while right < len(stores_pincode_data) and fast_pincode_index[right] == user_pincode:
-                                            result.append(stores_pincode_data[right])
-                                            right += 1
-                                        
-                                        while left >= 0 and fast_pincode_index[left] == user_pincode:
-                                            result.append(stores_pincode_data[left])
-                                            left -= 1
-                                        
-                                        # Expand to get remaining closest based on numerical difference
-                                        while len(result) < 5 and (left >= 0 or right < len(stores_pincode_data)):
-                                            if left < 0:
-                                                result.append(stores_pincode_data[right])
-                                                right += 1
-                                            elif right >= len(stores_pincode_data):
-                                                result.append(stores_pincode_data[left])
-                                                left -= 1
-                                            else:
-                                                if abs(fast_pincode_index[left] - user_pincode) <= abs(fast_pincode_index[right] - user_pincode):
-                                                    result.append(stores_pincode_data[left])
-                                                    left -= 1
-                                                else:
-                                                    result.append(stores_pincode_data[right])
-                                                    right += 1
-
-                                        top_5_stores = result[:5]
-                                        
-                                        # Format the results into a clean string for Gemini to read
-                                        if top_5_stores:
-                                            formatted_stores = []
-                                            # ✅ New — structured formatting with format_digits applied
-                                            for idx, store in enumerate(top_5_stores):
-                                                meta = store.get("metadata", {})
-
-                                                raw_pincode       = str(store.get("pincode", ""))
-                                                formatted_pincode = format_digits(raw_pincode) if raw_pincode else "N/A"
-
-                                                # phones is a list e.g. ["9147106932", "9147132351"]
-                                                phones_list      = meta.get("phones", [])
-                                                formatted_phones = " | ".join(
-                                                    format_digits(p.strip()) for p in phones_list if p.strip()
-                                                ) if phones_list else "N/A"
-
-                                                chunk = (
-                                                    f"Store {idx+1}:\n"
-                                                    f"Store Name: {meta.get('store_name', 'N/A')}\n"
-                                                    f"Address: {store.get('address', 'N/A')}\n"
-                                                    f"State: {meta.get('state', 'N/A')}\n"
-                                                    f"District: {meta.get('district', 'N/A')}\n"
-                                                    f"Pincode: {formatted_pincode}\n"
-                                                    f"Phones: {formatted_phones}"
-                                                )
-
-                                                logger.info(f"Store Result {idx+1}:\n{chunk}")  # ✅ fixed i+1 → idx+1
-                                                formatted_stores.append(chunk)
-                                            
-                                            retrieved_context = "\n\n".join(formatted_stores)
-                                        else:
-                                            retrieved_context = "No stores found or database empty."
-
-                                        logger.info(f"✅ Found {len(top_5_stores)} nearest stores for pincode {user_pincode}.")
-
-                                        # Send the result back to Gemini
-                                        function_responses_to_send.append(
-                                            types.FunctionResponse(
-                                                id=call.id,
-                                                name=call.name,
-                                                response={"result": retrieved_context}
-                                            )
-                                        )
-
-                                    except Exception as e:
-                                        logger.error(f"❌ Pincode Search Failed: {e}")
-                                        function_responses_to_send.append(
-                                            types.FunctionResponse(
-                                                id=call.id,
-                                                name=call.name,
-                                                response={"error": "Failed to search by pincode. Tell the user you are currently unable to fetch the details."}
-                                            )
-                                        )
                                 # else:
                                 #     # Execute against Adamas Tech server
                                 #     mcp_result = await mcp_session.call_tool(
@@ -2060,6 +1895,7 @@ async def execute_pending_terminal_action(
     if pending_end:
         call_state["end_call_tool_executed"] = True
         call_state["pending_end_call"] = False
+        await asyncio.to_thread(save_lead, call_state, "completed")
         await terminate_plivo_call(
             plivo_client,
             call_state,
@@ -2100,6 +1936,11 @@ async def execute_pending_terminal_action(
             aleg_method="GET",
         )
         logger.info(f"Plivo call transferred via API for call_uuid={call_uuid}")
+        try:
+            transfer_summary = json.loads(call_state.get("transfer_summary", "") or "{}").get("call_summary", "")
+        except (json.JSONDecodeError, AttributeError):
+            transfer_summary = call_state.get("transfer_summary", "")
+        await asyncio.to_thread(save_lead, call_state, "transferred", transfer_summary)
     except Exception as e:
         logger.error(f"Failed to transfer call: {e}")
         await terminate_plivo_call(
