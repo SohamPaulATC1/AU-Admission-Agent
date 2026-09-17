@@ -35,4 +35,4 @@ senco_llm3.json
 test*
 call_transcript
 leads/
-record*.wav
+*.wav
