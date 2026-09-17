@@ -91,6 +91,16 @@ AGC_SMOOTHING_ALPHA = 0.08         # Slow alpha to prevent volume pumping
 
 VAD_SPEECH_ONSET_FRAMES = 3
 VAD_SILENCE_OFFSET_FRAMES = 10   # ~200 ms trailing silence before end-of-turn (was 15 = 300 ms)
+
+# --- Hybrid VAD (env-gated, default OFF) ---
+# Default path = pure MANUAL VAD (automatic_activity_detection disabled; we own
+# start/end via activity_start/activity_end, echo-gated onset). Set HYBRID_VAD=1
+# to instead let the SERVER own start-of-speech + barge-in (automatic detection
+# ON, audio streamed continuously) while our RNNoise end-of-speech sends
+# audio_stream_end for fast client-side turn finalization. Reversible via env.
+HYBRID_VAD = os.getenv("HYBRID_VAD", "0").strip().lower() in ("1", "true", "yes", "on")
+HYBRID_VAD_PREFIX_PADDING_MS = int(os.getenv("HYBRID_VAD_PREFIX_PADDING_MS", "20"))
+HYBRID_VAD_SILENCE_DURATION_MS = int(os.getenv("HYBRID_VAD_SILENCE_DURATION_MS", "800"))
 TERMINAL_ACTION_RECHECK_SECONDS = 0.2
 LOG_EVERY_N_CHUNKS = 50
 SUPERVISOR_POLL_INTERVAL = 0.25
@@ -924,7 +934,12 @@ async def handle_media_stream():
         "awaiting_model": False,
         "model_response_deadline": None,
         "interrupting": False,
-        
+
+        # Barge-in diagnostics (counters + discarded audio)
+        "barge_in_count": 0,
+        "out_buffer_clear_count": 0,
+        "out_buffer_bytes_discarded": 0,
+
         # AI speech timing trackers
         "ai_playback_start_time": None,
         "current_utterance_bytes": 0,
@@ -1124,8 +1139,17 @@ async def handle_media_stream():
                     )
                 ),
                 realtime_input_config=types.RealtimeInputConfig(
-                    automatic_activity_detection=types.AutomaticActivityDetection(
-                        disabled=True,
+                    automatic_activity_detection=(
+                        types.AutomaticActivityDetection(
+                            disabled=False,
+                            # Telephony is echo-prone; bias against false starts.
+                            start_of_speech_sensitivity=types.StartSensitivity.START_SENSITIVITY_LOW,
+                            end_of_speech_sensitivity=types.EndSensitivity.END_SENSITIVITY_LOW,
+                            prefix_padding_ms=HYBRID_VAD_PREFIX_PADDING_MS,
+                            silence_duration_ms=HYBRID_VAD_SILENCE_DURATION_MS,
+                        )
+                        if HYBRID_VAD
+                        else types.AutomaticActivityDetection(disabled=True)
                     ),
                     activity_handling=types.ActivityHandling.START_OF_ACTIVITY_INTERRUPTS,
                 ),
@@ -1383,7 +1407,47 @@ async def stream_plivo_to_gemini(plivo_ws, session, call_state):
                     
                 if not call_state.get("greeting_completed", False):
                     continue
-                
+
+                if HYBRID_VAD:
+                    # Server owns start-of-speech + barge-in (automatic detection ON).
+                    # We stream cleaned audio CONTINUOUSLY so the server can detect
+                    # onset/interruption itself, and only emit audio_stream_end when
+                    # our RNNoise sees end-of-speech, to finalize the turn fast
+                    # (bypassing the server's ~800ms silence wait). No activity_start/
+                    # activity_end, no local barge-in: the server's `interrupted`
+                    # signal (handled in stream_gemini_to_plivo) stops playback.
+                    if speech_started:
+                        call_state["silence_followup_count"] = 0
+                        if call_state.get("silence_timer_task") and not call_state["silence_timer_task"].done():
+                            call_state["silence_timer_task"].cancel()
+                            call_state["silence_timer_task"] = None
+
+                    if not call_state["tool_call_in_progress"]:
+                        call_state["gemini_input_buffer"].extend(clean_pcm_16k)
+                        while len(call_state["gemini_input_buffer"]) >= GEMINI_PCM_CHUNK_SIZE:
+                            audio_chunk = bytes(call_state["gemini_input_buffer"][:GEMINI_PCM_CHUNK_SIZE])
+                            del call_state["gemini_input_buffer"][:GEMINI_PCM_CHUNK_SIZE]
+                            await session.send_realtime_input(
+                                audio=types.Blob(data=audio_chunk, mime_type="audio/pcm;rate=16000")
+                            )
+
+                    if speech_ended:
+                        if call_state["gemini_input_buffer"]:
+                            await session.send_realtime_input(
+                                audio=types.Blob(
+                                    data=bytes(call_state["gemini_input_buffer"]),
+                                    mime_type="audio/pcm;rate=16000",
+                                )
+                            )
+                            call_state["gemini_input_buffer"].clear()
+                        await session.send_realtime_input(audio_stream_end=True)
+                        call_state["awaiting_model"] = True
+                        call_state["model_response_deadline"] = (
+                            time.monotonic() + MODEL_RESPONSE_TIMEOUT_SECONDS
+                        )
+                        logger.info("⏹️ [Hybrid VAD] Sent audio_stream_end")
+                    continue
+
                 # Maintain ~200ms preroll using the CLEAN 16kHz audio
                 if not call_state["user_activity_open"]:
                     call_state["preroll_pcm16"].extend(clean_pcm_16k)
@@ -1409,7 +1473,19 @@ async def stream_plivo_to_gemini(plivo_ws, session, call_state):
                     if call_state["assistant_speaking"]:
                         call_state["interrupting"] = True
                         call_state["assistant_speaking"] = False
-                        
+
+                        # Barge-in diagnostic: count + how long the AI had been
+                        # speaking before we cut it. Repeated very-short values
+                        # (<~0.5s) point to echo/noise false-triggering our VAD.
+                        call_state["barge_in_count"] += 1
+                        ai_spoke_ms = None
+                        if call_state.get("ai_playback_start_time") is not None:
+                            ai_spoke_ms = (datetime.now(ist_tz) - call_state["ai_playback_start_time"]).total_seconds() * 1000
+                        logger.info(
+                            f"📊 [BARGE-IN] source=local-vad count={call_state['barge_in_count']} "
+                            f"ai_spoke_ms={ai_spoke_ms if ai_spoke_ms is None else round(ai_spoke_ms)}"
+                        )
+
                         # Log the exact time the AI was cut off
                         interrupted_time = datetime.now(ist_tz)
                         logger.info(f"🎙️ [TIMING] AI Speech Interrupted at: {interrupted_time.strftime('%H:%M:%S.%f')[:-3]}")
@@ -1685,8 +1761,15 @@ async def stream_gemini_to_plivo(session, plivo_ws, call_state,plivo_client):
                         call_state["ai_text_buffer"] += output_transcription.text
                     
                     if getattr(server_content, 'interrupted', False):
-                        logger.info("🛑 Gemini confirmed interruption")
-                        
+                        call_state["barge_in_count"] += 1
+                        ai_spoke_ms = None
+                        if call_state.get("ai_playback_start_time") is not None:
+                            ai_spoke_ms = (datetime.now(ist_tz) - call_state["ai_playback_start_time"]).total_seconds() * 1000
+                        logger.info(
+                            f"🛑 Gemini confirmed interruption | 📊 [BARGE-IN] source=server count={call_state['barge_in_count']} "
+                            f"ai_spoke_ms={ai_spoke_ms if ai_spoke_ms is None else round(ai_spoke_ms)}"
+                        )
+
                         if call_state["ai_text_buffer"].strip():
                             logger.info(f"🤖 [GEMINI] (Interrupted): {call_state['ai_text_buffer'].strip()}")
                             call_state["ai_text_buffer"] = ""
@@ -1975,6 +2058,13 @@ async def send_plivo_audio(plivo_ws, call_state,session,plivo_client):
 
                 while len(out_buffer) >= PLIVO_ULAW_CHUNK_SIZE:
                     if call_state["interrupting"] or call_state["user_activity_open"]:
+                        call_state["out_buffer_clear_count"] += 1
+                        call_state["out_buffer_bytes_discarded"] += len(out_buffer)
+                        logger.info(
+                            f"📊 [OUT-CLEAR] count={call_state['out_buffer_clear_count']} "
+                            f"discarded_bytes={len(out_buffer)} "
+                            f"reason={'interrupting' if call_state['interrupting'] else 'user_activity_open'}"
+                        )
                         out_buffer.clear()
                         break
 

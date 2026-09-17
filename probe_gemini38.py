@@ -63,7 +63,27 @@ def report_enum_support(types):
         "types.AutomaticActivityDetection(disabled=True)": lambda: types.AutomaticActivityDetection(
             disabled=True
         ),
+        # --- Hybrid VAD specific (only needed if HYBRID_VAD=1) ---
+        "types.StartSensitivity.START_SENSITIVITY_LOW": lambda: types.StartSensitivity.START_SENSITIVITY_LOW,
+        "types.EndSensitivity.END_SENSITIVITY_LOW": lambda: types.EndSensitivity.END_SENSITIVITY_LOW,
+        "types.AutomaticActivityDetection(hybrid config)": lambda: types.AutomaticActivityDetection(
+            disabled=False,
+            start_of_speech_sensitivity=types.StartSensitivity.START_SENSITIVITY_LOW,
+            end_of_speech_sensitivity=types.EndSensitivity.END_SENSITIVITY_LOW,
+            prefix_padding_ms=20,
+            silence_duration_ms=800,
+        ),
     }
+
+    # Does send_realtime_input accept audio_stream_end? (hybrid finalization signal)
+    try:
+        import inspect
+        from google.genai.live import AsyncSession
+        sig = inspect.signature(AsyncSession.send_realtime_input)
+        ok = "audio_stream_end" in sig.parameters
+        print(f"  {'OK  ' if ok else 'FAIL'}  session.send_realtime_input(audio_stream_end=...) param present: {ok}")
+    except Exception as e:
+        print(f"  SKIP  could not introspect send_realtime_input: {type(e).__name__}: {e}")
     for label, fn in checks.items():
         try:
             fn()
