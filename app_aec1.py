@@ -45,7 +45,7 @@ PRICE_AUDIO_INPUT = 3.00
 PRICE_AUDIO_OUTPUT = 12.00
 
 LIVE_API_KEY = os.getenv('GOOGLE_API_KEY')
-GEMINI_MODEL = "gemini-3.1-flash-live-preview"
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-live-extended-thinking")
 PUBLIC_BASE_URL = os.getenv('PUBLIC_BASE_URL')
 HUMAN_TRANSFER_NUMBER = "+918335027643"
 PLIVO_PHONE_NUMBER = os.getenv('FROM_NUMBER')
@@ -274,6 +274,11 @@ def execute_transfer_call(summary: str):
 end_call_tool = types.FunctionDeclaration(
     name="endCall",
     description="Ends the call when the user says goodbye or wants to end the conversation.",
+    # NON_BLOCKING is required by gemini-3.8-live-extended-thinking (blocking
+    # function calls return a hard error on that model). The deferred-terminal
+    # dispatch below already returns an "accepted" FunctionResponse without a
+    # scheduling field, which is exactly the non-blocking contract.
+    behavior=types.Behavior.NON_BLOCKING,
     parameters={
         "type": "OBJECT",
         "properties": {
@@ -299,6 +304,8 @@ transfer_call_tool = types.FunctionDeclaration(
         "Hands the call over to a senior human admission counselor when the user asks to speak with a person "
         "or asks something beyond the AI agent's knowledge that needs a counselor."
     ),
+    # NON_BLOCKING required by gemini-3.8-live-extended-thinking (see endCall).
+    behavior=types.Behavior.NON_BLOCKING,
     parameters={
         "type": "OBJECT",
         "properties": {
