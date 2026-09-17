@@ -856,7 +856,6 @@ async def play_disclaimer(plivo_ws, call_state, disclaimer_finished_event):
         call_state["playing_disclaimer"] = False
         disclaimer_finished_event.set() # 🟢 Flip the traffic light to GREEN!
 
-@app.websocket('/media-stream')
 def _sanitize_filename(name):
     cleaned = "".join(c if (c.isalnum() or c in " _-") else "_" for c in (name or "")).strip()
     return cleaned or "Unknown"
@@ -905,6 +904,7 @@ def close_gemini_input_recording(call_state):
         call_state["gemini_in_wav"] = None
 
 
+@app.websocket('/media-stream')
 async def handle_media_stream():
     logger.info('Client connected to Quart WebSocket')
     
