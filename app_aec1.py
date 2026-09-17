@@ -50,7 +50,7 @@ PUBLIC_BASE_URL = os.getenv('PUBLIC_BASE_URL')
 HUMAN_TRANSFER_NUMBER = "+918335027643"
 PLIVO_PHONE_NUMBER = os.getenv('FROM_NUMBER')
 
-PORT = 8008
+PORT = 8000
 
 PLIVO_START_TIMEOUT_SECONDS = float(os.getenv("PLIVO_START_TIMEOUT_SECONDS", "10"))
 GEMINI_CONNECT_TIMEOUT_SECONDS = float(os.getenv("GEMINI_CONNECT_TIMEOUT_SECONDS", "20"))
@@ -78,12 +78,6 @@ PREROLL_MAX_BYTES_PCM8 = 3200        # ~200 ms @ 8kHz PCM16
 
 VAD_THRESHOLD = 0.75
 
-# Echo half-duplex gate: a light backstop for barge-in during playback. The real
-# echo removal is done by the AEC (see aec.py) BEFORE RNNoise, so this gate no
-# longer has to be aggressive — it only needs to reject the small residual the
-# linear filter can't cancel. Kept slightly above the normal threshold / onset
-# for margin; relax toward VAD_THRESHOLD / VAD_SPEECH_ONSET_FRAMES if barge-in
-# still feels sluggish, tighten if any residual echo self-triggers.
 VAD_THRESHOLD_WHILE_SPEAKING = 0.82
 VAD_SPEECH_ONSET_FRAMES_WHILE_SPEAKING = 4   # ~80 ms of sustained speech to barge in
 

@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Senco AI Outbound Calling Dashboard</title>
-    <meta name="description" content="AI-powered outbound calling dashboard for Senco Gold and Diamonds. Dispatch and monitor voice agent calls in real-time.">
+    <title>Adamas University — AI Admission Agent</title>
+    <meta name="description" content="AI-powered outbound admission dashboard for Adamas University. Dispatch and monitor voice agent calls in real-time.">
     <link rel="icon" href="favicon.png?v=1" type="image/png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -13,18 +13,19 @@
     <style>
         :root {
             /* Light Theme (Editorial Brutalism Default) */
-            --bg-primary: #f4f4f0; /* Warm off-white/cream */
+            --bg-primary: #FAFBFD; /* Clean Alabaster */
             --bg-secondary: #ffffff;
-            --bg-card: #f4f4f0;
+            --bg-card: #FAFBFD;
             --text-primary: #000000;
             --text-secondary: #52525b;
             
             --border-color: #000000;
             --border-width: 1px;
             
-            --senco-red: #c9243f;
-            --senco-red-hover: #a01c32;
-            --gold-primary: #d4af37;
+            --au-blue: #005AAB;
+            --au-blue-hover: #004488;
+            --au-orange: #FF5604;
+            --au-blue-light: #E8F2FC;
             
             --success: #16a34a;
             --warning: #d97706;
@@ -41,8 +42,10 @@
             
             --border-color: #ffffff;
             
-            --senco-red: #ff2a55;
-            --senco-red-hover: #ff5577;
+            --au-blue: #3388DD;
+            --au-blue-hover: #1166BB;
+            --au-orange: #FF7733;
+            --au-blue-dark: #003D7A;
             
             --success: #4ade80;
             --warning: #fbbf24;
@@ -146,7 +149,7 @@
         }
 
         .theme-toggle:hover {
-            background-color: var(--senco-red);
+            background-color: var(--au-blue);
         }
         
         .theme-toggle:hover svg { stroke: #fff; }
@@ -169,13 +172,7 @@
         [data-theme="light"] .theme-toggle .icon-sun { opacity: 1; transform: scale(1); }
         [data-theme="light"] .theme-toggle .icon-moon { opacity: 0; transform: scale(0); }
 
-        .partner-brand {
-            display: flex;
-            align-items: center;
-            height: 100%;
-            padding: 0 2rem;
-            border-left: var(--border-width) solid var(--border-color);
-        }
+
 
         /* ─── Main Layout ─── */
         .dashboard {
@@ -349,7 +346,7 @@
         .status-pill.connected .pill-dot { background: var(--success); }
         .status-pill.ended .pill-dot { background: var(--text-secondary); }
         .status-pill.failed .pill-dot { background: var(--danger); }
-        .status-pill.transferring .pill-dot { background: var(--gold-primary); }
+        .status-pill.transferring .pill-dot { background: var(--au-orange); }
 
         /* ─── Call Progress Steps (Editorial Pipeline) ─── */
         .call-progress {
@@ -367,7 +364,7 @@
         }
 
         .progress-step.reached { color: var(--text-primary); }
-        .progress-step.current { color: var(--senco-red); font-weight: 600; }
+        .progress-step.current { color: var(--au-blue); font-weight: 600; }
         .progress-step.failed-step { color: var(--danger); }
         .call-entry.ended .progress-step { color: var(--text-primary); }
         .call-entry.ended .progress-step:not(.reached) { color: var(--text-secondary); }
@@ -402,7 +399,7 @@
         .live-timer {
             font-family: "Syne", sans-serif;
             font-size: 1.25rem;
-            color: var(--senco-red);
+            color: var(--au-blue);
             font-weight: 700;
         }
         
@@ -433,9 +430,9 @@
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.05em;
-            color: var(--senco-red);
+            color: var(--au-blue);
             margin-bottom: 2rem;
-            border-bottom: var(--border-width) solid var(--senco-red);
+            border-bottom: var(--border-width) solid var(--au-blue);
             padding-bottom: 0.25rem;
             width: max-content;
         }
@@ -489,7 +486,7 @@
         }
 
         .input-group input:focus {
-            border-bottom-color: var(--senco-red);
+            border-bottom-color: var(--au-blue);
         }
         
         .input-group input::placeholder {
@@ -498,7 +495,7 @@
 
         .input-error {
             font-size: 0.8rem;
-            color: var(--senco-red);
+            color: var(--au-blue);
             position: absolute;
             bottom: -1.5rem;
             left: 0;
@@ -509,7 +506,7 @@
 
         .dispatch-btn {
             height: 80px;
-            background: var(--senco-red);
+            background: var(--au-blue);
             color: #ffffff;
             border: none;
             font-family: "Syne", sans-serif;
@@ -526,7 +523,7 @@
         }
 
         .dispatch-btn:hover {
-            background: var(--senco-red-hover);
+            background: var(--au-blue-hover);
         }
 
         .dispatch-btn:disabled {
@@ -587,7 +584,7 @@
     <!-- Nav -->
     <nav class="top-nav">
         <div class="brand">
-            <img src="/senco.png" alt="Senco Gold and Diamonds" class="brand-logo">
+            <img src="/atc.png" alt="Adamas University" class="brand-logo">
         </div>
         <div class="nav-right">
             <div class="sse-indicator" id="sseIndicator">
@@ -598,9 +595,7 @@
                 <svg class="icon-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
                 <svg class="icon-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
             </button>
-            <div class="partner-brand">
-                <img src="/atc.png" alt="Adamas Tech" class="brand-logo" style="height: 24px;">
-            </div>
+
         </div>
     </nav>
 
@@ -627,11 +622,11 @@
             <div class="dispatch-card" id="dispatchCard">
                 <span class="card-badge">AI Agent Operations</span>
                 <h2>New Call</h2>
-                <p class="subtitle">Dispatch the voice agent.</p>
+                <p class="subtitle">Dispatch the admission agent.</p>
 
                 <form class="dispatch-form" id="dispatchForm" novalidate>
                     <div class="input-group">
-                        <label for="userName">Customer Name</label>
+                        <label for="userName">Applicant Name</label>
                         <input id="userName" name="userName" type="text" autocomplete="name" placeholder="Enter name" required>
                         <div class="input-error" id="nameError"></div>
                     </div>
@@ -660,11 +655,11 @@
 
         function setTheme(theme) {
             document.documentElement.setAttribute("data-theme", theme);
-            localStorage.setItem("senco-dash-theme", theme);
+            localStorage.setItem("au-dash-theme", theme);
         }
 
         (function initTheme() {
-            const saved = localStorage.getItem("senco-dash-theme");
+            const saved = localStorage.getItem("au-dash-theme");
             // Default to light for Snowhouse Studio aesthetic
             if (saved === "dark") {
                 setTheme("dark");
