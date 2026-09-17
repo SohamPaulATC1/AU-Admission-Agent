@@ -101,6 +101,14 @@ VAD_SILENCE_OFFSET_FRAMES = 10   # ~200 ms trailing silence before end-of-turn (
 HYBRID_VAD = os.getenv("HYBRID_VAD", "0").strip().lower() in ("1", "true", "yes", "on")
 HYBRID_VAD_PREFIX_PADDING_MS = int(os.getenv("HYBRID_VAD_PREFIX_PADDING_MS", "20"))
 HYBRID_VAD_SILENCE_DURATION_MS = int(os.getenv("HYBRID_VAD_SILENCE_DURATION_MS", "800"))
+
+# --- Record the preprocessed audio actually sent to Gemini (env-gated, default OFF) ---
+# Captures the exact 16kHz PCM16 blobs streamed to the model (post RNNoise/AGC/
+# resample) into one WAV per call, named by user_name. Set RECORD_GEMINI_INPUT=1
+# to enable. ~2 MB/min, so kept off by default.
+RECORD_GEMINI_INPUT = os.getenv("RECORD_GEMINI_INPUT", "0").strip().lower() in ("1", "true", "yes", "on")
+RECORD_GEMINI_INPUT_DIR = os.getenv("RECORD_GEMINI_INPUT_DIR", "User_call_recordings")
+
 TERMINAL_ACTION_RECHECK_SECONDS = 0.2
 LOG_EVERY_N_CHUNKS = 50
 SUPERVISOR_POLL_INTERVAL = 0.25
@@ -849,6 +857,54 @@ async def play_disclaimer(plivo_ws, call_state, disclaimer_finished_event):
         disclaimer_finished_event.set() # 🟢 Flip the traffic light to GREEN!
 
 @app.websocket('/media-stream')
+def _sanitize_filename(name):
+    cleaned = "".join(c if (c.isalnum() or c in " _-") else "_" for c in (name or "")).strip()
+    return cleaned or "Unknown"
+
+
+def open_gemini_input_recording(call_state):
+    """Open a per-call WAV writer for the exact audio streamed to Gemini
+    (16kHz mono PCM16). No-op unless RECORD_GEMINI_INPUT is set."""
+    call_state["gemini_in_wav"] = None
+    call_state["gemini_in_wav_path"] = None
+    if not RECORD_GEMINI_INPUT:
+        return
+    try:
+        os.makedirs(RECORD_GEMINI_INPUT_DIR, exist_ok=True)
+        base = _sanitize_filename(call_state.get("user_name", "Unknown"))
+        ts = datetime.now(ist_tz).strftime("%Y%m%d_%H%M%S")
+        path = os.path.join(RECORD_GEMINI_INPUT_DIR, f"{base}_{ts}.wav")
+        wf = wave.open(path, "wb")
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(16000)
+        call_state["gemini_in_wav"] = wf
+        call_state["gemini_in_wav_path"] = path
+        logger.info(f"🎙️ [REC] Recording Gemini input audio -> {path}")
+    except Exception as e:
+        logger.error(f"[REC] Failed to open recording: {e}")
+        call_state["gemini_in_wav"] = None
+
+
+def record_gemini_pcm(call_state, data):
+    """Append PCM16 frames actually sent to Gemini to the per-call WAV."""
+    wf = call_state.get("gemini_in_wav")
+    if wf is not None and data:
+        try:
+            wf.writeframes(data)
+        except Exception as e:
+            logger.error(f"[REC] write failed: {e}")
+
+
+def close_gemini_input_recording(call_state):
+    wf = call_state.get("gemini_in_wav")
+    if wf is not None:
+        with contextlib.suppress(Exception):
+            wf.close()
+        logger.info(f"🎙️ [REC] Saved Gemini input audio: {call_state.get('gemini_in_wav_path')}")
+        call_state["gemini_in_wav"] = None
+
+
 async def handle_media_stream():
     logger.info('Client connected to Quart WebSocket')
     
@@ -979,6 +1035,9 @@ async def handle_media_stream():
         "preroll_pcm16": bytearray(),
         "gemini_input_buffer": bytearray(),
         "plivo_output_queue": asyncio.Queue(),
+        # per-call recording of the audio actually sent to Gemini
+        "gemini_in_wav": None,
+        "gemini_in_wav_path": None,
         
         # helpers
         "closing": False,
@@ -998,7 +1057,9 @@ async def handle_media_stream():
         "usage_total_updates": 0,
         "usage_total_non_monotonic_count": 0,
     }
-    
+
+    open_gemini_input_recording(call_state)
+
     disclaimer_finished = asyncio.Event()
     disclaimer_task = None
 
@@ -1271,6 +1332,7 @@ async def handle_media_stream():
         # exists — persist a stub so no lead is lost.
         if not call_state.get("lead_saved"):
             save_lead(call_state, "user_hangup")
+        close_gemini_input_recording(call_state)
         log_call_stats(call_state)
 
 async def stream_plivo_to_gemini(plivo_ws, session, call_state):
@@ -1430,6 +1492,7 @@ async def stream_plivo_to_gemini(plivo_ws, session, call_state):
                             await session.send_realtime_input(
                                 audio=types.Blob(data=audio_chunk, mime_type="audio/pcm;rate=16000")
                             )
+                            record_gemini_pcm(call_state, audio_chunk)
 
                     if speech_ended:
                         if call_state["gemini_input_buffer"]:
@@ -1439,6 +1502,7 @@ async def stream_plivo_to_gemini(plivo_ws, session, call_state):
                                     mime_type="audio/pcm;rate=16000",
                                 )
                             )
+                            record_gemini_pcm(call_state, bytes(call_state["gemini_input_buffer"]))
                             call_state["gemini_input_buffer"].clear()
                         await session.send_realtime_input(audio_stream_end=True)
                         call_state["awaiting_model"] = True
@@ -1539,6 +1603,7 @@ async def stream_plivo_to_gemini(plivo_ws, session, call_state):
                             await session.send_realtime_input(
                                 audio=types.Blob(data=audio_chunk, mime_type="audio/pcm;rate=16000")
                             )
+                            record_gemini_pcm(call_state, audio_chunk)
                 if speech_ended and call_state["user_activity_open"]:
                     logger.info(" 🔇 User speech end detected")
                     emit_call_event(call_state.get("call_uuid"), "user_silent")
@@ -1551,6 +1616,7 @@ async def stream_plivo_to_gemini(plivo_ws, session, call_state):
                                 mime_type="audio/pcm;rate=16000"
                             )
                         )
+                        record_gemini_pcm(call_state, bytes(call_state["gemini_input_buffer"]))
                         call_state["gemini_input_buffer"].clear()
 
                     await session.send_realtime_input(
@@ -1742,6 +1808,7 @@ async def stream_gemini_to_plivo(session, plivo_ws, call_state,plivo_client):
                                         data=bytes(call_state["gemini_input_buffer"]),
                                     )
                                 )
+                                record_gemini_pcm(call_state, bytes(call_state["gemini_input_buffer"]))
                                 call_state["gemini_input_buffer"].clear()
 
                 # ==========================================
