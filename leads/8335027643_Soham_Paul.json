@@ -1,8 +1,8 @@
 {
   "name": "Soham Paul",
   "phone_number": "8335027643",
-  "outcome": "completed",
-  "summary": "Spoke with the student, Soham Paul, who is already a B.Tech CSE AIML student at Adamas University. He was interested in M.Tech programs for the 2027 session. I shared the eligibility criteria (60% in B.Tech + GATE/AUAT) and fee details (First Sem Fee 78,250, Total Fee 3,51,800) for the M.Tech programs. He had no further questions and ended the call.",
-  "call_uuid": "557635e6-fa9b-424d-b935-83a308eb49c3",
-  "timestamp": "2026-09-16T13:41:47.028691+05:30"
+  "outcome": "user_hangup",
+  "summary": "",
+  "call_uuid": "750d1581-49d5-418d-9aac-8a9abd557ee7",
+  "timestamp": "2026-09-17T15:54:16.694072+05:30"
 }
