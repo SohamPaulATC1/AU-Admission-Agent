@@ -1385,19 +1385,23 @@ async def stream_plivo_to_gemini(plivo_ws, session, call_state):
                 )
                 samples_48k = np.frombuffer(pcm_48k, dtype=np.int16)
             
-                denoised_samples = []
                 speech_probs = []
                 chunk_48k = samples_48k.reshape(1, -1)
-                
-                for speech_prob, clean_frame in call_state["denoiser"].denoise_chunk(chunk_48k):
-                    denoised_samples.append(np.array(clean_frame, dtype=np.int16).flatten())
+
+                # RNNoise is a 48kHz WIDEBAND denoiser. Fed 8kHz telephony
+                # upsampled to 48kHz (no real energy above ~3.4kHz), its per-band
+                # gains treat the legitimate narrowband speech as out-of-band noise
+                # and crush the 1-3.4kHz speech band (probe_dsp.py: 95% energy
+                # collapses from 2.9kHz to 755Hz), muffling what Gemini hears.
+                # So we run denoise_chunk ONLY to harvest its speech_prob for the
+                # manual VAD, and send the NON-denoised audio to Gemini. Echo is
+                # already removed by the AEC and low-level hiss by the AGC noise gate.
+                for speech_prob, _clean_frame in call_state["denoiser"].denoise_chunk(chunk_48k):
                     speech_probs.append(speech_prob)
-                
-                clean_pcm_48k = np.concatenate(denoised_samples).tobytes() if denoised_samples else b""
-                
-                # Downsample 48k → 16k
+
+                # Downsample the ORIGINAL (non-denoised) 48k audio 48k → 16k
                 clean_pcm_16k, call_state["ratecv_state_down"] = audioop.ratecv(
-                    clean_pcm_48k, 2, 1, 48000, GEMINI_INPUT_RATE, call_state["ratecv_state_down"]
+                    pcm_48k, 2, 1, 48000, GEMINI_INPUT_RATE, call_state["ratecv_state_down"]
                 )
                 
                 rms_db, float_samples = calculate_rms_db(clean_pcm_16k)
