@@ -26,6 +26,9 @@ import asyncio
 import os
 import sys
 
+from dotenv import load_dotenv
+load_dotenv()
+
 MODEL = os.getenv("PROBE_MODEL", "gemini-3.8-live-extended-thinking")
 API_KEY = os.getenv("GOOGLE_API_KEY")
 RECEIVE_TIMEOUT_SECONDS = 30.0

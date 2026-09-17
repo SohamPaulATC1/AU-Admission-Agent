@@ -1190,7 +1190,7 @@ async def handle_media_stream():
                 input_audio_transcription=types.AudioTranscriptionConfig(),
                 output_audio_transcription=types.AudioTranscriptionConfig(),
                 thinking_config=types.ThinkingConfig(
-                    thinking_level="low",
+                    thinking_level="medium",
                 ),
                 speech_config=types.SpeechConfig(
                     voice_config=types.VoiceConfig(
