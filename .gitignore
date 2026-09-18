@@ -42,3 +42,8 @@ leads/*.json
 record*.wav
 User_call_recordings/
 >>>>>>> Stashed changes
+
+# Keep the regression suite for the live calling bridge.
+!tests/
+!tests/test_call_runtime.py
+!tests/test_app_lifecycle.py

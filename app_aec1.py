@@ -15,6 +15,10 @@ import wave
 import sqlite3
 from pyrnnoise import RNNoise
 from aec import AcousticEchoCanceller
+from call_runtime import (
+    OutputResampler, PlivoPlayback, ResponseTracker, SpeechGate,
+    cancel_tasks, soft_limit,
+)
 import numpy as np
 import urllib.parse
 
@@ -46,6 +50,7 @@ PRICE_AUDIO_OUTPUT = 12.00
 
 LIVE_API_KEY = os.getenv('GOOGLE_API_KEY')
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-live-extended-thinking")
+#GEMINI_MODEL = "gemini-3.1-flash-live-preview"
 PUBLIC_BASE_URL = os.getenv('PUBLIC_BASE_URL')
 HUMAN_TRANSFER_NUMBER = "+918335027643"
 PLIVO_PHONE_NUMBER = os.getenv('FROM_NUMBER')
@@ -76,38 +81,32 @@ PLIVO_ULAW_CHUNK_SIZE = 160          # 20 ms @ 8kHz μ-law
 GEMINI_PCM_CHUNK_SIZE = 640          # 20 ms @ 16kHz PCM16 = 320 samples = 640 bytes
 PREROLL_MAX_BYTES_PCM8 = 3200        # ~200 ms @ 8kHz PCM16
 
-VAD_THRESHOLD = 0.75
+VAD_THRESHOLD = float(os.getenv("VAD_THRESHOLD", "0.75"))
+VAD_THRESHOLD_WHILE_SPEAKING = float(os.getenv("VAD_THRESHOLD_WHILE_SPEAKING", "0.92"))
+VAD_ONSET_MS = max(20, int(os.getenv("VAD_ONSET_MS", "80")))
+VAD_BARGE_IN_MS = max(VAD_ONSET_MS, int(os.getenv("VAD_BARGE_IN_MS", "240")))
+VAD_MIN_RMS_DB = float(os.getenv("VAD_MIN_RMS_DB", "-50"))
+VAD_BARGE_MIN_RMS_DB = float(os.getenv("VAD_BARGE_MIN_RMS_DB", "-42"))
 
-VAD_THRESHOLD_WHILE_SPEAKING = 0.82
-VAD_SPEECH_ONSET_FRAMES_WHILE_SPEAKING = 4   # ~80 ms of sustained speech to barge in
-
-PREROLL_MAX_BYTES_PCM16 = 6400       # ~200 ms @ 16kHz PCM16 (Replacing PREROLL_MAX_BYTES_PCM8)
+PREROLL_MAX_BYTES_PCM16 = max(6400, (VAD_BARGE_IN_MS + 80) * 32)  # Preserve onset through longer barge-in confirmation.
 
 # DSP Constants
 AGC_TARGET_DB = -12.0
-AGC_MAX_GAIN_DB = 30.0               # Tuned down to prevent telephony artifact amplification
+AGC_MAX_GAIN_DB = 15.0  # Same effective cap as the previous hardcoded clamp.
 AGC_NOISE_GATE_DB = -50.0
 AGC_SMOOTHING_ALPHA = 0.08         # Slow alpha to prevent volume pumping
 
-VAD_SPEECH_ONSET_FRAMES = 3
-VAD_SILENCE_OFFSET_FRAMES = 10   # ~200 ms trailing silence before end-of-turn (was 15 = 300 ms)
+# Hysteresis plus 400 ms of silence avoids splitting ordinary short pauses.
+VAD_SILENCE_OFFSET_MS = max(20, int(os.getenv("VAD_SILENCE_OFFSET_MS", "400")))
+PLAYBACK_ACK_TIMEOUT_SECONDS = float(os.getenv("PLAYBACK_ACK_TIMEOUT_SECONDS", "5"))
+MAX_EMPTY_RESPONSE_RETRIES = 1
+MAX_INPUT_QUEUE_FRAMES = 25  # At most 500 ms of 20 ms frames.
+SSE_HEARTBEAT_SECONDS = 15
 
-# --- Hybrid VAD (env-gated, default OFF) ---
-# Default path = pure MANUAL VAD (automatic_activity_detection disabled; we own
-# start/end via activity_start/activity_end, echo-gated onset). Set HYBRID_VAD=1
-# to instead let the SERVER own start-of-speech + barge-in (automatic detection
-# ON, audio streamed continuously) while our RNNoise end-of-speech sends
-# audio_stream_end for fast client-side turn finalization. Reversible via env.
-HYBRID_VAD = os.getenv("HYBRID_VAD", "0").strip().lower() in ("1", "true", "yes", "on")
-HYBRID_VAD_PREFIX_PADDING_MS = int(os.getenv("HYBRID_VAD_PREFIX_PADDING_MS", "20"))
-HYBRID_VAD_SILENCE_DURATION_MS = int(os.getenv("HYBRID_VAD_SILENCE_DURATION_MS", "800"))
-
-# --- Record the preprocessed audio actually sent to Gemini (env-gated, default OFF) ---
-# Captures the exact 16kHz PCM16 blobs streamed to the model (post RNNoise/AGC/
-# resample) into one WAV per call, named by user_name. Set RECORD_GEMINI_INPUT=1
-# to enable. ~2 MB/min, so kept off by default.
-RECORD_GEMINI_INPUT = os.getenv("RECORD_GEMINI_INPUT", "0").strip().lower() in ("1", "true", "yes", "on")
-RECORD_GEMINI_INPUT_DIR = os.getenv("RECORD_GEMINI_INPUT_DIR", "User_call_recordings")
+# The demo uses manual VAD and does not record call audio. Existing .env flags
+# intentionally cannot enable the unvalidated hybrid path or debug WAV writes.
+HYBRID_VAD = False
+RECORD_GEMINI_INPUT = True
 
 TERMINAL_ACTION_RECHECK_SECONDS = 0.2
 LOG_EVERY_N_CHUNKS = 50
@@ -181,12 +180,12 @@ def load_transfer_context(call_uuid):
 
 
 initialize_transfer_context_store()
-    
+
 def get_indian_time():
     ist = timezone(timedelta(hours=5, minutes=30))
     now_ist = datetime.now(ist)
     return now_ist.strftime("%A, %d %B %Y %H:%M:%S IST")
-    
+
 # =============================================================================
 # Audio utilities
 # =============================================================================
@@ -259,15 +258,15 @@ def load_disclaimer():
     try:
         with wave.open("playback_audio_files/recorded1.wav", "rb") as wf:
             pcm_data = wf.readframes(wf.getnframes())
-            
+
             ulaw_data = pcm_to_ulaw(pcm_data)
-            
+
             chunk_size = 160  # 20ms of 8kHz mu-law
             for i in range(0, len(ulaw_data), chunk_size):
                 chunk = ulaw_data[i:i+chunk_size]
                 if len(chunk) == chunk_size:
                     DISCLAIMER_ULAW_CHUNKS.append(base64.b64encode(chunk).decode("utf-8"))
-                    
+
         logger.info(f"✅ Loaded pre-optimized recorded1.wav ({len(DISCLAIMER_ULAW_CHUNKS)} chunks).")
     except Exception as e:
         logger.warning(f"⚠️ Could not load recorded1.wav. Disclaimer disabled. Error: {e}")
@@ -280,7 +279,7 @@ def format_digits(number_str):
         '5': 'five', '6': 'six', '7': 'seven', '8': 'eight', '9': 'nine'
     }
     return "-".join(digit_words[d] for d in number_str.strip())
-    
+
 # Define native Python functions for the tools
 def execute_end_call():
     return json.dumps({"action": "END_CALL", "statusCode": 200})
@@ -341,7 +340,7 @@ transfer_call_tool = types.FunctionDeclaration(
 )
 
 LOCAL_GEMINI_TOOLS = [{"function_declarations": [end_call_tool, transfer_call_tool]}]
-    
+
 SILENCE_FOLLOWUP_PROMPT = (
     "The user has been silent for a few seconds after you spoke with them last."
     "Please briefly and politely re-engage them in the same language you have been speaking. "
@@ -356,30 +355,31 @@ SILENCE_FAREWELL_PROMPT = (
 )
 
 async def silence_watchdog(session, call_state, delay=SILENCE_FOLLOWUP_SECONDS):
+    epoch = call_state['responses'].epoch
     try:
         await asyncio.sleep(delay)
-        if call_state.get("terminate_session") or call_state.get("user_activity_open"):
+        if (
+            call_state.get('terminate_session') or not call_state.get('session_ready')
+            or call_state['responses'].epoch != epoch
+            or call_state['user_activity_open'] or call_state['is_speaking']
+            or call_state['playback'].busy or call_state['responses'].active is not None
+        ):
             return
-        if call_state["silence_followup_count"] >= MAX_SILENCE_FOLLOWUPS:
-            logger.info("Maximum silence follow-ups reached. Sending farewell prompt before ending call.")
-            call_state["closing_audio_phase"] = True
-            call_state["awaiting_model"] = True
-            call_state["model_response_deadline"] = time.monotonic() + MODEL_RESPONSE_TIMEOUT_SECONDS
-            call_state["terminal_action_deadline"] = time.monotonic() + TERMINAL_ACTION_TIMEOUT_SECONDS
-            await session.send_realtime_input(text=SILENCE_FAREWELL_PROMPT)
-            return
-        call_state["silence_followup_count"] += 1
-        call_state["awaiting_model"] = True
-        call_state["model_response_deadline"] = time.monotonic() + MODEL_RESPONSE_TIMEOUT_SECONDS
-        logger.info(f"Prompting AI to re-engage ({call_state['silence_followup_count']}/{MAX_SILENCE_FOLLOWUPS}).")
-        await session.send_realtime_input(text=SILENCE_FOLLOWUP_PROMPT)
+        if call_state['silence_followup_count'] >= MAX_SILENCE_FOLLOWUPS:
+            call_state['closing_audio_phase'] = True
+            call_state['terminal_action_deadline'] = time.monotonic() + MODEL_RESPONSE_TIMEOUT_SECONDS
+            await send_model_prompt(session, call_state, SILENCE_FAREWELL_PROMPT, 'farewell')
+        else:
+            call_state['silence_followup_count'] += 1
+            await send_model_prompt(session, call_state, SILENCE_FOLLOWUP_PROMPT, 'followup')
     except asyncio.CancelledError:
-        pass
-    except Exception as e:
-        logger.error(f"Silence watchdog failed: {e}")
-        call_state["pending_end_call"] = True
-        call_state["closing_audio_phase"] = True
-        call_state["terminal_action_deadline"] = time.monotonic() + 1.0
+        raise
+    except Exception as exc:
+        # The session supervisor owns recovery; a timer must not terminate a
+        # healthy successor session after the connection it used has expired.
+        if call_state['responses'].epoch == epoch:
+            call_state['session_error'] = exc
+
 
 def calculate_rms_db(pcm_data):
     """Converts int16 PCM to float32, calculates RMS in dB, and returns both."""
@@ -423,14 +423,17 @@ async def call_events_stream():
     async def event_generator():
         try:
             while True:
-                payload = await q.get()
-                yield f"data: {payload}\n\n"
+                try:
+                    payload = await asyncio.wait_for(q.get(), timeout=SSE_HEARTBEAT_SECONDS)
+                    yield f"data: {payload}\n\n"
+                except asyncio.TimeoutError:
+                    yield ": heartbeat\n\n"
         except asyncio.CancelledError:
             pass
         finally:
             call_event_subscribers.discard(q)
 
-    return Response(
+    response = Response(
         event_generator(),
         mimetype='text/event-stream',
         headers={
@@ -439,6 +442,8 @@ async def call_events_stream():
             'Connection': 'keep-alive',
         }
     )
+    response.timeout = None
+    return response
 
 plivo_client = plivo.RestClient(auth_id=os.getenv('PLIVO_AUTH_ID'), auth_token=os.getenv('PLIVO_AUTH_TOKEN'))
 
@@ -475,17 +480,16 @@ async def serve_dashboard():
 #         from_number = form_data.get("From", "Unknown")
 #     else:
 #         from_number = request.args.get("From", "Unknown")
-        
+
 #     from_number = str(from_number)[2:]
-        
+
 #     logger.info(f"Incoming call webhook triggered by: {from_number}")
-    
+
 #     AUDIO_URL = f"{PUBLIC_BASE_URL}/playback_audio_files/recorded.wav"
-    
+
 #     xml_data = f'''<?xml version="1.0" encoding="UTF-8"?>
 #     <Response>
-#         <Record action="{PUBLIC_BASE_URL}/recording-callback" redirect="false" recordSession="true" maxLength="3600" />
-#         <Play>{AUDIO_URL}</Play>
+# #         <Play>{AUDIO_URL}</Play>
 #         <Stream streamTimeout="86400" keepCallAlive="true" bidirectional="true" noiseCancellation="true" noiseCancellationLevel="85" contentType="audio/x-mulaw;rate=8000" audioTrack="inbound" >
 #             wss://{request.host}/media-stream?from_number={from_number}
 #         </Stream>
@@ -498,17 +502,16 @@ async def outbound_webhook():
     # Extract user details passed from the main block
     user_name = request.args.get("user_name", "Unknown")
     phone_number = request.args.get("phone_number", "Unknown")
-    
+
     logger.info(f"📞 Outbound call answered by: {phone_number} ({user_name})")
-    
+
     import urllib.parse
     encoded_name = urllib.parse.quote(user_name)
     encoded_phone = urllib.parse.quote(phone_number)
-    
+
     ws_base_url = PUBLIC_BASE_URL.replace("https://", "wss://").replace("http://", "ws://")
     xml_data = f'''<?xml version="1.0" encoding="UTF-8"?>
     <Response>
-        <Record action="{PUBLIC_BASE_URL}/recording-callback" redirect="false" recordSession="true" maxLength="3600" />
         <Stream streamTimeout="86400" keepCallAlive="true" bidirectional="true" noiseCancellation="true" noiseCancellationLevel="85" contentType="audio/x-mulaw;rate=8000" audioTrack="inbound" >
             {ws_base_url}/media-stream?user_name={encoded_name}&amp;phone_number={encoded_phone}
         </Stream>
@@ -531,7 +534,7 @@ async def transfer_xml():
 
     if request.method == 'POST':
         form_data = await request.form
-        
+
     plivo_number = PLIVO_PHONE_NUMBER
 
     target_number = request.args.get("number", HUMAN_TRANSFER_NUMBER)
@@ -577,7 +580,7 @@ async def dial_action():
 
     # Safely get call_uuid from URL args first, fallback to form data
     call_uuid = request.args.get("call_uuid") or plivo_call_uuid
-    
+
     # Normalize status (Plivo sends "hangup" when the human ends an answered call)
     dial_status = dial_status.lower()
     logger.info(f"📲 DialStatus={dial_status}, call_uuid={call_uuid}")
@@ -593,7 +596,7 @@ async def dial_action():
 
     encoded_phone = urllib.parse.quote(original_from)
     encoded_context_id = urllib.parse.quote(call_uuid or "")
-    
+
     # Map Plivo's successful states to 'completed' so handle_media_stream reads it correctly
     is_success = "completed" if dial_status in ["hangup", "answered", "completed"] else "failed"
     encoded_status   = urllib.parse.quote(is_success)
@@ -605,8 +608,8 @@ async def dial_action():
     xml_data = f"""<?xml version="1.0" encoding="UTF-8"?>
     <Response>
         <Play>{RECONNECTING_URL}</Play>
-        <Stream streamTimeout="86400" keepCallAlive="true" bidirectional="true" 
-                noiseCancellation="true" noiseCancellationLevel="85" 
+        <Stream streamTimeout="86400" keepCallAlive="true" bidirectional="true"
+                noiseCancellation="true" noiseCancellationLevel="85"
                 contentType="audio/x-mulaw;rate=8000" audioTrack="inbound">
             wss://{ws_host}/media-stream?phone_number={encoded_phone}&amp;transfer_context_id={encoded_context_id}&amp;dial_status={encoded_status}&amp;is_transfer_return=1
         </Stream>
@@ -709,10 +712,10 @@ async def terminate_plivo_call(plivo_client, call_state, reason):
 
     try:
         if call_uuid:
-            await asyncio.to_thread(
+            await asyncio.wait_for(asyncio.to_thread(
                 plivo_client.calls.delete,
                 call_uuid=call_uuid,
-            )
+            ), 5)
             logger.info(f"Plivo call explicitly terminated for call_uuid={call_uuid}")
         else:
             logger.warning("Cannot explicitly terminate Plivo call because call_uuid is unavailable")
@@ -724,80 +727,52 @@ async def terminate_plivo_call(plivo_client, call_state, reason):
 
 
 async def supervise_call(call_state, plivo_client):
-    while not call_state.get("terminate_session"):
+    while not call_state.get('terminate_session'):
         now = time.monotonic()
-
-        if now >= call_state["call_deadline"]:
-            await terminate_plivo_call(plivo_client, call_state, "maximum call duration reached")
+        call_state['playback'].check_deadlines(now)
+        if now >= call_state['call_deadline']:
+            await terminate_plivo_call(plivo_client, call_state, 'maximum call duration reached')
             return
-
-        response_deadline = call_state.get("model_response_deadline")
-        if (
-            call_state.get("awaiting_model")
-            and response_deadline is not None
-            and now >= response_deadline
-        ):
-            await terminate_plivo_call(plivo_client, call_state, "Gemini response timeout")
-            return
+        if call_state['closing_audio_phase']:
+            deadline = call_state.get('terminal_action_deadline')
+            if (
+                deadline is not None and now >= deadline
+                and call_state['responses'].active is None
+                and not call_state['pending_end_call'] and not call_state['pending_transfer_call']
+            ):
+                call_state['pending_end_call'] = True
+                call_state['turn_complete'] = True
+        if not call_state['playing_disclaimer']:
+            if await execute_pending_terminal_action(None, call_state, plivo_client, None):
+                return
         await asyncio.sleep(SUPERVISOR_POLL_INTERVAL)
 
 
 @contextlib.asynccontextmanager
 async def connect_live_with_timeout(client, model, config):
     live_context = client.aio.live.connect(model=model, config=config)
-    session = await asyncio.wait_for(
-        live_context.__aenter__(),
-        timeout=GEMINI_CONNECT_TIMEOUT_SECONDS,
-    )
-
+    session = await asyncio.wait_for(live_context.__aenter__(), GEMINI_CONNECT_TIMEOUT_SECONDS)
     try:
         yield session
-    except BaseException as exc:
+    finally:
+        # Cleanup must never swallow/replace the original failure or cancellation.
         try:
-            suppress_exception = await live_context.__aexit__(
-                type(exc), exc, exc.__traceback__
-            )
-            if not suppress_exception:
-                raise
-        except Exception as cleanup_exc:
-            from google.genai import errors as genai_errors
-            if isinstance(cleanup_exc, genai_errors.APIError) and "1000" in str(cleanup_exc):
-                pass
-            else:
-                raise
-    else:
-        try:
-            await live_context.__aexit__(None, None, None)
-        except Exception as cleanup_exc:
-            from google.genai import errors as genai_errors
-            if isinstance(cleanup_exc, genai_errors.APIError) and "1000" in str(cleanup_exc):
-                pass
-            else:
-                raise
+            await asyncio.wait_for(live_context.__aexit__(None, None, None), 5)
+        except Exception as exc:
+            logger.warning('Gemini connection cleanup: %s', exc)
 
 
 async def coordinate_call_tasks(task_map, call_state):
-    done, pending = await asyncio.wait(
-        task_map.values(),
-        return_when=asyncio.FIRST_COMPLETED,
-    )
-    completed_names = {
-        name for name, task in task_map.items() if task in done
-    }
-    call_state["terminate_session"] = True
-
-    for task in pending:
-        task.cancel()
-    await asyncio.gather(*pending, return_exceptions=True)
-
-    for task in done:
-        if task.cancelled():
-            continue
-        exception = task.exception()
-        if exception is not None:
-            raise exception
-
-    return completed_names
+    try:
+        done, _ = await asyncio.wait(task_map.values(), return_when=asyncio.FIRST_COMPLETED)
+        # Retrieve exceptions in stable task order. The finally retrieves the rest.
+        for task in task_map.values():
+            if task in done:
+                task.result()
+        return {name for name, task in task_map.items() if task in done}
+    finally:
+        call_state['terminate_session'] = True
+        await cancel_tasks(task_map.values())
 
 
 def log_call_stats(call_state):
@@ -821,93 +796,442 @@ def log_call_stats(call_state):
 
 
 async def play_disclaimer(plivo_ws, call_state, disclaimer_finished_event):
-    if not DISCLAIMER_ULAW_CHUNKS or call_state.get("is_returning_from_transfer"):
-        logger.warning("No disclaimer chunks found. Skipping directly to AI greeting.")
-        call_state["playing_disclaimer"] = False
+    try:
+        if DISCLAIMER_ULAW_CHUNKS and not call_state['is_returning_from_transfer']:
+            audio = b''.join(base64.b64decode(chunk) for chunk in DISCLAIMER_ULAW_CHUNKS)
+            call_state['playback'].feed('disclaimer', audio)
+            await call_state['playback'].finish('disclaimer', 'disclaimer')
+        call_state['playing_disclaimer'] = False
         disclaimer_finished_event.set()
-        return
-        
-    logger.info("📢 Playing legal disclaimer to user...")
-    try:
-        start_time = time.perf_counter()
-        for i, chunk in enumerate(DISCLAIMER_ULAW_CHUNKS):
-            if call_state.get("terminate_session", False):
-                break
-            audio_delta = {
-                "event": "playAudio",
-                "media": {
-                    "contentType": "audio/x-mulaw",
-                    "sampleRate": 8000,
-                    "payload": chunk
-                }
-            }
-            await plivo_ws.send(json.dumps(audio_delta))
-            expected_time = start_time + ((i + 1) * 0.02)
-            sleep_time = expected_time - time.perf_counter()
-            if sleep_time > 0:
-                await asyncio.sleep(sleep_time)
-            
-        logger.info("✅ Disclaimer finished. Unlocking Gemini prompt.")
     except asyncio.CancelledError:
-        pass
-    except Exception as e:
-        logger.error(f"Disclaimer task error: {e}")
-    finally:
-        call_state["playing_disclaimer"] = False
-        disclaimer_finished_event.set() # 🟢 Flip the traffic light to GREEN!
-
-def _sanitize_filename(name):
-    cleaned = "".join(c if (c.isalnum() or c in " _-") else "_" for c in (name or "")).strip()
-    return cleaned or "Unknown"
+        raise
 
 
-def open_gemini_input_recording(call_state):
-    """Open a per-call WAV writer for the exact audio streamed to Gemini
-    (16kHz mono PCM16). No-op unless RECORD_GEMINI_INPUT is set."""
-    call_state["gemini_in_wav"] = None
-    call_state["gemini_in_wav_path"] = None
-    if not RECORD_GEMINI_INPUT:
+def reset_input_state(call_state):
+    call_state['is_speaking'] = False
+    call_state['speech_gate'].reset()
+    call_state['user_activity_open'] = False
+    call_state['preroll_pcm16'].clear()
+    call_state['gemini_input_buffer'].clear()
+    call_state['ratecv_state_up'] = None
+    call_state['ratecv_state_down'] = None
+    call_state['agc_current_gain_lin'] = 1.0
+    call_state['denoiser'] = RNNoise(sample_rate=48000)
+    queue = call_state['input_audio_queue']
+    while not queue.empty():
+        queue.get_nowait()
+
+
+def cancel_silence_timer(call_state):
+    task = call_state.get('silence_timer_task')
+    if task is not None and task is not asyncio.current_task() and not task.done():
+        task.cancel()
+    call_state['silence_timer_task'] = None
+
+
+def arm_silence_timer(call_state):
+    cancel_silence_timer(call_state)
+    if (
+        call_state.get('session_ready') and call_state.get('greeting_completed')
+        and not call_state['playing_disclaimer'] and not call_state['closing_audio_phase']
+        and not call_state['user_activity_open'] and not call_state['is_speaking']
+        and not call_state['playback'].busy and call_state['responses'].active is None
+    ):
+        task = asyncio.create_task(silence_watchdog(call_state['session'], call_state))
+        call_state['silence_timer_task'] = task
+        call_state['background_tasks'].add(task)
+        task.add_done_callback(call_state['background_tasks'].discard)
+
+
+async def playback_completed(call_state, mark):
+    if mark.tag == 'disclaimer':
+        call_state['playing_disclaimer'] = False
         return
+    # Marks invalidated by a clear or reconnect never reach this callback.
+    call_state['assistant_speaking'] = call_state['playback'].busy
+    emit_call_event(call_state.get('call_uuid'), 'ai_done')
+    logger.info('Playback acknowledged: call=%s mark=%s owner=%s',
+                call_state.get('call_uuid'), mark.name, mark.owner)
+    if mark.tag == 'greeting' and not call_state['greeting_completed']:
+        reset_input_state(call_state)
+        call_state['greeting_completed'] = True
+        emit_call_event(call_state.get('call_uuid'), 'call_connected')
+        logger.info('Initial greeting acknowledged. Microphone is now live.')
+    arm_silence_timer(call_state)
+
+
+async def send_model_prompt(session, call_state, text, kind, retries=0):
+    cancel_silence_timer(call_state)
+    turn = call_state['responses'].begin(kind, retries)
+    call_state['turn_complete'] = False
+    await asyncio.wait_for(session.send_client_content(
+        turns=types.Content(role='user', parts=[types.Part.from_text(text=text)]),
+        turn_complete=True,
+    ), timeout=GEMINI_CONNECT_TIMEOUT_SECONDS)
+    return turn
+
+
+async def read_plivo_events(plivo_ws, call_state):
+    """Only socket reader. It outlives individual Gemini connections."""
+    remainder = bytearray()
+    input_epoch = call_state['responses'].epoch
     try:
-        os.makedirs(RECORD_GEMINI_INPUT_DIR, exist_ok=True)
-        base = _sanitize_filename(call_state.get("user_name", "Unknown"))
-        ts = datetime.now(ist_tz).strftime("%Y%m%d_%H%M%S")
-        path = os.path.join(RECORD_GEMINI_INPUT_DIR, f"{base}_{ts}.wav")
-        wf = wave.open(path, "wb")
-        wf.setnchannels(1)
-        wf.setsampwidth(2)
-        wf.setframerate(16000)
-        call_state["gemini_in_wav"] = wf
-        call_state["gemini_in_wav_path"] = path
-        logger.info(f"🎙️ [REC] Recording Gemini input audio -> {path}")
-    except Exception as e:
-        logger.error(f"[REC] Failed to open recording: {e}")
-        call_state["gemini_in_wav"] = None
+        while not call_state['terminate_session']:
+            raw = await plivo_ws.receive()
+            if raw is None:
+                break
+            data = json.loads(raw)
+            event = data.get('event')
+            if event == 'stop':
+                break
+            if event in ('playedStream', 'clearedAudio'):
+                was_muted = not call_state['greeting_completed']
+                await call_state['playback'].acknowledge(data)
+                if was_muted and call_state['greeting_completed']:
+                    remainder.clear()
+                continue
+            if event != 'media':
+                continue
+            media = data.get('media', {})
+            if media.get('track', 'inbound') != 'inbound' or not media.get('payload'):
+                continue
+            if input_epoch != call_state['responses'].epoch:
+                remainder.clear()
+                input_epoch = call_state['responses'].epoch
+            remainder.extend(base64.b64decode(media['payload'], validate=True))
+            while len(remainder) >= PLIVO_ULAW_CHUNK_SIZE:
+                frame = bytes(remainder[:PLIVO_ULAW_CHUNK_SIZE])
+                del remainder[:PLIVO_ULAW_CHUNK_SIZE]
+                # Consume far-end references even when input is muted. This
+                # keeps the AEC clock moving through the disclaimer/greeting.
+                pcm = call_state['aec'].process(ulaw_to_pcm(frame))
+                if (
+                    call_state['playing_disclaimer'] or not call_state['greeting_completed']
+                    or not call_state.get('session_ready') or call_state['closing_audio_phase']
+                ):
+                    continue
+                queue = call_state['input_audio_queue']
+                if queue.full():
+                    # Never replay a growing backlog of caller speech after a
+                    # slow model send. Reconnect rather than silently splice a turn.
+                    call_state['session_error'] = GeminiSessionDisconnected('Inbound audio backpressure')
+                    while not queue.empty():
+                        queue.get_nowait()
+                queue.put_nowait((call_state['responses'].epoch, time.monotonic(), pcm))
+            await asyncio.sleep(0)
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        call_state['plivo_disconnected'] = True
+        raise
+    call_state['plivo_disconnected'] = True
+    call_state['terminate_session'] = True
 
 
-def record_gemini_pcm(call_state, data):
-    """Append PCM16 frames actually sent to Gemini to the per-call WAV."""
-    wf = call_state.get("gemini_in_wav")
-    if wf is not None and data:
+async def supervise_model_session(call_state, epoch):
+    while call_state['responses'].epoch == epoch:
+        if call_state['terminate_session']:
+            return
+        if call_state.get('session_error') is not None:
+            raise call_state['session_error']
+        now = time.monotonic()
+        if call_state.get('go_away_received') and (
+            (call_state['responses'].active is None and not call_state['playback'].busy
+             and not call_state['user_activity_open'])
+            or now >= call_state['go_away_deadline']
+        ):
+            raise GeminiSessionDisconnected('Gemini GoAway handover')
+        if call_state['responses'].expired(now):
+            raise GeminiSessionDisconnected('Gemini response/generation timeout')
+        await asyncio.sleep(SUPERVISOR_POLL_INTERVAL)
+
+
+def recoverable_gemini_error(exc):
+    from google.genai import errors as genai_errors
+    from websockets.exceptions import ConnectionClosed, InvalidStatus
+    from httpx import TransportError
+    if isinstance(exc, (GeminiSessionDisconnected, TimeoutError, ConnectionError, OSError, TransportError)):
+        return True
+    if isinstance(exc, ConnectionClosed):
+        close = exc.rcvd or exc.sent
+        return close is None or close.code in (1000, 1001, 1006, 1011, 1012, 1013)
+    if isinstance(exc, InvalidStatus):
+        return exc.response.status_code in (408, 429, 500, 502, 503, 504)
+    if isinstance(exc, genai_errors.APIError):
+        # Configuration/auth/policy failures (including 1008) aren't transient.
+        return exc.code in (408, 429, 500, 502, 503, 504, 1000, 1001, 1006, 1011, 1012, 1013)
+    return False
+
+
+async def coordinate_model_tasks(tasks):
+    try:
+        done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+        for task in tasks:
+            if task in done:
+                task.result()
+    finally:
+        await cancel_tasks(tasks)
+
+
+async def recover_empty_response(session, call_state, turn):
+    if turn.stale or call_state['user_activity_open'] or call_state['responses'].active is not None:
+        return
+    if turn.retries >= MAX_EMPTY_RESPONSE_RETRIES:
+        call_state['pending_end_call'] = True
+        call_state['closing_audio_phase'] = True
+        call_state['turn_complete'] = True
+        call_state['terminal_action_deadline'] = time.monotonic()
+        logger.warning('Ending call after repeated empty Gemini responses: %s', turn.key)
+        return
+    if not call_state['greeting_completed']:
+        text = call_state['initial_prompt']
+        kind = 'greeting'
+    elif call_state['closing_audio_phase']:
+        text = SILENCE_FAREWELL_PROMPT
+        kind = 'farewell'
+    else:
+        text = ('Your last turn contained no audible response. Briefly ask the caller '
+                'to repeat their last question in their chosen language. Do not invent an answer.')
+        kind = 'empty_retry'
+    await send_model_prompt(session, call_state, text, kind, retries=turn.retries + 1)
+
+
+async def run_gemini_sessions(client, call_state, system_instruction_text, initial_prompt, disclaimer_finished):
+    for attempt in range(MAX_GEMINI_RECONNECTS + 1):
+        if call_state['terminate_session']:
+            return
+        call_state['gemini_reconnect_count'] = attempt
+        call_state['session_ready'] = False
+        if attempt:
+            if not call_state['playing_disclaimer']:
+                await call_state['playback'].clear(reason='gemini-reconnect')
+            emit_call_event(call_state.get('call_uuid'), 'gemini_reconnecting', {'attempt': attempt})
+            await asyncio.sleep(min(GEMINI_RECONNECT_DELAY_SECONDS * 2 ** (attempt - 1), 4))
+        if ('extended-thinking' in GEMINI_MODEL
+                and 'interaction_status' not in types.LiveServerContent.model_fields):
+            raise RuntimeError('Gemini Extended Thinking requires the SDK pinned in requirements.txt; '
+                               'install project dependencies and restart the app.')
+        config = types.LiveConnectConfig(
+            system_instruction=types.Content(parts=[
+                types.Part.from_text(text=system_instruction_text)
+            ]),
+            tools=LOCAL_GEMINI_TOOLS,
+            temperature=0.2,
+            session_resumption=types.SessionResumptionConfig(
+                handle=call_state.get("session_resumption_handle")
+            ),
+            response_modalities=["AUDIO"],
+            input_audio_transcription=types.AudioTranscriptionConfig(),
+            output_audio_transcription=types.AudioTranscriptionConfig(),
+            thinking_config=types.ThinkingConfig(
+                thinking_level="medium",
+            ),
+            speech_config=types.SpeechConfig(
+                voice_config=types.VoiceConfig(
+                    prebuilt_voice_config=types.PrebuiltVoiceConfig(
+                        voice_name="Kore"
+                    )
+                )
+            ),
+            realtime_input_config=types.RealtimeInputConfig(
+                automatic_activity_detection=types.AutomaticActivityDetection(disabled=True),
+                activity_handling=types.ActivityHandling.START_OF_ACTIVITY_INTERRUPTS,
+            ),
+            context_window_compression=(
+                types.ContextWindowCompressionConfig(
+                    sliding_window=types.SlidingWindow(),
+                )
+            )
+        )
+
         try:
-            wf.writeframes(data)
-        except Exception as e:
-            logger.error(f"[REC] write failed: {e}")
+            async with connect_live_with_timeout(client, GEMINI_MODEL, config) as session:
+                epoch = call_state['responses'].new_session()
+                reset_input_state(call_state)
+                call_state['session_error'] = None
+                call_state['session'] = session
+                call_state['go_away_received'] = False
+                call_state['turn_complete'] = False
+
+                async def send_initial_and_listen():
+                    await disclaimer_finished.wait()
+                    if not call_state['greeting_completed']:
+                        prompt, kind = initial_prompt, 'greeting'
+                    else:
+                        prompt = ('The audio connection was interrupted. Briefly ask the caller to '
+                                  'repeat their last question in their chosen language. Do not '
+                                  'restart the introduction or invent anything said during the gap.')
+                        if not call_state.get('session_resumption_handle'):
+                            history = json.dumps(call_state['conversation_log'][-12:], ensure_ascii=False)
+                            prompt += '\nEarlier call context:\n' + initial_prompt + '\nTranscript:\n' + history[-12000:]
+                        kind = 'recovery'
+                    call_state['session_ready'] = True
+                    await send_model_prompt(session, call_state, prompt, kind)
+                    if attempt:
+                        emit_call_event(call_state.get('call_uuid'), 'gemini_reconnected')
+                    await stream_plivo_to_gemini(None, session, call_state)
+
+                tasks = [
+                    asyncio.create_task(send_initial_and_listen()),
+                    asyncio.create_task(stream_gemini_to_plivo(session, None, call_state, plivo_client)),
+                    asyncio.create_task(supervise_model_session(call_state, epoch)),
+                ]
+                try:
+                    await coordinate_model_tasks(tasks)
+                finally:
+                    call_state['session_ready'] = False
+                    cancel_silence_timer(call_state)
+                    await cancel_tasks(call_state['background_tasks'])
+            if call_state['terminate_session']:
+                return
+            raise GeminiSessionDisconnected('Gemini session task stopped unexpectedly')
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            call_state['session_ready'] = False
+            # A mid-turn snapshot can retain an open manual activity or replay
+            # output without client turn IDs. Restore confirmed context in a
+            # fresh session in that case. Idle sessions can resume directly.
+            interrupted_turn = bool(call_state['responses'].turns) or call_state['user_activity_open']
+            call_state['responses'].invalidate()
+            from google.genai.errors import APIError
+            invalid_handle = (
+                isinstance(exc, APIError) and exc.code == 400
+                and call_state.get('session_resumption_handle')
+                and any(word in str(exc).lower() for word in ('resum', 'handle'))
+            )
+            if invalid_handle or interrupted_turn:
+                call_state['session_resumption_handle'] = None
+            if not (invalid_handle or recoverable_gemini_error(exc)):
+                raise
+            logger.warning('Recoverable Gemini failure (%s/%s): %s', attempt, MAX_GEMINI_RECONNECTS, exc)
+            if call_state['closing_audio_phase']:
+                call_state['responses'].turns.clear()
+                call_state['turn_complete'] = True
+                if not call_state['pending_transfer_call']:
+                    call_state['pending_end_call'] = True
+                playback = call_state['playback']
+                if playback.dirty and not playback.marks:
+                    resampler = call_state.get('output_resampler')
+                    if resampler is not None:
+                        playback.feed(playback.current_owner, pcm_to_ulaw(resampler.finish()))
+                    playback.finish(playback.current_owner)
+                # Root supervisor performs the accepted action after its mark.
+                await asyncio.Event().wait()
+            if attempt >= MAX_GEMINI_RECONNECTS:
+                await terminate_plivo_call(plivo_client, call_state, 'Gemini recovery attempts exhausted')
+                return
 
 
-def close_gemini_input_recording(call_state):
-    wf = call_state.get("gemini_in_wav")
-    if wf is not None:
-        with contextlib.suppress(Exception):
-            wf.close()
-        logger.info(f"🎙️ [REC] Saved Gemini input audio: {call_state.get('gemini_in_wav_path')}")
-        call_state["gemini_in_wav"] = None
+def create_call_state(user_name, phone_number, is_returning_from_transfer=False):
+    call_state = {
+        "from_number": phone_number,
+        "user_name": user_name,
+        "lead_saved": False,
+        "end_call_summary": "",
+        "is_returning_from_transfer": is_returning_from_transfer,
+        "playing_disclaimer": True,
+        "stream_id": None,
+        "call_uuid" : None,
+        "public_base_url": PUBLIC_BASE_URL,
+
+        "greeting_completed": False,
+
+        # Transcription Buffers ---
+        "user_text_buffer": "",
+        "ai_text_buffer": "",
+        "conversation_log": [],
+
+        # Acoustic echo canceller (8 kHz). Removes the AI's own voice echoed back
+        # through a speakerphone mic BEFORE RNNoise/VAD, so echo can't self-trigger
+        # a false barge-in loop. Far-end reference is fed by the Plivo sender.
+        "aec": AcousticEchoCanceller(frame_size=PLIVO_ULAW_CHUNK_SIZE),
+
+        # VAD
+        "denoiser": RNNoise(sample_rate=48000),
+        "ratecv_state_up": None,
+        "ratecv_state_down": None,
+        "is_speaking": False,
+
+        "agc_current_gain_lin": 1.0,
+        "chunk_count": 0,
+
+        "user_activity_open": False,
+        "assistant_speaking": False,
+
+        # Barge-in diagnostics
+        "barge_in_count": 0,
+
+        # Model generation completion (separate from Plivo playback).
+        "turn_complete": True,
+
+        # silence handling
+        "silence_timer_task": None,
+        "silence_followup_count": 0,
+
+        # deferred end-call control
+        "pending_end_call": False,
+        "ending_call_phase": False,
+        "closing_audio_phase": False,
+        "end_call_tool_executed": False,
+        "terminate_session": False,
+        "terminal_action_deadline": None,
+        "terminal_action_completed": False,
+        "terminal_action_in_progress": False,
+        "hangup_started": False,
+        "plivo_disconnected": False,
+        "call_deadline": None,
+        "end_call_summary": "",
+
+
+        # transfer call control
+        "pending_transfer_call": False,
+        "transfer_call_tool_executed": False,
+        "transfer_summary": "",
+        # user context
+        #"user_details": user_details,
+
+        # audio buffers
+        "preroll_pcm16": bytearray(),
+        "gemini_input_buffer": bytearray(),
+
+
+        # session resumption
+        "session_resumption_handle": None,
+        "go_away_received": False,
+        "gemini_reconnect_count": 0,
+
+        # token tracking
+        "tokens_text_in": 0,
+        "tokens_text_out": 0,
+        "tokens_audio_in": 0,
+        "tokens_audio_out": 0,
+        "last_usage_total_token_count": None,
+        "usage_total_updates": 0,
+        "usage_total_non_monotonic_count": 0,
+    }
+
+    call_state.update({
+        'responses': ResponseTracker(MODEL_RESPONSE_TIMEOUT_SECONDS),
+        'speech_gate': SpeechGate(
+            onset_ms=VAD_ONSET_MS, barge_ms=VAD_BARGE_IN_MS,
+            offset_ms=VAD_SILENCE_OFFSET_MS, start_probability=VAD_THRESHOLD,
+            barge_probability=VAD_THRESHOLD_WHILE_SPEAKING,
+            minimum_db=VAD_MIN_RMS_DB, barge_minimum_db=VAD_BARGE_MIN_RMS_DB,
+        ),
+        'input_audio_queue': asyncio.Queue(maxsize=MAX_INPUT_QUEUE_FRAMES),
+        'background_tasks': set(),
+        'session_ready': False,
+        'session_error': None,
+        'session': None,
+    })
+    return call_state
 
 
 @app.websocket('/media-stream')
 async def handle_media_stream():
     logger.info('Client connected to Quart WebSocket')
-    
+
     # Extract and sanitize inputs to prevent prompt injection
     user_name = websocket.args.get("user_name", "Unknown").replace("{", "").replace("}", "").strip()
     phone_number = websocket.args.get("phone_number", "Unknown").replace("{", "").replace("}", "").strip()
@@ -945,129 +1269,36 @@ async def handle_media_stream():
         except json.JSONDecodeError:
             logger.warning("Could not parse transfer summary as JSON. Falling back to raw string.")
             call_summary = transfer_summary_raw
-    
+
     logger.info(f'Client connected to Quart WebSocket. Caller: {phone_number}')
     plivo_ws = websocket
-    
+
      # Dictionary to maintain state without using Python global variables
-    call_state = {
-        "from_number": phone_number,
-        "user_name": user_name,
-        "lead_saved": False,
-        "end_call_summary": "",
-        "is_returning_from_transfer": is_returning_from_transfer,
-        "playing_disclaimer": True,
-        "stream_id": None,
-        "call_uuid" : None,
-        "public_base_url": PUBLIC_BASE_URL,
-        
-        "greeting_completed": False,
-        
-        # Transcription Buffers ---
-        "user_text_buffer": "",
-        "ai_text_buffer": "",
-        "conversation_log": [],  
-        
-        # Acoustic echo canceller (8 kHz). Removes the AI's own voice echoed back
-        # through a speakerphone mic BEFORE RNNoise/VAD, so echo can't self-trigger
-        # a false barge-in loop. Far-end reference is fed by the Plivo sender.
-        "aec": AcousticEchoCanceller(frame_size=PLIVO_ULAW_CHUNK_SIZE),
-
-        # VAD
-        "denoiser": RNNoise(sample_rate=48000),
-        "ratecv_state_up": None,
-        "ratecv_state_down": None,
-        "ratecv_state_out": None,
-        "rnnoise_speech_count": 0,
-        "rnnoise_silence_frames": 0,
-        "is_speaking": False,
-        
-        "agc_current_gain_lin": 1.0,
-        "chunk_count": 0,
-        
-        "user_activity_open": False,
-        "assistant_speaking": False,
-        "awaiting_model": False,
-        "model_response_deadline": None,
-        "interrupting": False,
-
-        # Barge-in diagnostics (counters + discarded audio)
-        "barge_in_count": 0,
-        "out_buffer_clear_count": 0,
-        "out_buffer_bytes_discarded": 0,
-
-        # AI speech timing trackers
-        "ai_playback_start_time": None,
-        "current_utterance_bytes": 0,
-        "turn_complete": True,
-        
-        # silence handling
-        "silence_timer_task": None,
-        "silence_followup_count": 0,
-        
-        # deferred end-call control
-        "pending_end_call": False,
-        "ending_call_phase": False,
-        "closing_audio_phase": False,
-        "closing_audio_started": False,
-        "end_call_tool_executed": False,
-        "terminate_session": False,
-        "terminal_action_deadline": None,
-        "terminal_action_completed": False,
-        "terminal_action_in_progress": False,
-        "hangup_started": False,
-        "plivo_disconnected": False,
-        "call_deadline": None,
-        "end_call_summary": "", 
-        
-        # unified finally analytics control
-        "analytics_saved": False,
-        "skip_finally_analytics": False,
-        
-        # transfer call control
-        "pending_transfer_call": False,
-        "transfer_call_tool_executed": False,
-        "transfer_summary": "", 
-        # user context
-        #"user_details": user_details,
-        
-        # audio buffers
-        "preroll_pcm16": bytearray(),
-        "gemini_input_buffer": bytearray(),
-        "plivo_output_queue": asyncio.Queue(),
-        # per-call recording of the audio actually sent to Gemini
-        "gemini_in_wav": None,
-        "gemini_in_wav_path": None,
-        
-        # helpers
-        "closing": False,
-        "tool_call_in_progress": False,
-        
-        # session resumption
-        "session_resumption_handle": None,
-        "go_away_received": False,
-        "gemini_reconnect_count": 0,
-        
-        # token tracking
-        "tokens_text_in": 0,
-        "tokens_text_out": 0,
-        "tokens_audio_in": 0,
-        "tokens_audio_out": 0,
-        "last_usage_total_token_count": None,
-        "usage_total_updates": 0,
-        "usage_total_non_monotonic_count": 0,
-    }
-
-    open_gemini_input_recording(call_state)
+    call_state = create_call_state(user_name, phone_number, is_returning_from_transfer)
+    persistent_tasks = {}
+    client = None
 
     disclaimer_finished = asyncio.Event()
     disclaimer_task = None
 
     try:
         await wait_for_plivo_start(plivo_ws, call_state)
-        disclaimer_task = asyncio.create_task(
-            play_disclaimer(plivo_ws, call_state, disclaimer_finished)
+        call_state['playback'] = PlivoPlayback(
+            plivo_ws, call_state['stream_id'], call_state['aec'], ulaw_to_pcm,
+            lambda mark: playback_completed(call_state, mark),
+            ack_timeout=PLAYBACK_ACK_TIMEOUT_SECONDS,
         )
+        persistent_tasks = {
+            'plivo_reader': asyncio.create_task(read_plivo_events(plivo_ws, call_state)),
+            'plivo_playback': asyncio.create_task(call_state['playback'].run()),
+            'supervisor': asyncio.create_task(supervise_call(call_state, plivo_client)),
+        }
+        async def disclaimer_lifecycle():
+            await play_disclaimer(plivo_ws, call_state, disclaimer_finished)
+            await asyncio.Event().wait()
+
+        disclaimer_task = asyncio.create_task(disclaimer_lifecycle())
+        persistent_tasks['disclaimer'] = disclaimer_task
 
         client = genai.Client(
             api_key=LIVE_API_KEY
@@ -1079,17 +1310,17 @@ async def handle_media_stream():
                 user_name=user_name,
                 phone_number=phone_number
             )
-            
+
             #logger.info(system_instruction_text)
         except KeyError as e:
             logger.error(f"⚠️ Missing a placeholder variable in the prompt file: {e}")
             # Fallback to direct replacement if format() fails due to unmatched braces
             system_instruction_text = f"Current Date and Time (India IST): {current_time}\n\n" + RAW_SYSTEM_PROMPT.replace("{user_name}", user_name).replace("{phone_number}", phone_number)
-        
+
         if is_returning_from_transfer:
             logger.info(f"🔄 Re-entry after human transfer. DialStatus={dial_status}")
             user_context = f"The user called from {phone_number}."
-                
+
             if dial_status == "completed":
                 initial_prompt = f"""
                 System Event: The user was previously speaking with you (Neha), was then transferred to a human admission counselor,
@@ -1126,7 +1357,7 @@ async def handle_media_stream():
 
                 The user's preferred language is: **{user_language}**
 
-                Here is a summary of the conversation before the transfer: 
+                Here is a summary of the conversation before the transfer:
                 {call_summary}
 
                 Instructions:
@@ -1141,7 +1372,7 @@ async def handle_media_stream():
                     everything discussed in this current session after the failed transfer attempt. Combine
                     both into one single complete summary.
                 Please speak first now.
-                """      
+                """
         else:
             logger.info("Loading standard greeting prompt...")
             initial_prompt = f"""
@@ -1149,870 +1380,272 @@ async def handle_media_stream():
             * **Greeting:** Start every call with "Namaskar {user_name}" in English, followed by: "I'm Neha, calling from the admissions team at Adamas University, Kolkata. Do you want to continue speaking in English, or switch to Hindi or Bengali?"
             * **STOP HERE:** After asking the language question, END YOUR TURN and stay silent. Do NOT mention courses, fees, admissions, or anything else yet. Wait for the user to state their language preference. Only AFTER the user replies do you continue — in their chosen language — with the consent question in the next step of the flow.
             """
-        
-        # === SESSION MANAGEMENT: Reconnection Loop ===
-        for _attempt in range(MAX_GEMINI_RECONNECTS + 1):
-            is_reconnect = call_state["gemini_reconnect_count"] > 0
 
-            if is_reconnect:
-                # If the caller already hung up, don't spin a fresh Gemini session
-                # against a dead Plivo socket — just stop.
-                if call_state.get("plivo_disconnected"):
-                    logger.info("Plivo already disconnected during disconnect. Not reconnecting Gemini.")
-                    break
-
-                # If a terminal action was in progress, don't reconnect — just terminate
-                if call_state.get("closing_audio_phase") or call_state.get("pending_end_call") or call_state.get("pending_transfer_call"):
-                    logger.info("Terminal action was in progress during disconnect. Terminating call.")
-                    await terminate_plivo_call(plivo_client, call_state, "disconnect during terminal action")
-                    break
-
-                logger.info(
-                    f"🔄 Gemini reconnection attempt {call_state['gemini_reconnect_count']}/{MAX_GEMINI_RECONNECTS} "
-                    f"(handle={'present' if call_state.get('session_resumption_handle') else 'none'})"
-                )
-                emit_call_event(call_state.get("call_uuid"), "gemini_reconnecting", {
-                    "attempt": call_state["gemini_reconnect_count"],
-                })
-                await asyncio.sleep(GEMINI_RECONNECT_DELAY_SECONDS)
-
-            # Build config with the current resumption handle (if any)
-            config = types.LiveConnectConfig(
-                system_instruction=types.Content(parts=[
-                    types.Part.from_text(text=system_instruction_text)
-                ]),
-                tools=LOCAL_GEMINI_TOOLS,
-                temperature=0.2,
-                session_resumption=types.SessionResumptionConfig(
-                    handle=call_state.get("session_resumption_handle")
-                ),
-                response_modalities=["AUDIO"],
-                input_audio_transcription=types.AudioTranscriptionConfig(),
-                output_audio_transcription=types.AudioTranscriptionConfig(),
-                thinking_config=types.ThinkingConfig(
-                    thinking_level="medium",
-                ),
-                speech_config=types.SpeechConfig(
-                    voice_config=types.VoiceConfig(
-                        prebuilt_voice_config=types.PrebuiltVoiceConfig(
-                            voice_name="Kore"
-                        )
-                    )
-                ),
-                realtime_input_config=types.RealtimeInputConfig(
-                    automatic_activity_detection=(
-                        types.AutomaticActivityDetection(
-                            disabled=False,
-                            # Telephony is echo-prone; bias against false starts.
-                            start_of_speech_sensitivity=types.StartSensitivity.START_SENSITIVITY_LOW,
-                            end_of_speech_sensitivity=types.EndSensitivity.END_SENSITIVITY_LOW,
-                            prefix_padding_ms=HYBRID_VAD_PREFIX_PADDING_MS,
-                            silence_duration_ms=HYBRID_VAD_SILENCE_DURATION_MS,
-                        )
-                        if HYBRID_VAD
-                        else types.AutomaticActivityDetection(disabled=True)
-                    ),
-                    activity_handling=types.ActivityHandling.START_OF_ACTIVITY_INTERRUPTS,
-                ),
-                context_window_compression=(
-                    types.ContextWindowCompressionConfig(
-                        sliding_window=types.SlidingWindow(),
-                    )
-                )
-            )
-
-            # Reset transient state for the new connection
-            call_state["go_away_received"] = False
-            call_state["terminate_session"] = False
-            call_state["user_activity_open"] = False
-            call_state["is_speaking"] = False
-            call_state["rnnoise_speech_count"] = 0
-            call_state["rnnoise_silence_frames"] = 0
-            call_state["awaiting_model"] = False
-            call_state["model_response_deadline"] = None
-            call_state["interrupting"] = False
-            call_state["tool_call_in_progress"] = False
-            call_state["gemini_input_buffer"] = bytearray()
-            call_state["preroll_pcm16"] = bytearray()
-            call_state["ratecv_state_up"] = None
-            call_state["ratecv_state_down"] = None
-            call_state["ratecv_state_out"] = None
-            # Clear the AEC far-end backlog on reconnect: the disconnect gap
-            # desyncs far/near timing. Keep the learned filter weights — the
-            # acoustic echo path is unchanged across a Gemini reconnect.
-            call_state["aec"].reset_far_end()
-
-            try:
-                async with connect_live_with_timeout(client, GEMINI_MODEL, config) as session:
-                    if is_reconnect:
-                        logger.info("✅ Gemini session resumed successfully")
-                        emit_call_event(call_state.get("call_uuid"), "gemini_reconnected")
-                    else:
-                        logger.info('Connected to Google GenAI Live API')
-
-                    if not is_reconnect:
-                        logger.info("Waiting for disclaimer audio to finish playing...")
-                        await disclaimer_finished.wait()
-
-                        logger.info("Disclaimer done. Sending initial context to trigger AI greeting...")
-                        await session.send_client_content(
-                            turns=types.Content(
-                                role="user",
-                                parts=[types.Part.from_text(text=initial_prompt)],
-                            ),
-                            turn_complete=True,
-                        )
-                        call_state["awaiting_model"] = True
-                        call_state["model_response_deadline"] = (
-                            time.monotonic() + MODEL_RESPONSE_TIMEOUT_SECONDS
-                        )
-
-                    task_map = {
-                        "plivo_input": asyncio.create_task(
-                            stream_plivo_to_gemini(plivo_ws, session, call_state)
-                        ),
-                        "gemini_output": asyncio.create_task(
-                            stream_gemini_to_plivo(session, plivo_ws, call_state, plivo_client)
-                        ),
-                        "plivo_output": asyncio.create_task(
-                            send_plivo_audio(plivo_ws, call_state, session, plivo_client)
-                        ),
-                        "supervisor": asyncio.create_task(
-                            supervise_call(call_state, plivo_client)
-                        ),
-                    }
-
-                    try:
-                        await coordinate_call_tasks(task_map, call_state)
-                        if (
-                            not call_state["plivo_disconnected"]
-                            and not call_state["terminal_action_completed"]
-                        ):
-                            await terminate_plivo_call(
-                                plivo_client,
-                                call_state,
-                                "call task ended unexpectedly",
-                            )
-                    finally:
-                        if call_state.get("silence_timer_task") and not call_state["silence_timer_task"].done():
-                            call_state["silence_timer_task"].cancel()
-                            with contextlib.suppress(asyncio.CancelledError):
-                                await call_state["silence_timer_task"]
-
-                # If we got here cleanly (no exception), the call ended normally
-                break
-
-            except GeminiSessionDisconnected:
-                call_state["gemini_reconnect_count"] += 1
-                if call_state["gemini_reconnect_count"] > MAX_GEMINI_RECONNECTS:
-                    logger.error(f"❌ Exhausted all {MAX_GEMINI_RECONNECTS} Gemini reconnection attempts")
-                    await terminate_plivo_call(
-                        plivo_client, call_state,
-                        "exhausted Gemini reconnection attempts",
-                    )
-                    break
-                logger.info("🔄 Gemini session disconnected, will attempt reconnection...")
-                continue  # Go to top of for loop for next attempt
+        call_state['initial_prompt'] = initial_prompt
+        persistent_tasks['gemini_session'] = asyncio.create_task(run_gemini_sessions(
+            client, call_state, system_instruction_text, initial_prompt, disclaimer_finished,
+        ))
+        await coordinate_call_tasks(persistent_tasks, call_state)
+        if not call_state['plivo_disconnected'] and not call_state['terminal_action_completed']:
+            await terminate_plivo_call(plivo_client, call_state, 'call task ended unexpectedly')
 
     except asyncio.CancelledError:
-        logger.info('Client disconnected')
+        if not call_state['plivo_disconnected'] and not call_state['terminal_action_completed']:
+            await terminate_plivo_call(plivo_client, call_state, 'call handler cancelled')
         raise
     except Exception:
         logger.error("Live call lifecycle failed")
         logger.error(traceback.format_exc())
         await terminate_plivo_call(plivo_client, call_state, "live call lifecycle failure")
     finally:
+        call_state['terminate_session'] = True
+        call_state['session_ready'] = False
+        cancel_silence_timer(call_state)
+        await cancel_tasks(persistent_tasks.values())
+        await cancel_tasks(call_state['background_tasks'])
+        if client is not None:
+            with contextlib.suppress(Exception):
+                await asyncio.wait_for(client.aio.aclose(), 5)
         call_state["playing_disclaimer"] = False
-        if disclaimer_task is not None and not disclaimer_task.done():
-            disclaimer_task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await disclaimer_task
+        if disclaimer_task is not None:
+            await cancel_tasks([disclaimer_task])
         # Fallback lead capture: if the call ended without the model calling
         # endCall/transferCall (e.g. the user hung up first), no model summary
         # exists — persist a stub so no lead is lost.
         if not call_state.get("lead_saved"):
             save_lead(call_state, "user_hangup")
-        close_gemini_input_recording(call_state)
         log_call_stats(call_state)
 
 async def stream_plivo_to_gemini(plivo_ws, session, call_state):
-    logger.info('Ready to stream audio from Plivo to Gemini')
+    epoch = call_state['responses'].epoch
+    queue = call_state['input_audio_queue']
+    while not call_state['terminate_session']:
+        frame_epoch, received_at, pcm_8k = await queue.get()
+        if frame_epoch != epoch:
+            continue
+        if call_state.get('session_error') is not None:
+            raise call_state['session_error']
+        if time.monotonic() - received_at > 0.5:
+            raise GeminiSessionDisconnected('Inbound audio became stale')
+        if call_state['closing_audio_phase'] or not call_state['greeting_completed']:
+            continue
+        pcm_48k, call_state['ratecv_state_up'] = audioop.ratecv(
+            pcm_8k, 2, 1, PLIVO_SAMPLE_RATE, 48000, call_state['ratecv_state_up'])
+        speech_probs = [float(np.mean(prob)) for prob, _ in call_state['denoiser'].denoise_chunk(
+            np.frombuffer(pcm_48k, dtype=np.int16).reshape(1, -1))]
+        pcm_16k, call_state['ratecv_state_down'] = audioop.ratecv(
+            pcm_48k, 2, 1, 48000, GEMINI_INPUT_RATE, call_state['ratecv_state_down'])
+        rms_db, samples = calculate_rms_db(pcm_16k)
+        probability = float(np.mean(speech_probs)) if speech_probs else 0.0
+        playback = call_state['playback']
+        decision = call_state['speech_gate'].update(
+            probability, rms_db, playback.busy,
+        )
+        call_state['is_speaking'] = call_state['speech_gate'].speaking
+        started, ended = decision.started, decision.ended
+        # Confidence/energy checks use pre-AGC audio; noise cannot qualify merely
+        # because it was amplified. Don't chase background noise with more gain.
+        gain_db = (np.clip(AGC_TARGET_DB - rms_db, 0, AGC_MAX_GAIN_DB)
+                   if decision.voice_evidence and rms_db > AGC_NOISE_GATE_DB else 0)
+        call_state['agc_current_gain_lin'] = (
+            AGC_SMOOTHING_ALPHA * 10 ** (gain_db / 20)
+            + (1 - AGC_SMOOTHING_ALPHA) * call_state['agc_current_gain_lin'])
+        clean_pcm = (soft_limit(samples * call_state['agc_current_gain_lin']) * 32767).astype('<i2').tobytes()
+        call_state['chunk_count'] += 1
+        if started or ended or call_state['chunk_count'] % 250 == 0:
+            logger.info(
+                'VAD: call=%s event=%s probability=%.3f rms_db=%.1f noise_db=%.1f '
+                'required_db=%.1f barge=%s rejected=%s',
+                call_state.get('call_uuid'), 'start' if started else 'end' if ended else 'sample',
+                probability, rms_db, decision.noise_db, decision.required_db,
+                decision.barge_in, call_state['speech_gate'].rejected_candidates,
+            )
+        if not call_state['user_activity_open']:
+            call_state['preroll_pcm16'].extend(clean_pcm)
+            del call_state['preroll_pcm16'][:-PREROLL_MAX_BYTES_PCM16]
+        if started:
+            cancel_silence_timer(call_state)
+            call_state['silence_followup_count'] = 0
+            call_state['responses'].invalidate()
+            call_state['user_activity_open'] = True
+            call_state['turn_complete'] = False
+            call_state['user_text_buffer'] = ''
+            if call_state['playback'].busy:
+                call_state['barge_in_count'] += 1
+                await call_state['playback'].clear(reason='confirmed-user-speech')
+                call_state['assistant_speaking'] = False
+            emit_call_event(call_state.get('call_uuid'), 'user_speaking')
+            await asyncio.wait_for(session.send_realtime_input(activity_start=types.ActivityStart()), 5)
+            call_state['gemini_input_buffer'].extend(call_state['preroll_pcm16'])
+            call_state['preroll_pcm16'].clear()
+        elif call_state['user_activity_open']:
+            call_state['gemini_input_buffer'].extend(clean_pcm)
+        if call_state['user_activity_open']:
+            while len(call_state['gemini_input_buffer']) >= GEMINI_PCM_CHUNK_SIZE:
+                chunk = bytes(call_state['gemini_input_buffer'][:GEMINI_PCM_CHUNK_SIZE])
+                del call_state['gemini_input_buffer'][:GEMINI_PCM_CHUNK_SIZE]
+                await asyncio.wait_for(session.send_realtime_input(
+                    audio=types.Blob(data=chunk, mime_type='audio/pcm;rate=16000')), 5)
+        if ended and call_state['user_activity_open']:
+            if call_state['gemini_input_buffer']:
+                await asyncio.wait_for(session.send_realtime_input(audio=types.Blob(
+                    data=bytes(call_state['gemini_input_buffer']), mime_type='audio/pcm;rate=16000')), 5)
+                call_state['gemini_input_buffer'].clear()
+            # Set ownership before the send can yield to a fast server response.
+            turn = call_state['responses'].begin('user')
+            call_state['user_activity_open'] = False
+            await asyncio.wait_for(session.send_realtime_input(activity_end=types.ActivityEnd()), 5)
+            logger.info('User activity ended: call=%s turn=%s at=%.6f',
+                        call_state.get('call_uuid'), turn.key, time.monotonic())
+            emit_call_event(call_state.get('call_uuid'), 'user_silent')
 
-    try:
-        while True:
-            if call_state["terminate_session"]:
-                logger.info("🎬 Terminating Plivo -> Gemini loop")
-                break
-            message = await plivo_ws.receive()
-            if message is None:
-                call_state["plivo_disconnected"] = True
-                call_state["terminate_session"] = True
-                break
 
-            data = json.loads(message)
-
-            if data['event'] == 'start':
-                apply_plivo_start(call_state, data.get('start', {}))
-
-            elif data['event'] == 'media':
-                payload = data.get('media', {}).get('payload')
-                if not payload:
-                    continue
-                
-                # Ignore user audio if we are ending the call OR if the disclaimer is actively playing
-                if call_state.get("closing_audio_phase") or call_state.get("playing_disclaimer"):
-                    continue
-
-                mulaw_chunk = base64.b64decode(payload)
-                pcm_8k = ulaw_to_pcm(mulaw_chunk)
-
-                # Acoustic echo cancellation FIRST — strip the AI's echoed voice
-                # (speakerphone) before any noise suppression / VAD sees it. When
-                # the AI isn't speaking the far-end is silent and this is a
-                # near-transparent passthrough.
-                pcm_8k = call_state["aec"].process(pcm_8k)
-                if not pcm_8k:
-                    continue
-
-                # ==========================================
-                # 1. DSP Pipeline: Preprocessing & Denoising
-                # ==========================================
-                noise_start_time = time.perf_counter()
-                
-                # Upsample 8k → 48k
-                pcm_48k, call_state["ratecv_state_up"] = audioop.ratecv(
-                    pcm_8k, 2, 1, PLIVO_SAMPLE_RATE, 48000, call_state["ratecv_state_up"]
-                )
-                samples_48k = np.frombuffer(pcm_48k, dtype=np.int16)
-            
-                speech_probs = []
-                chunk_48k = samples_48k.reshape(1, -1)
-
-                # RNNoise is a 48kHz WIDEBAND denoiser. Fed 8kHz telephony
-                # upsampled to 48kHz (no real energy above ~3.4kHz), its per-band
-                # gains treat the legitimate narrowband speech as out-of-band noise
-                # and crush the 1-3.4kHz speech band (probe_dsp.py: 95% energy
-                # collapses from 2.9kHz to 755Hz), muffling what Gemini hears.
-                # So we run denoise_chunk ONLY to harvest its speech_prob for the
-                # manual VAD, and send the NON-denoised audio to Gemini. Echo is
-                # already removed by the AEC and low-level hiss by the AGC noise gate.
-                for speech_prob, _clean_frame in call_state["denoiser"].denoise_chunk(chunk_48k):
-                    speech_probs.append(speech_prob)
-
-                # Downsample the ORIGINAL (non-denoised) 48k audio 48k → 16k
-                clean_pcm_16k, call_state["ratecv_state_down"] = audioop.ratecv(
-                    pcm_48k, 2, 1, 48000, GEMINI_INPUT_RATE, call_state["ratecv_state_down"]
-                )
-                
-                rms_db, float_samples = calculate_rms_db(clean_pcm_16k)
-
-                if rms_db > AGC_NOISE_GATE_DB:
-                    target_gain_db = AGC_TARGET_DB - rms_db
-                    target_gain_db = np.clip(target_gain_db, 0, 15.0) 
-                else:
-                    target_gain_db = 0.0
-
-                target_gain_lin = 10 ** (target_gain_db / 20.0)
-
-                call_state["agc_current_gain_lin"] = (AGC_SMOOTHING_ALPHA * target_gain_lin) + ((1.0 - AGC_SMOOTHING_ALPHA) * call_state["agc_current_gain_lin"])
-
-                processed_samples = float_samples * call_state["agc_current_gain_lin"]
-                
-                limit_threshold = 0.9
-                processed_samples = np.where(
-                    np.abs(processed_samples) < limit_threshold,
-                    processed_samples,
-                    limit_threshold * np.sign(processed_samples) + 
-                    (1.0 - limit_threshold) * np.tanh((np.abs(processed_samples) - limit_threshold) / (1.0 - limit_threshold))
-                )
-
-                # Final clean 16kHz PCM
-                processed_samples_int16 = (processed_samples * 32767.0).astype(np.int16)
-                clean_pcm_16k = processed_samples_int16.tobytes()
-                
-                if call_state["chunk_count"] % LOG_EVERY_N_CHUNKS == 0:
-                    current_gain_db_log = 20 * np.log10(call_state["agc_current_gain_lin"] + 1e-12)
-                    logger.info(f"🔊 [AGC] Inbound RMS: {rms_db:.1f} dB | Gain: +{current_gain_db_log:.1f} dB")
-
-                noise_end_time = time.perf_counter()
-                
-                avg_prob = float(np.mean(speech_probs)) if speech_probs else 0.0
-                speech_started = False
-                speech_ended = False
-
-                # Half-duplex echo gate: raise the bar for detecting a NEW speech
-                # onset while the assistant is talking, so the AI's own echoed voice
-                # (no AEC in this pipeline) cannot self-trigger a false barge-in loop.
-                # Once the user is already established as speaking, keep the normal
-                # onset/offset thresholds so genuine turns aren't cut short.
-                if call_state["assistant_speaking"] and not call_state["is_speaking"]:
-                    active_threshold = VAD_THRESHOLD_WHILE_SPEAKING
-                    active_onset_frames = VAD_SPEECH_ONSET_FRAMES_WHILE_SPEAKING
-                else:
-                    active_threshold = VAD_THRESHOLD
-                    active_onset_frames = VAD_SPEECH_ONSET_FRAMES
-
-                if avg_prob > active_threshold:  # Threshold for confident speech
-                    call_state["rnnoise_speech_count"] += 1
-                    call_state["rnnoise_silence_frames"] = 0
-                    if call_state["rnnoise_speech_count"] >= active_onset_frames and not call_state["is_speaking"]:
-                        call_state["is_speaking"] = True
-                        speech_started = True
-                else:
-                    call_state["rnnoise_speech_count"] = 0
-                    if call_state["is_speaking"]:
-                        call_state["rnnoise_silence_frames"] += 1
-                        if call_state["rnnoise_silence_frames"] >= VAD_SILENCE_OFFSET_FRAMES:
-                            call_state["is_speaking"] = False
-                            speech_ended = True
-                            
-                call_state["chunk_count"] += 1
-                if call_state["chunk_count"] % LOG_EVERY_N_CHUNKS == 0:
-                    latency_ms = (noise_end_time - noise_start_time) * 1000
-                    logger.info(f"🎧 [RNNoise] Latency: {latency_ms:.2f} ms | VAD Prob: {avg_prob:.2f}")
-                    
-                if not call_state.get("greeting_completed", False):
-                    continue
-
-                if HYBRID_VAD:
-                    # Server owns start-of-speech + barge-in (automatic detection ON).
-                    # We stream cleaned audio CONTINUOUSLY so the server can detect
-                    # onset/interruption itself, and only emit audio_stream_end when
-                    # our RNNoise sees end-of-speech, to finalize the turn fast
-                    # (bypassing the server's ~800ms silence wait). No activity_start/
-                    # activity_end, no local barge-in: the server's `interrupted`
-                    # signal (handled in stream_gemini_to_plivo) stops playback.
-                    if speech_started:
-                        call_state["silence_followup_count"] = 0
-                        if call_state.get("silence_timer_task") and not call_state["silence_timer_task"].done():
-                            call_state["silence_timer_task"].cancel()
-                            call_state["silence_timer_task"] = None
-
-                    if not call_state["tool_call_in_progress"]:
-                        call_state["gemini_input_buffer"].extend(clean_pcm_16k)
-                        while len(call_state["gemini_input_buffer"]) >= GEMINI_PCM_CHUNK_SIZE:
-                            audio_chunk = bytes(call_state["gemini_input_buffer"][:GEMINI_PCM_CHUNK_SIZE])
-                            del call_state["gemini_input_buffer"][:GEMINI_PCM_CHUNK_SIZE]
-                            await session.send_realtime_input(
-                                audio=types.Blob(data=audio_chunk, mime_type="audio/pcm;rate=16000")
-                            )
-                            record_gemini_pcm(call_state, audio_chunk)
-
-                    if speech_ended:
-                        if call_state["gemini_input_buffer"]:
-                            await session.send_realtime_input(
-                                audio=types.Blob(
-                                    data=bytes(call_state["gemini_input_buffer"]),
-                                    mime_type="audio/pcm;rate=16000",
-                                )
-                            )
-                            record_gemini_pcm(call_state, bytes(call_state["gemini_input_buffer"]))
-                            call_state["gemini_input_buffer"].clear()
-                        await session.send_realtime_input(audio_stream_end=True)
-                        call_state["awaiting_model"] = True
-                        call_state["model_response_deadline"] = (
-                            time.monotonic() + MODEL_RESPONSE_TIMEOUT_SECONDS
-                        )
-                        logger.info("⏹️ [Hybrid VAD] Sent audio_stream_end")
-                    continue
-
-                # Maintain ~200ms preroll using the CLEAN 16kHz audio
-                if not call_state["user_activity_open"]:
-                    call_state["preroll_pcm16"].extend(clean_pcm_16k)
-                    if len(call_state["preroll_pcm16"]) > PREROLL_MAX_BYTES_PCM16:
-                        overflow = len(call_state["preroll_pcm16"]) - PREROLL_MAX_BYTES_PCM16
-                        del call_state["preroll_pcm16"][:overflow]
-
-                chunk_already_buffered_via_preroll = False
-
-                if speech_started:
-                    logger.info("🎤 User speech detected")
-                    emit_call_event(call_state.get("call_uuid"), "user_speaking")
-                    call_state["silence_followup_count"] = 0
-                    call_state["awaiting_model"] = False
-                    call_state["model_response_deadline"] = None
-                    
-                    # Cancel the silence timer if active
-                    if call_state.get("silence_timer_task") and not call_state["silence_timer_task"].done():
-                        call_state["silence_timer_task"].cancel()
-                        call_state["silence_timer_task"] = None
-
-                    # Barge-in: if assistant is speaking, stop local queue and Plivo playback immediately
-                    if call_state["assistant_speaking"]:
-                        call_state["interrupting"] = True
-                        call_state["assistant_speaking"] = False
-
-                        # Barge-in diagnostic: count + how long the AI had been
-                        # speaking before we cut it. Repeated very-short values
-                        # (<~0.5s) point to echo/noise false-triggering our VAD.
-                        call_state["barge_in_count"] += 1
-                        ai_spoke_ms = None
-                        if call_state.get("ai_playback_start_time") is not None:
-                            ai_spoke_ms = (datetime.now(ist_tz) - call_state["ai_playback_start_time"]).total_seconds() * 1000
-                        logger.info(
-                            f"📊 [BARGE-IN] source=local-vad count={call_state['barge_in_count']} "
-                            f"ai_spoke_ms={ai_spoke_ms if ai_spoke_ms is None else round(ai_spoke_ms)}"
-                        )
-
-                        # Log the exact time the AI was cut off
-                        interrupted_time = datetime.now(ist_tz)
-                        logger.info(f"🎙️ [TIMING] AI Speech Interrupted at: {interrupted_time.strftime('%H:%M:%S.%f')[:-3]}")
-                        
-                        # Reset timing trackers
-                        call_state["ai_playback_start_time"] = None
-                        call_state["current_utterance_bytes"] = 0
-
-                        # Drain queued outbound audio
-                        while not call_state["plivo_output_queue"].empty():
-                            with contextlib.suppress(asyncio.QueueEmpty):
-                                call_state["plivo_output_queue"].get_nowait()
-
-                        if call_state.get("stream_id"):
-                            await plivo_ws.send(json.dumps({
-                                "event": "clearAudio",
-                                "stream_id": call_state["stream_id"]
-                            }))
-                            logger.info("🛑 Cleared Plivo playback buffer")
-
-                    if not call_state["user_activity_open"]:
-                        if not call_state["tool_call_in_progress"]:
-                            # Set the flag BEFORE the await so the concurrent gemini
-                            # task cannot also open activity in the same window
-                            # (avoids a double activityStart with no activityEnd).
-                            call_state["user_activity_open"] = True
-                            call_state["awaiting_model"] = False
-                            call_state["model_response_deadline"] = None
-                            call_state["turn_complete"] = False
-                            await session.send_realtime_input(
-                                activity_start=types.ActivityStart()
-                            )
-                            logger.info("▶️ Sent activityStart to Gemini")
-
-                            # Flush the clean preroll buffer
-                            if call_state["preroll_pcm16"]:
-                                call_state["gemini_input_buffer"].extend(call_state["preroll_pcm16"])
-                                call_state["preroll_pcm16"].clear()
-                                chunk_already_buffered_via_preroll = True
-                            
-                        call_state["interrupting"] = False
-
-                # While user activity is open, continuously stream audio to Gemini
-                if call_state["user_activity_open"] and not chunk_already_buffered_via_preroll:
-                    call_state["gemini_input_buffer"].extend(clean_pcm_16k)
-
-                    while len(call_state["gemini_input_buffer"]) >= GEMINI_PCM_CHUNK_SIZE:
-                        audio_chunk = bytes(call_state["gemini_input_buffer"][:GEMINI_PCM_CHUNK_SIZE])
-                        del call_state["gemini_input_buffer"][:GEMINI_PCM_CHUNK_SIZE]
-                        if not call_state["tool_call_in_progress"]:
-                            await session.send_realtime_input(
-                                audio=types.Blob(data=audio_chunk, mime_type="audio/pcm;rate=16000")
-                            )
-                            record_gemini_pcm(call_state, audio_chunk)
-                if speech_ended and call_state["user_activity_open"]:
-                    logger.info(" 🔇 User speech end detected")
-                    emit_call_event(call_state.get("call_uuid"), "user_silent")
-
-                    # Flush remainder before ending activity
-                    if call_state["gemini_input_buffer"]:
-                        await session.send_realtime_input(
-                            audio=types.Blob(
-                                data=bytes(call_state["gemini_input_buffer"]),
-                                mime_type="audio/pcm;rate=16000"
-                            )
-                        )
-                        record_gemini_pcm(call_state, bytes(call_state["gemini_input_buffer"]))
-                        call_state["gemini_input_buffer"].clear()
-
-                    await session.send_realtime_input(
-                        activity_end=types.ActivityEnd()
-                    )
-                    call_state["user_activity_open"] = False
-                    call_state["awaiting_model"] = True
-                    call_state["model_response_deadline"] = (
-                        time.monotonic() + MODEL_RESPONSE_TIMEOUT_SECONDS
-                    )
-                    call_state["interrupting"] = False
-                    logger.info("⏹️ Sent activityEnd to Gemini")
-
-            elif data['event'] == 'stop':
-                logger.info('Plivo stream stopped')
-                call_state["plivo_disconnected"] = True
-                call_state["terminate_session"] = True
-                break
-
-    except asyncio.CancelledError:
-        logger.info("Plivo -> Gemini stream cancelled")
-        raise
-    except Exception as e:
-        logger.error(f"Error in Plivo -> Gemini stream: {e}")
-        raise
-
-async def stream_gemini_to_plivo(session, plivo_ws, call_state,plivo_client):
-    logger.info('Ready to stream audio from Gemini to Plivo')
-    try:
-        while True:
-            async for response in session.receive():
-                
-                # ==========================================
-                # 0. To end the call
-                # ==========================================
-                if call_state["terminate_session"]:
-                    logger.info("Terminating Gemini -> Plivo loop")
-                    break
-                
-                # ==========================================
-                # 1. NEW: Handle Tool Calls at the Root Level
-                # ==========================================
-                if response.tool_call:
-                    call_state["tool_call_in_progress"] = True
-                    call_state["awaiting_model"] = False
-                    call_state["model_response_deadline"] = None
-                    function_responses_to_send = []
-                    
-                    try:
-                    
-                        for call in response.tool_call.function_calls:
-                            logger.info(f"\n[⚙️ Gemini requested tool execution: {call.name}]")
-                            emit_call_event(call_state.get("call_uuid"), "tool_called", {"tool_name": call.name})
-                            args_dict = dict(call.args) if call.args else {}
-                            logger.info(f"Arguments: {args_dict}")
-
-                            try:
-                                if call.name == "endCall":
-                                    end_call_summary = args_dict.get("summary_of_whole_call", "")
-                                    call_state["end_call_summary"] = end_call_summary
-                                    logger.info(f"📋 End-call summary captured from Gemini: {end_call_summary}")
-                                    call_state["pending_end_call"] = True
-                                    call_state["closing_audio_phase"] = True
-                                    call_state["terminal_action_deadline"] = (
-                                        time.monotonic() + TERMINAL_ACTION_TIMEOUT_SECONDS
-                                    )
-                                    call_state["end_call_tool_executed"] = False
-                                    call_state["terminate_session"] = False
-                                    
-                                    # Reset VAD state to prevent barge-in from carrying over stale context
-                                    call_state["is_speaking"] = False
-                                    call_state["user_activity_open"] = False
-                                    
-                                    logger.info("📴 Call ending requested by Gemini; MCP endCall will execute after closing audio playback finishes")
-
-                                    function_responses_to_send.append(
-                                        types.FunctionResponse(
-                                            id=call.id,
-                                            name=call.name,
-                                            response={
-                                                "status": "accepted", 
-                                                "message": "Call will end after audio playback completes."
-                                            }
-                                        )
-                                    )
-                                elif call.name == "transferCall":
-                                    call_summary = args_dict.get("call_summary", "")
-                                    language = args_dict.get("language", "")
-                                    
-                                    structured_summary = {
-                                        "call_summary": call_summary,
-                                        "language": language
-                                    }
-                                    
-                                    summary_json_string = json.dumps(structured_summary)
-                                    call_state["transfer_summary"] = summary_json_string
-                                    logger.info(f"📋 Summary captured from Gemini: {summary_json_string}")
-                                    
-                                    call_state["pending_transfer_call"] = True
-                                    call_state["closing_audio_phase"] = True
-                                    call_state["terminal_action_deadline"] = (
-                                        time.monotonic() + TERMINAL_ACTION_TIMEOUT_SECONDS
-                                    )
-                                    call_state["transfer_call_tool_executed"] = False
-                                    call_state["terminate_session"] = False
-                                    
-                                    # Reset VAD state to prevent barge-in from carrying over stale context
-                                    call_state["is_speaking"] = False
-                                    call_state["user_activity_open"] = False
-                                    logger.info("🔀 Call transfer requested by Gemini; MCP transferCall will execute after audio playback finishes")
-
-                                    function_responses_to_send.append(
-                                        types.FunctionResponse(
-                                            id=call.id,
-                                            name=call.name,
-                                            response={
-                                                "status": "accepted", 
-                                                "message": "Call will be transferred after audio playback completes."
-                                            }
-                                        )
-                                    )
-                                    
-                                # else:
-                                #     # Execute against Adamas Tech server
-                                #     mcp_result = await mcp_session.call_tool(
-                                #         call.name, args_dict
-                                #     )
-                                #     result_text = "\n".join(
-                                #         [
-                                #             c.text
-                                #             for c in mcp_result.content
-                                #             if c.type == "text"
-                                #         ]
-                                #     )
-                                #     logger.info("[✅ Tool executed successfully. Returning data to Gemini...]")
-                                #     logger.info(f"Raw Data from MCP: {result_text}")
-
-                                #     function_responses_to_send.append(
-                                #         types.FunctionResponse(
-                                #             id=call.id,
-                                #             name=call.name,
-                                #             response={
-                                #                 "result": result_text,
-                                #                 # schedule
-                                #                 # "scheduling": "WHEN_IDLE"
-                                #             },
-                                #         )
-                                #     )
-                            except Exception as e:
-                                logger.error(f"[❌ Error executing MCP tool {call.name}: {e}]")
-                                function_responses_to_send.append(
-                                    types.FunctionResponse(
-                                        id=call.id,
-                                        name=call.name,
-                                        response={"error": str(e)},
-                                    )
-                                )
-                            
-                    finally:
-                        if function_responses_to_send:
-                            await session.send_tool_response(
-                                function_responses=function_responses_to_send
-                            )
-                        call_state["tool_call_in_progress"] = False
-                        
-                        if call_state.get("is_speaking") and not call_state.get("user_activity_open"):
-                            # Set the flag before the await to avoid a double
-                            # activityStart racing the Plivo input task.
-                            call_state["user_activity_open"] = True
-                            call_state["awaiting_model"] = False
-                            call_state["model_response_deadline"] = None
-                            call_state["turn_complete"] = False
-                            await session.send_realtime_input(
-                                activity_start=types.ActivityStart()
-                            )
-                            logger.info("▶️ Sent deferred activityStart to Gemini (tool call finished)")
-
-                            # Speech that began DURING the tool call was captured in
-                            # preroll (activity was not open yet). Prepend it so the
-                            # onset of the user's utterance isn't clipped, then flush
-                            # anything already in the input buffer.
-                            if call_state["preroll_pcm16"]:
-                                call_state["gemini_input_buffer"][:0] = call_state["preroll_pcm16"]
-                                call_state["preroll_pcm16"].clear()
-                            if call_state["gemini_input_buffer"]:
-                                await session.send_realtime_input(
-                                    audio=types.Blob(
-                                        mime_type="audio/pcm;rate=16000",
-                                        data=bytes(call_state["gemini_input_buffer"]),
-                                    )
-                                )
-                                record_gemini_pcm(call_state, bytes(call_state["gemini_input_buffer"]))
-                                call_state["gemini_input_buffer"].clear()
-
-                # ==========================================
-                # 2. Handle Audio and Interruptions
-                # ==========================================
-                server_content = getattr(response, 'server_content', None)
-                if server_content is not None:
-                    
-                    # 1. Accumulate User Transcriptions silently
-                    input_transcription = getattr(server_content, 'input_transcription', None)
-                    if input_transcription and getattr(input_transcription, 'text', None):
-                        call_state["user_text_buffer"] += input_transcription.text
-                        
-                    # 2. Accumulate AI Transcriptions silently
-                    output_transcription = getattr(server_content, 'output_transcription', None)
-                    if output_transcription and getattr(output_transcription, 'text', None):
-                        call_state["ai_text_buffer"] += output_transcription.text
-                    
-                    if getattr(server_content, 'interrupted', False):
-                        call_state["barge_in_count"] += 1
-                        ai_spoke_ms = None
-                        if call_state.get("ai_playback_start_time") is not None:
-                            ai_spoke_ms = (datetime.now(ist_tz) - call_state["ai_playback_start_time"]).total_seconds() * 1000
-                        logger.info(
-                            f"🛑 Gemini confirmed interruption | 📊 [BARGE-IN] source=server count={call_state['barge_in_count']} "
-                            f"ai_spoke_ms={ai_spoke_ms if ai_spoke_ms is None else round(ai_spoke_ms)}"
-                        )
-
-                        if call_state["ai_text_buffer"].strip():
-                            logger.info(f"🤖 [GEMINI] (Interrupted): {call_state['ai_text_buffer'].strip()}")
-                            call_state["ai_text_buffer"] = ""
-                            
-                        call_state["assistant_speaking"] = False
-                        call_state["awaiting_model"] = False
-                        call_state["model_response_deadline"] = None
-                        call_state["interrupting"] = False
-                        if not call_state["closing_audio_phase"]:
-                            call_state["pending_end_call"] = False
-                            call_state["pending_transfer_call"] = False
-                            call_state["ending_call_phase"] = False
-                            call_state["closing_audio_started"] = False
-                        call_state["turn_complete"] = True
-                        
-                        while not call_state["plivo_output_queue"].empty():
-                            with contextlib.suppress(asyncio.QueueEmpty):
-                                call_state["plivo_output_queue"].get_nowait()
-                                
-                        if call_state.get("stream_id"):
-                            await plivo_ws.send(json.dumps({
-                                "event": "clearAudio",
-                                "stream_id": call_state["stream_id"]
-                            }))
-                    
-                    if getattr(server_content, 'turn_complete', False):
-                        call_state["turn_complete"] = True
-                        
-                        # Flush the completed AI sentence to the logs
-                        if call_state["ai_text_buffer"].strip():
-                            ai_transcript = call_state["ai_text_buffer"].strip()
-                            logger.info(f"🤖 [GEMINI]: {ai_transcript}")
-                            call_state["conversation_log"].append({
-                                "role": "agent",
-                                "text": ai_transcript
-                            })
-                            emit_call_event(call_state.get("call_uuid"), "ai_transcript", {"text": ai_transcript})
-                            call_state["ai_text_buffer"] = ""
-                    
-                    model_turn = getattr(server_content, 'model_turn', None)
-                    #logger.info("⚡ Gemini Audio Chunk Received!")
-                    if model_turn is not None:
-                        call_state["awaiting_model"] = False
-                        call_state["model_response_deadline"] = None
-                        
-                        # Flush the completed user sentence to the logs now.
-                        if call_state["user_text_buffer"].strip() and not call_state["assistant_speaking"]:
-                            user_transcript = call_state["user_text_buffer"].strip()
-                            logger.info(f"🗣️ [USER]: {user_transcript}")
-                            call_state["conversation_log"].append({
-                                "role": "user",
-                                "text": user_transcript
-                            })
-                            emit_call_event(call_state.get("call_uuid"), "user_transcript", {"text": user_transcript})
-                            call_state["user_text_buffer"] = ""
-                            
-                        for part in model_turn.parts:
-                            if getattr(part, 'inline_data', None) and part.inline_data.data:
-                                if call_state["interrupting"] or call_state["user_activity_open"]:
-                                    continue
-                                pcm_8k, call_state["ratecv_state_out"] = audioop.ratecv(
-                                    part.inline_data.data, 2, 1, GEMINI_OUTPUT_RATE, PLIVO_SAMPLE_RATE, call_state["ratecv_state_out"]
-                                )
-                                plivo_ulaw = pcm_to_ulaw(pcm_8k)
-                                
-                                if plivo_ulaw:
-                                    if call_state.get("is_ringing"):
-                                        call_state["is_ringing"] = False
-                                        if call_state.get("stream_id"):
-                                            await plivo_ws.send(json.dumps({
-                                                "event": "clearAudio",
-                                                "stream_id": call_state["stream_id"]
-                                            }))
-                                            logger.info("🛑 Gemini generated first audio. Synthetic ringback killed.")
-                                    await call_state["plivo_output_queue"].put(plivo_ulaw)
-                                    call_state["assistant_speaking"] = True
-                                    call_state["awaiting_model"] = False
-                                    if call_state.get("closing_audio_phase") and not call_state.get("closing_audio_started"):
-                                        call_state["closing_audio_started"] = True
-                                        logger.info("🎙️ Closing audio has started streaming from Gemini")
-                
-                # ==========================================
-                # 3. Usage Metadata & Pricing tracking
-                # ==========================================
-                usage_metadata = getattr(response, 'usage_metadata', None)
-                if usage_metadata:
-                    total_token_count = getattr(usage_metadata, 'total_token_count', None)
-                    if total_token_count is not None:
-                        previous_total = call_state["last_usage_total_token_count"]
-                        call_state["usage_total_updates"] += 1
-                        if previous_total is not None and total_token_count < previous_total:
-                            call_state["usage_total_non_monotonic_count"] += 1
-                            logger.warning(
-                                f"📉 usage_metadata.total_token_count decreased: prev={previous_total}, current={total_token_count}"
-                            )
+async def stream_gemini_to_plivo(session, plivo_ws, call_state, plivo_client):
+    epoch = call_state['responses'].epoch
+    resampler = OutputResampler()
+    call_state['output_resampler'] = resampler
+    resampler_owner = None
+    while not call_state['terminate_session']:
+        received = False
+        async for response in session.receive():
+            received = True
+            if epoch != call_state['responses'].epoch or call_state['terminate_session']:
+                return
+            update = getattr(response, 'session_resumption_update', None)
+            if update and getattr(update, 'resumable', False) and getattr(update, 'new_handle', None):
+                call_state['session_resumption_handle'] = update.new_handle
+            go_away = getattr(response, 'go_away', None)
+            if go_away is not None:
+                remaining = getattr(go_away, 'time_left', None)
+                try:
+                    seconds = (remaining.total_seconds() if hasattr(remaining, 'total_seconds')
+                               else float(str(remaining).removesuffix('s')))
+                except (TypeError, ValueError):
+                    seconds = 1.0
+                call_state['go_away_received'] = True
+                call_state['go_away_deadline'] = time.monotonic() + max(0, seconds - 1)
+                emit_call_event(call_state.get('call_uuid'), 'gemini_goaway')
+            tracker = call_state['responses']
+            turn = tracker.current(epoch)
+            content = getattr(response, 'server_content', None)
+            if content is not None:
+                transcript = getattr(content, 'input_transcription', None)
+                if transcript and getattr(transcript, 'text', None):
+                    call_state['user_text_buffer'] += transcript.text
+                if getattr(content, 'interrupted', False):
+                    if turn is not None:
+                        turn.stale = True
+                        turn.deadline = None
+                        if tracker.active is turn:
+                            tracker.active = None
+                        if call_state['playback'].current_owner == turn.key:
+                            await call_state['playback'].clear(reason='model-interruption')
+                    # Keep the stale turn until its turn_complete boundary. A
+                    # later interruption must never clear a newer turn's timer.
+                    resampler.reset()
+            valid = turn is not None and not turn.stale and not call_state['user_activity_open']
+            tool_call = getattr(response, 'tool_call', None)
+            if tool_call:
+                replies = []
+                for call in tool_call.function_calls:
+                    if not valid:
+                        result = {'status': 'cancelled', 'message': 'This turn was interrupted.'}
+                    elif call.name not in ('endCall', 'transferCall'):
+                        result = {'error': 'Unknown tool'}
+                    else:
+                        turn.has_tool = True
+                        turn.deadline = time.monotonic() + MODEL_RESPONSE_TIMEOUT_SECONDS
+                        args = dict(call.args or {})
+                        call_state['closing_audio_phase'] = True
+                        call_state['terminal_action_deadline'] = time.monotonic() + TERMINAL_ACTION_TIMEOUT_SECONDS
+                        cancel_silence_timer(call_state)
+                        if call.name == 'endCall':
+                            call_state['end_call_summary'] = args.get('summary_of_whole_call', '')
+                            call_state['pending_end_call'] = True
                         else:
-                            delta = total_token_count - previous_total if previous_total is not None else None
-                            logger.info(
-                                f"📊 usage_metadata.total_token_count: current={total_token_count}, prev={previous_total}, delta={delta}"
-                            )
-                        call_state["last_usage_total_token_count"] = total_token_count
+                            call_state['transfer_summary'] = json.dumps({
+                                'call_summary': args.get('call_summary', ''),
+                                'language': args.get('language', ''),
+                            })
+                            call_state['pending_transfer_call'] = True
+                        emit_call_event(call_state.get('call_uuid'), 'tool_called', {'tool_name': call.name})
+                        result = {'status': 'accepted', 'message': 'Action will execute after confirmed playback.'}
+                    replies.append(types.FunctionResponse(id=call.id, name=call.name, response=result))
+                await asyncio.wait_for(session.send_tool_response(function_responses=replies), 5)
+            if content is not None:
+                output_text = getattr(content, 'output_transcription', None)
+                if valid and output_text and getattr(output_text, 'text', None):
+                    call_state['ai_text_buffer'] += output_text.text
+                model_turn = getattr(content, 'model_turn', None)
+                if valid and model_turn:
+                    for part in model_turn.parts or []:
+                        inline = getattr(part, 'inline_data', None)
+                        if not inline or not inline.data:
+                            continue
+                        if resampler_owner != turn.key:
+                            resampler.reset()
+                            resampler_owner = turn.key
+                        if not turn.has_audio:
+                            logger.info('First Gemini audio: call=%s turn=%s at=%.6f',
+                                        call_state.get('call_uuid'), turn.key, time.monotonic())
+                            emit_call_event(call_state.get('call_uuid'), 'ai_speaking')
+                        turn.has_audio = True
+                        # After first audio this deadline guards stalled generation.
+                        turn.deadline = time.monotonic() + MODEL_RESPONSE_TIMEOUT_SECONDS
+                        audio = pcm_to_ulaw(resampler.process(inline.data))
+                        call_state['playback'].feed(turn.key, audio)
+                        call_state['assistant_speaking'] = True
+                        cancel_silence_timer(call_state)
+                if getattr(content, 'turn_complete', False):
+                    status = getattr(content, 'interaction_status', None)
+                    status = str(getattr(status, 'value', status) or '').upper()
+                    if status == 'IN_PROGRESS' and turn is not None and not turn.stale:
+                        turn.deadline = time.monotonic() + MODEL_RESPONSE_TIMEOUT_SECONDS
+                        logger.info('Gemini background reasoning continues: call=%s turn=%s',
+                                    call_state.get('call_uuid'), turn.key)
+                        # More audio can follow this intermediate turn_complete.
+                        # Retain response ownership, resampler history, and timeout.
+                    else:
+                        completed = tracker.complete(epoch)
+                        if completed is not None and not completed.stale:
+                            call_state['turn_complete'] = tracker.active is None and not call_state['user_activity_open']
+                            for field, role, event in [('user_text_buffer', 'user', 'user_transcript'),
+                                                       ('ai_text_buffer', 'agent', 'ai_transcript')]:
+                                text = call_state[field].strip()
+                                if text:
+                                    logger.info('Transcript: call=%s turn=%s role=%s text=%s',
+                                                call_state.get('call_uuid'), completed.key, role, text)
+                                    call_state['conversation_log'].append({'role': role, 'text': text})
+                                    emit_call_event(call_state.get('call_uuid'), event, {'text': text})
+                                    call_state[field] = ''
+                            if completed.has_audio:
+                                tail = pcm_to_ulaw(resampler.finish())
+                                call_state['playback'].feed(completed.key, tail)
+                                tag = 'greeting' if not call_state['greeting_completed'] else 'response'
+                                call_state['playback'].finish(completed.key, tag)
+                            elif not completed.has_tool:
+                                await recover_empty_response(session, call_state, completed)
+                        else:
+                            call_state['ai_text_buffer'] = ''
+                        resampler.reset()
+            usage = getattr(response, 'usage_metadata', None)
+            if usage:
+                total = getattr(usage, 'total_token_count', None)
+                previous = call_state['last_usage_total_token_count']
+                if total is not None:
+                    if previous is not None and total < previous:
+                        call_state['usage_total_non_monotonic_count'] += 1
+                    call_state['last_usage_total_token_count'] = total
+                call_state['usage_total_updates'] += 1
+                for attr, direction in [('prompt_tokens_details', 'in'), ('response_tokens_details', 'out')]:
+                    for detail in getattr(usage, attr, None) or []:
+                        modality = str(detail.modality).upper()
+                        kind = 'audio' if 'AUDIO' in modality else 'text'
+                        call_state[f'tokens_{kind}_{direction}'] += detail.token_count or 0
+        if not received:
+            raise GeminiSessionDisconnected('Gemini receive ended without a turn')
 
-                    if getattr(usage_metadata, 'prompt_tokens_details', None):
-                        for detail in usage_metadata.prompt_tokens_details:
-                            modality = getattr(detail, 'modality', str(getattr(detail, 'modality', ''))).upper()
-                            count = getattr(detail, 'token_count', 0) or 0
-                            if "TEXT" in modality:
-                                call_state["tokens_text_in"] += count
-                            elif "AUDIO" in modality:
-                                call_state["tokens_audio_in"] += count
-                    
-                    if getattr(usage_metadata, 'response_tokens_details', None):
-                        for detail in usage_metadata.response_tokens_details:
-                            modality = getattr(detail, 'modality', str(getattr(detail, 'modality', ''))).upper()
-                            count = getattr(detail, 'token_count', 0) or 0
-                            if "TEXT" in modality:
-                                call_state["tokens_text_out"] += count
-                            elif "AUDIO" in modality:
-                                call_state["tokens_audio_out"] += count
-                
-                # ==========================================
-                # 4. Session Resumption & GoAway handling
-                # ==========================================
-                resumption_update = getattr(response, 'session_resumption_update', None)
-                if resumption_update:
-                    if getattr(resumption_update, 'resumable', False) and getattr(resumption_update, 'new_handle', None):
-                        call_state["session_resumption_handle"] = resumption_update.new_handle
-                        logger.info("🔑 Session resumption handle updated")
 
-                go_away = getattr(response, 'go_away', None)
-                if go_away is not None:
-                    time_left = getattr(go_away, 'time_left', 'unknown')
-                    logger.warning(f"⚠️ GoAway received from Gemini. Time left: {time_left}")
-                    call_state["go_away_received"] = True
-                    emit_call_event(call_state.get("call_uuid"), "gemini_goaway", {"time_left": str(time_left)})
-                    # Raise to trigger reconnection before the connection is forcibly closed
-                    raise GeminiSessionDisconnected(f"GoAway received, time_left={time_left}")
-
-    except asyncio.CancelledError:
-        logger.info("Gemini -> Plivo stream cancelled")
-        raise
-    except GeminiSessionDisconnected:
-        logger.info("🔄 GeminiSessionDisconnected raised, propagating for reconnection")
-        raise
-    except Exception as e:
-        from google.genai import errors as genai_errors
-        if isinstance(e, genai_errors.APIError):
-            if "1000" in str(e):
-                if call_state.get("terminate_session"):
-                    logger.info("Gemini Live session closed cleanly (1000 OK) during normal shutdown.")
-                    return
-                else:
-                    logger.warning("⚠️ Gemini Live session closed cleanly (1000 OK) unexpectedly mid-call. Attempting resumption...")
-                    raise GeminiSessionDisconnected(f"Unexpected API 1000 closure") from e
-            elif "1008" in str(e):
-                if call_state.get("session_resumption_handle"):
-                    logger.warning(f"⚠️ Gemini Live session closed by API (1008): {e}. Attempting session resumption...")
-                    raise GeminiSessionDisconnected(f"API 1008 error: {e}") from e
-                else:
-                    logger.warning(f"⚠️ Gemini Live session closed by API (1008): {e}. No resumption handle available, ending call.")
-                    await terminate_plivo_call(
-                        plivo_client,
-                        call_state,
-                        "Gemini Live session closed with policy error 1008 (no resumption handle)",
-                    )
-            else:
-                logger.error(f"Error in Gemini -> Plivo stream: {e}")
-                raise
-        else:
-            logger.error(f"Error in Gemini -> Plivo stream: {e}")
-            raise
-    
 async def execute_pending_terminal_action(
     plivo_ws,
     call_state,
@@ -2026,26 +1659,16 @@ async def execute_pending_terminal_action(
     if call_state.get("terminal_action_in_progress") or call_state.get("user_activity_open"):
         return False
 
-    queue_empty = call_state["plivo_output_queue"].empty()
-    playback_idle = not call_state.get("assistant_speaking")
-    turn_complete = call_state.get("turn_complete", True)
-    deadline = call_state.get("terminal_action_deadline")
-    deadline_expired = deadline is not None and time.monotonic() >= deadline
-
-    if not queue_empty or not playback_idle:
+    if call_state['playback'].busy:
         return False
-    if not turn_complete and not deadline_expired:
+    deadline = call_state.get('terminal_action_deadline')
+    expired = deadline is not None and time.monotonic() >= deadline
+    if not call_state['turn_complete'] and not expired:
         return False
-
-    call_state["terminal_action_in_progress"] = True
-    call_state["ending_call_phase"] = True
-    out_buffer.clear()
-    await asyncio.sleep(0.2)
-
-    if not call_state["plivo_output_queue"].empty() or call_state["assistant_speaking"]:
-        call_state["terminal_action_in_progress"] = False
-        call_state["ending_call_phase"] = False
-        return False
+    # Stop future generation before executing a terminal side effect.
+    call_state['responses'].invalidate()
+    call_state['terminal_action_in_progress'] = True
+    call_state['ending_call_phase'] = True
 
     if pending_end:
         call_state["end_call_tool_executed"] = True
@@ -2110,126 +1733,10 @@ async def execute_pending_terminal_action(
     call_state["terminate_session"] = True
     await asyncio.sleep(POST_TRANSFER_DELAY_SECONDS)
     with contextlib.suppress(Exception):
-        await plivo_ws.close(1000)
+        if plivo_ws is not None:
+            await plivo_ws.close(1000)
     return True
 
-
-async def send_plivo_audio(plivo_ws, call_state,session,plivo_client):
-    logger.info('Ready to send audio to Plivo')
-    out_buffer = bytearray()
-
-    try:
-        while True:
-            if call_state["terminate_session"]:
-                logger.info("Terminating Plivo sender loop")
-                break
-            try:
-                audio = await asyncio.wait_for(call_state["plivo_output_queue"].get(), timeout=PLIVO_SEND_POLL_TIMEOUT)
-                out_buffer.extend(audio)
-
-                while len(out_buffer) >= PLIVO_ULAW_CHUNK_SIZE:
-                    if call_state["interrupting"] or call_state["user_activity_open"]:
-                        call_state["out_buffer_clear_count"] += 1
-                        call_state["out_buffer_bytes_discarded"] += len(out_buffer)
-                        logger.info(
-                            f"📊 [OUT-CLEAR] count={call_state['out_buffer_clear_count']} "
-                            f"discarded_bytes={len(out_buffer)} "
-                            f"reason={'interrupting' if call_state['interrupting'] else 'user_activity_open'}"
-                        )
-                        out_buffer.clear()
-                        break
-
-                    chunk = bytes(out_buffer[:PLIVO_ULAW_CHUNK_SIZE])
-                    del out_buffer[:PLIVO_ULAW_CHUNK_SIZE]
-
-                    # Feed the exact audio we are about to play out as the AEC
-                    # far-end reference, aligned to real playback time so the
-                    # canceller can subtract this signal's echo from the mic.
-                    call_state["aec"].add_far_end(ulaw_to_pcm(chunk))
-
-                    # --- TIMING LOGIC: Start time and byte tracking ---
-                    if call_state["ai_playback_start_time"] is None:
-                        call_state["ai_playback_start_time"] = datetime.now(ist_tz)
-                        logger.info(f"🎙️ [TIMING] AI Speech Started playing at: {call_state['ai_playback_start_time'].strftime('%H:%M:%S.%f')[:-3]}")
-                        emit_call_event(call_state.get("call_uuid"), "ai_speaking")
-                        
-                        # Cancel the silence timer when AI starts speaking
-                        if call_state.get("silence_timer_task") and not call_state["silence_timer_task"].done():
-                            call_state["silence_timer_task"].cancel()
-                            call_state["silence_timer_task"] = None
-                        
-                    call_state["current_utterance_bytes"] += len(chunk)
-                    # --------------------------------------------------
-
-                    audio_delta = {
-                        "event": "playAudio",
-                        "media": {
-                            "contentType": "audio/x-mulaw",
-                            "sampleRate": 8000,
-                            "payload": base64.b64encode(chunk).decode("utf-8"),
-                        }
-                    }
-                    await plivo_ws.send(json.dumps(audio_delta))
-
-            except asyncio.TimeoutError:
-                if len(out_buffer) < PLIVO_ULAW_CHUNK_SIZE and call_state["plivo_output_queue"].empty():
-                    if call_state["ai_playback_start_time"] is not None and call_state["current_utterance_bytes"] > 0:
-                        duration_seconds = call_state["current_utterance_bytes"] / 8000.0
-                        expected_end_time = call_state["ai_playback_start_time"] + timedelta(seconds=duration_seconds)
-                        now = datetime.now(ist_tz)
-
-                        if now < expected_end_time:
-                            continue
-
-                        logger.info(
-                            f"AI speech playback ended at {now.strftime('%H:%M:%S.%f')[:-3]} "
-                            f"(calculated duration: {duration_seconds:.2f}s)"
-                        )
-                        emit_call_event(call_state.get("call_uuid"), "ai_done")
-
-                        if not call_state.get("greeting_completed", False):
-                            logger.info("Initial greeting complete. Microphone is now live.")
-                            call_state["greeting_completed"] = True
-                            emit_call_event(call_state.get("call_uuid"), "call_connected")
-
-                        call_state["ai_playback_start_time"] = None
-                        call_state["current_utterance_bytes"] = 0
-                        call_state["assistant_speaking"] = False
-                        call_state["interrupting"] = False
-
-                        if (
-                            call_state.get("turn_complete", True)
-                            and not call_state["pending_end_call"]
-                            and not call_state["pending_transfer_call"]
-                            and not call_state["closing_audio_phase"]
-                        ):
-                            if call_state.get("silence_timer_task") and not call_state["silence_timer_task"].done():
-                                call_state["silence_timer_task"].cancel()
-                            call_state["silence_timer_task"] = asyncio.create_task(
-                                silence_watchdog(
-                                    session,
-                                    call_state,
-                                    delay=SILENCE_FOLLOWUP_SECONDS,
-                                )
-                            )
-                    else:
-                        call_state["assistant_speaking"] = False
-                        call_state["interrupting"] = False
-
-                    terminal_executed = await execute_pending_terminal_action(
-                        plivo_ws,
-                        call_state,
-                        plivo_client,
-                        out_buffer,
-                    )
-                    if terminal_executed:
-                        break
-
-                continue
-
-    except Exception as e:
-        logger.error(f"Error in send_plivo_audio: {e}")
-        raise
 
 @app.route("/trigger-call", methods=["POST"])
 async def trigger_call():
@@ -2239,18 +1746,18 @@ async def trigger_call():
         return {"status": "error", "message": "Unauthorized"}, 401
 
     data = await request.get_json()
-    
+
     target_user_name = data.get("user_name", "Unknown")
     target_phone_number = data.get("phone_number")
-    
+
     if not target_phone_number:
         return {"status": "error", "message": "Phone number is required"}, 400
 
     encoded_name = urllib.parse.quote(target_user_name)
     encoded_phone = urllib.parse.quote(target_phone_number)
-    
+
     answer_url = f"{PUBLIC_BASE_URL}/outbound-webhook?user_name={encoded_name}&phone_number={encoded_phone}"
-    
+
     try:
         logger.info(f"Initiating outbound call to {target_phone_number} via Dashboard...")
         call_made = await asyncio.to_thread(
@@ -2273,7 +1780,7 @@ if __name__ == "__main__":
     logger.info(f'Starting the Quart Server on Port {PORT} with Hypercorn (Waiting for Dashboard trigger...)')
     import hypercorn.asyncio
     from hypercorn.config import Config as HypercornConfig
-    
+
     hconfig = HypercornConfig()
     hconfig.bind = [f"0.0.0.0:{PORT}"]
     asyncio.run(hypercorn.asyncio.serve(app, hconfig))

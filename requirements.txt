@@ -8,6 +8,7 @@ python-dotenv==1.2.2
 Quart==0.20.0
 audiolab==0.5.1
 av==17.0.0
-google-genai==1.66.0
+google-genai==2.24.0
+google-auth==2.56.0
 # audioop was removed from the stdlib in Python 3.13; this backport restores it.
 audioop-lts==0.2.1; python_version >= "3.13"

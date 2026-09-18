@@ -173,11 +173,11 @@ class AcousticEchoCanceller:
             self._far_fifo = self._far_fifo[-self._max_far_samples:]
 
     def reset_far_end(self):
-        """Clear the far-end backlog. Call on session reconnect: the ~1 s gap
-        desynchronizes far/near timing, but the learned echo path (filter
-        weights) stays valid because the acoustics didn't change."""
+        """Discard abandoned playback references, preserving learned weights."""
         self._far_fifo = np.zeros(0, dtype=np.float32)
         self._near_buf = np.zeros(0, dtype=np.float32)
+        self._filter.X.fill(0)
+        self._filter.x.fill(0)
 
     def _pop_far(self, n):
         """Pop n far-end samples; zero-pad if the AI isn't playing / not enough

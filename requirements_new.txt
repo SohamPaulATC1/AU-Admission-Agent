@@ -56,11 +56,11 @@ future==1.0.0
 google-ai-generativelanguage==0.6.15
 google-api-core==2.30.0
 google-api-python-client==2.192.0
-google-auth==2.48.0
+google-auth==2.56.0
 google-auth-httplib2==0.3.0
 google-cloud-speech==2.37.0
 google-cloud-texttospeech==2.34.0
-google-genai==1.66.0
+google-genai==2.24.0
 google-generativeai==0.8.6
 googleapis-common-protos==1.72.0
 graphifyy==0.5.0
