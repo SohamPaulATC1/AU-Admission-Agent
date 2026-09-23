@@ -87,8 +87,9 @@ correlation.**
 
 ## 3. What is DONE and wired (Tasks 1–4 complete, Task 5 in progress)
 
-Task list lives in the session todo and in
-`.kiro/specs/bengali-grapheme-stutter-fix/`. Progress: **4/8 complete, #5 in
+Task list lives in the session todo and in `docs/spec/tasks.md` (tracked
+copy; the Kiro working copy under the gitignored
+`.kiro/specs/bengali-grapheme-stutter-fix/` is kept identical). Progress: **4/8 complete, #5 in
 progress.**
 
 ### Task 1 — grounding (DONE)
@@ -110,7 +111,7 @@ Full audio path mapped. Key facts:
   context window compression.
 
 ### Task 2 — design note (DONE)
-`.kiro/specs/bengali-grapheme-stutter-fix/redesign-audio-pipeline.md`. Two
+`docs/spec/redesign-audio-pipeline.md`. Two
 coupled defects:
 - **D1** far-end reference fed at send-time (no pacing) → `buffer_lead` grows
   208→558 ms > the AEC's 480 ms modelled window → cancellation degrades →

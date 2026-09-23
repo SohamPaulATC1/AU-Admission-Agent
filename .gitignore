@@ -23,6 +23,10 @@ debug_recordings/
 # startup and the test-suite echo fixtures live here and must stay committable.
 !playback_audio_files/
 !playback_audio_files/*.wav
+# Phone-exported call recordings (caller PII) and the Kiro halt snapshots.
+CALL_RECORDINGS/
+*.m4a
+*.kiro-halt
 
 # Local databases / persisted state
 *.sqlite3
