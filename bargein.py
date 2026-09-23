@@ -4,7 +4,7 @@ Every function here is pure: no I/O, no logging, no timers, no mutable module
 state. State is passed in and results are returned. That is deliberate -- it is
 what lets the barge-in decision be unit-tested against the on-disk call
 recordings with no phone call and no live model (see
-`.kiro/specs/bengali-grapheme-stutter-fix/redesign-audio-pipeline.md`).
+`docs/spec/redesign-audio-pipeline.md`).
 
 Why the specific choices here, all from measured data on the two reproduction
 calls (2026-09-22 16:32 and 17:05), not guesses:
@@ -181,9 +181,10 @@ def should_barge_in(
 ) -> BargeInDecision:
     """Decide whether a while-speaking VAD onset is a genuine interruption.
 
-    Called only at the moment the VAD would otherwise truncate the assistant
-    (speech_started AND assistant_speaking) -- never per frame, never while the
-    assistant is silent. Three outcomes:
+    Called only at a VAD onset while the far window still holds playback: while
+    the assistant is speaking, or in the post-playback echo tail that app.py's
+    ``far_window_has_playback`` tracks -- never per frame, never once the
+    assistant has been silent for the whole far window. Three outcomes:
 
     * far-end inactive  -> genuine speech (nothing to echo)   -> barge in
     * correlated >= threshold -> the assistant's own echo     -> suppress

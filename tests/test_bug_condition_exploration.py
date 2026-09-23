@@ -1,26 +1,26 @@
-"""Task 3 -- bug condition exploration test. **THIS TEST IS EXPECTED TO FAIL.**
+"""Task 3 -- bug condition exploration test, now the task 5.12 fix validator.
 
 Property 1: Bug Condition -- Echo-Driven Truncation Cuts a Grapheme Cluster.
 
 Every assertion below encodes the **fixed** behaviour from design.md Property 1.
-Run against unfixed code they fail, and that failure is the deliverable: it is
-the evidence that the defect exists. Do not weaken these assertions and do not
-"fix" them. Task 5.12 re-runs this same file as the fix validator.
+When task 3 wrote them they failed against the unfixed code, and that failure
+was the evidence that the defect existed. With the fix and the audio-pipeline
+redesign in place they pass. Do not weaken these assertions to make a later
+failure go away: a failure here is now a regression.
 
 --------------------------------------------------------------------------------
-WHICH CASES THE AUTHORISED SCOPE CAN EVER CLOSE -- read this before treating a
-failure here as a regression
+WHAT CLOSES EACH CASE
 --------------------------------------------------------------------------------
 
 Cases A and B depend on the barge-in decision distinguishing echo-correlated
-near-end from caller speech. That distinction is concerns (a) and (b), tasks 5.7
-and 5.9, which are **PARKED PENDING REDESIGN** after task 1's INCONCLUSIVE
-verdict. Nothing in the authorised scope (tasks 5.1, 5.2, 5.3, 5.4, 5.4a, 5.10)
-changes the decision, so **A and B will still fail after the authorised work
-lands. That is expected, not a regression.** They are documentation of the
-defect, not a target for this pass.
+near-end from caller speech. That is concerns (a) and (b), tasks 5.7 and 5.9.
+They were parked after task 1's INCONCLUSIVE verdict (so A and B were expected
+to fail at the time), then implemented as redesigned: the corroborated echo
+gate, the echo latch, the echo return ceiling and the post-playback echo tail
+gate (docs/spec/redesign-audio-pipeline.md; docs/HANDOFF.md sections 5.6-5.8).
+A and B pass on that code.
 
-Cases C and D are the ones the authorised scope actually closes:
+Cases C and D were closed by the pre-redesign instrumentation work:
 
 * Case C -- loop reproduction. Closed by task 5.10, the leading-fragment commit
   gate, which holds the new turn's audio until ``GRAPHEME_COMMIT_MS`` so a
@@ -43,16 +43,17 @@ explained by the far-end reference at the tracked lag.
 The first three are constructed exactly. The fourth is constructed as a property
 of the *input* -- the near-end is literally a delayed, attenuated copy of the
 bytes app.py handed to ``aec.add_far_end`` -- and is *verified* with a test-side
-envelope correlation. It is NOT measured by production code, because unfixed
-code computes no correlation anywhere: there is no far-end shadow buffer, no
-``echo_correlation``, no ``LagTracker``. Those belong to the parked task 5.7 and
-this pass must not create them. So the "echo-correlated" clause is established
-by construction and by the harness, never by app.py.
+envelope correlation. When this file was written production code computed no
+correlation at all. Since the redesign app.py's gate measures one
+(``evaluate_echo_gate``, a lag search rather than the spec's ``LagTracker``),
+but the clause is still established by construction and verified test-side, so
+the test never relies on the code under test to certify its own input.
 
 The far-end really is delivered by app.py: ``send_plivo_audio`` runs for real, so
-``aec.add_far_end`` (app.py 1942) is called by production code on exactly the
-bytes sent to Plivo, and ``current_utterance_bytes`` is accumulated by production
-code too.
+production code queues exactly the bytes sent to Plivo into ``farend_ref_queue``,
+and the inbound loop feeds them to ``aec.add_far_end`` and ``far_shadow`` one
+frame per inbound frame (redesign Part 1). ``current_utterance_bytes`` is
+accumulated by production code too.
 
 One measurement worth recording, because it contradicts a natural assumption:
 ``delivered_ms`` derived from ``current_utterance_bytes / 8000`` is **quantised to
@@ -82,7 +83,9 @@ from tests.harness.fakes import (
     SenderHarness,
 )
 
-ANOMALOUS_TRUNCATION_MS = 350       # design.md literal; NOT defined in app.py (parked)
+# design.md literal, kept here on purpose so the test states the requirement
+# independently; app.py defines the same constant, checked in TestDesignLiterals.
+ANOMALOUS_TRUNCATION_MS = 350
 FRAME_BYTES = app.PLIVO_ULAW_CHUNK_SIZE
 # 500 ms of between-turns line noise fed before the turn; see EchoTruncationScenario.run.
 WARM_START_FRAMES = 25
@@ -489,6 +492,12 @@ class TestCaseCLoopReproduction(unittest.TestCase):
         )
 
 
+class TestDesignLiterals(unittest.TestCase):
+    def test_anomalous_truncation_ms_matches_app(self):
+        """The test-side design.md literal must not drift from app.py's constant."""
+        self.assertEqual(ANOMALOUS_TRUNCATION_MS, app.ANOMALOUS_TRUNCATION_MS)
+
+
 class TestCaseDAnomalyInvisibility(unittest.TestCase):
     """Case D -- a GENUINE short barge-in is logged with full provenance.
 
@@ -528,6 +537,11 @@ class TestCaseDAnomalyInvisibility(unittest.TestCase):
 
     def test_trigger_provenance_fields_are_recorded(self):
         """RECONCILED WITH REALITY — see the block comment below before editing.
+
+        UPDATE (audio-pipeline redesign): the rest of this docstring is the
+        pre-redesign record. Concern (a) has since been implemented, this test
+        was revisited exactly as it predicted, and the assertions at the end now
+        pin the MEASURED evidence rather than the placeholder.
 
         The original field list came straight out of task 5.3's prose and included
         ``far_end_active``, ``echo_correlation`` and "the tracked lag". **Those

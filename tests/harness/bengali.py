@@ -136,7 +136,7 @@ NON_BENGALI_SAMPLES = {
 def clusters(text: str) -> list[str]:
     """UAX #29 extended grapheme clusters via ``regex``'s ``\\X``.
 
-    This is the *test-side* segmenter. ``bargein.grapheme_clusters`` belongs to
-    parked task 5.5 and is not created by this pass.
+    This is the *test-side* segmenter, kept independent of production so tests
+    can check ``app.grapheme_clusters`` against it.
     """
     return regex.findall(r"\X", text)

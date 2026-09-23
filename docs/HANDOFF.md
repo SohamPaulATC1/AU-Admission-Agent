@@ -1,11 +1,22 @@
 # Audio Pipeline Redesign — Session Handoff
 
 Snapshot for resuming the AU Admission Assist audio-pipeline redesign (echo
-rejection, barge-in, VAD) on `gemini-3.8-live`. Written at a deliberate halt
-mid-Task-5. Nothing is in a broken half-edited state: `app.py` and `bargein.py`
-compile, and every current test failure is isolated to the redesign's own
-acceptance harness (`tests/test_bug_condition_exploration.py`), not to
-production behaviour.
+rejection, barge-in, VAD) on `gemini-3.8-live`.
+
+**Current state (2026-09-23, after Redesign Task 7):** Redesign Tasks 1-7 are
+done. The suite is green (section 2). Committed on `dev` as `84eb866`, then
+`be6c19f` (line endings, gitignore, tracked spec copies) and a docs-and-comments
+commit on top; not pushed. Remaining: Redesign Task 8, live-call validation,
+which needs real calls.
+
+**Numbering.** This file numbers its own work "Redesign Task 1-8". The spec
+(`docs/spec/tasks.md`) numbers tasks 1-10 with subtasks 5.x. The mapping is in
+section 3. In the historical text (sections 4, 5 and 7), a bare "Task N" means
+Redesign Task N.
+
+This file was first written at a deliberate halt mid-Task-5. Sections 5.1-5.5
+and 7 are that halt's diagnosis trail. They are kept for the record and are
+resolved by sections 5.6-5.8.
 
 ---
 
@@ -44,18 +55,56 @@ tests/test_bug_condition_exploration.py                   a7baf73d92cf188feb9acb
 tests/test_preservation_4_8_resumption_recording_stats.py 4996b08736aeaca63a5872acc55ee09adb3fe60ef115c5d9014e747bc11fda1e
 ```
 
+Updated again 2026-09-23 after Redesign Task 7's comment and docstring fixes
+(section 8, #7 item 5). aec.py unchanged. bargein.py changed for the first time
+since the halt (the `should_barge_in` docstring and the spec citation; no code change). app.py
+changed in comments only, with the same line count, so the `GEMINI_MODEL` pins
+still hold. test_bug_condition_exploration.py gained `TestDesignLiterals`:
+
+```
+bargein.py                                                aea4d037fbcd287b59592ac42eae307752af178eccc601eed527daf42f023600
+app.py                                                    0f1e075b93ab4015567b44e3e8237de193157e0f8047acf6b297b9558eceef8c
+tests/test_bug_condition_exploration.py                   4ccb3e074cdc58524fc50f33b3f5bc1d5bff61cfffd25feadc754384420d0ed8
+```
+
+These hashes are of the LF working tree. Since `be6c19f` the repo has a
+`.gitattributes` with `* text=auto eol=lf`. A fresh clone on this machine
+(`core.autocrlf=true`) checks out `aec.py` with the same sha256, and
+`tests.test_preservation_4_7_aec_integrity` passes 11/11 there, so no re-pin
+was needed.
+
 `aec.py` is byte-identical to session start and pinned by
 `tests/test_preservation_4_7_aec_integrity.py::TestAecPyIsByteIdentical`. The
 redesign has NOT needed to modify the canceller — only how `app.py` drives it.
 
-## 2. Test suite state at halt
+## 2. Test suite state
 
-> **Current (2026-09-23, after section 5.8):** `venv312/Scripts/python.exe -m
-> unittest discover -s tests -t .` gives **211 tests, OK (2 skipped, 1 expected
-> failure)** (208 after section 5.7, +3 echo-tail tests). The skips are the pre-existing Case C retirement and the
-> reconnect-loop deferral. The expected failure is
-> `TestCaseDQuietCallerKnownLimitation.test_quiet_genuine_caller_barges_in`
-> (section 5.7). The historical state below is kept for the record.
+**Current (2026-09-23, after Redesign Task 7):**
+`venv312/Scripts/python.exe -m unittest discover -s tests -t .` gives **212
+tests, OK (2 skipped, 1 expected failure)**. That was 208 after section 5.7,
+plus 3 echo-tail tests, plus `TestDesignLiterals` (the test file's
+`ANOMALOUS_TRUNCATION_MS = 350` literal must equal `app.ANOMALOUS_TRUNCATION_MS`).
+- The skips are the pre-existing Case C retirement and the reconnect-loop
+  deferral.
+- The expected failure is
+  `TestCaseDQuietCallerKnownLimitation.test_quiet_genuine_caller_barges_in`
+  (section 5.7).
+- `tests.test_preservation_4_7_aec_integrity`: 11/11 OK, including
+  `TestAecPyIsByteIdentical`.
+
+Redesign Task 7 neutrality checks (ad hoc, scratch script, not in the suite):
+- With `ECHO_GATE_ENABLED` off, pre-gate behaviour returns. Echo truncates
+  (clearAudio 1, activityStart 1, 9600 bytes to the model) and the echo tail
+  opens a phantom turn.
+- A genuine barge-in and a no-echo caller after playback produce identical
+  outbound Plivo bytes and model input with the gate on and off.
+
+Existing in-suite neutrality proofs still pass:
+- The far-end recorder on vs off is byte-identical.
+- The commit gate is inert until armed.
+- The 4_x preservation golden records hold.
+
+### Historical: state at the mid-Task-5 halt (resolved, kept for the record)
 
 `venv/bin/python -m unittest discover -s tests`  →  **198 tests, 4 failures,
 1 error, 2 skipped.**
@@ -76,6 +125,9 @@ Everything else passes: all `test_preservation_4_*`, all `test_instrumentation_5
 real-recording validation that proves the gate suppresses actual echo at 0.97
 correlation.**
 
+> (Resolved: all five were fixed by sections 5.6-5.7. The pin is re-pinned
+> after every app.py change; current values are in section 5.8.)
+>
 > NOTE on `test_model_identifier_is_recorded`: this is a line-number pin in
 > `test_preservation_4_8_resumption_recording_stats.py`. Task 5 added lines to
 > `app.py` (the gate + helpers + constants) so the `GEMINI_MODEL` reference line
@@ -85,14 +137,31 @@ correlation.**
 
 ---
 
-## 3. What is DONE and wired (Tasks 1–4 complete, Task 5 in progress)
+## 3. What is DONE and wired (Redesign Tasks 1–7 complete)
 
 Task list lives in the session todo and in `docs/spec/tasks.md` (tracked
 copy; the Kiro working copy under the gitignored
-`.kiro/specs/bengali-grapheme-stutter-fix/` is kept identical). Progress: **4/8 complete, #5 in
-progress.**
+`.kiro/specs/bengali-grapheme-stutter-fix/` is kept identical). Progress:
+**7/8 complete; Redesign Task 8 needs live calls.** Redesign Task 6 is in
+section 5.8, Redesign Task 7 in section 8.
 
-### Task 1 — grounding (DONE)
+Mapping from this file's Redesign Tasks to the spec's numbering. Spec tasks
+2-4 and 5.1-5.4a, 5.10 (harness, exploration and preservation tests, the
+concern (c)/(d) instrumentation and commit gate) were done before the redesign
+started and have no Redesign Task.
+
+| Redesign Task | What | Spec task(s) |
+|---|---|---|
+| 1 | Grounding: map the audio path | none (spec task 1, the offline provenance check, is a separate earlier measurement) |
+| 2 | Design note, `docs/spec/redesign-audio-pipeline.md` | the "design-phase revision" the spec's scope gate required for 5.7/5.9 |
+| 3 | `bargein.py`, pure module plus unit tests | 5.5, 5.6 (as redesigned) |
+| 4 | Far-end alignment: playout-paced reference, `far_shadow`, `reset_far_reference` | 5.7 (the shadow buffer), 5.8 |
+| 5 | Corroborated gate, echo latch, echo return ceiling | 5.7 (the gate), 5.3's evidence fields |
+| 6 | Concern (b): post-playback echo tail gate; preroll trim declined | 5.9 |
+| 7 | Verification and doc reconciliation | 5.12, 5.13, 9 |
+| 8 | Live-call validation and tuning | 5.11, 10 |
+
+### Redesign Task 1 — grounding (DONE)
 Full audio path mapped. Key facts:
 - INBOUND `stream_plivo_to_gemini`: raw 8k → `aec.process` (AEC runs FIRST on
   raw 8k) → upsample 48k → RNNoise `denoise_chunk` (per-frame speech_prob) →
@@ -110,7 +179,7 @@ Full audio path mapped. Key facts:
   `activity_handling=START_OF_ACTIVITY_INTERRUPTS`, session resumption +
   context window compression.
 
-### Task 2 — design note (DONE)
+### Redesign Task 2 — design note (DONE)
 `docs/spec/redesign-audio-pipeline.md`. Two
 coupled defects:
 - **D1** far-end reference fed at send-time (no pacing) → `buffer_lead` grows
@@ -119,7 +188,7 @@ coupled defects:
 - **D2** barge-in gate cannot tell echo from speech → truncates (the stutter) and
   flushes echo upstream (the garbage caller turns).
 
-### Task 3 — `bargein.py` (DONE, pure module, unit-tested)
+### Redesign Task 3 — `bargein.py` (DONE, pure module, unit-tested)
 Pure, no I/O/logging/state. Surface:
 - `pcm16_to_float(bytes)`
 - `envelope(samples, *, rate, bin_ms=10)` — short-term RMS energy envelope
@@ -134,7 +203,9 @@ Pure, no I/O/logging/state. Surface:
 Design facts baked in (measured, not guessed):
 - ENVELOPE domain, never waveform (waveform corr flipped sign −0.47…+0.58; envelope was 0.976–0.993).
 - Lag search default **80 ms** — measured real best-lag was 50–60 ms, NOT 0.
-- `test_bargein_unit.py` (13 tests, PASSING): synthetic tests MUST use
+- `test_bargein_unit.py` (13 tests at Task 3; 20 now, after
+  `TestProductionGateCatchesRealisticEchoDelays` (section 5.6) and
+  `TestEchoLatch` (section 5.7); PASSING): synthetic tests MUST use
   amplitude-MODULATED signals (a pure sine has a flat envelope → 0 variance →
   0 correlation). Real-recording tests parse `Gemini_Assistant.log` 17:05 call,
   align per-trigger via far-end `t_mono` anchors + AGC inbound anchors
@@ -151,7 +222,7 @@ anchors. In the LIVE system the shadow buffer is built inline against the
 inbound clock, so alignment is controlled by construction — which is why Task 4
 (playout-aligned shadow) is essential.
 
-### Task 4 — far-end alignment fix (DONE)
+### Redesign Task 4 — far-end alignment fix (DONE)
 Implemented in `app.py`:
 - Imports: `import collections`, `import bargein`.
 - Constants (after `FAREND_MAX_PAD_SAMPLES`):
@@ -170,8 +241,12 @@ Implemented in `app.py`:
   and appctl got `import collections`):
   - `"farend_ref_queue": collections.deque()`
   - `"far_shadow": collections.deque(maxlen=FAR_SHADOW_FRAMES)`
+  - Added later, also in both places: `"echo_latch_erl_db"`, `"latch_episode"`
+    and `"latch_stats"` (section 5.7), and `"far_silent_frames"` (section 5.8).
 - `reset_far_reference(call_state)` helper (defined before `reset_delta_trace`):
   calls `aec.reset_far_end()` + clears `farend_ref_queue` + clears `far_shadow`.
+  Since sections 5.7/5.8 it also drops the echo latch (closing the episode as
+  `ended_by=reset`) and sets `far_silent_frames = ECHO_TAIL_FRAMES`.
   Replaced all 4 bare `reset_far_end()` call sites with it (barge-in,
   model-confirmed-interrupt, ringback, reconnect). The ONLY direct
   `aec.reset_far_end()` is now inside this helper.
@@ -188,7 +263,15 @@ DESIGN of Task 4: pace the REFERENCE feed, not the Plivo send (send stays fast;
 preservation tests pin it). Inbound blocks arrive at realtime (Plivo 20 ms), so
 consuming one far frame per inbound block paces the reference to playout.
 
-### Task 5 — corroborated barge-in gate (IN PROGRESS — wired, harness not yet green)
+### Redesign Task 5 — corroborated barge-in gate (DONE)
+The as-first-wired description is below. The final logic differs in four ways;
+section 5.7 is authoritative:
+- The gate condition is `assistant_speaking or far_window_has_playback()`
+  (the echo tail, section 5.8).
+- `apply_echo_latch` sits between the verdict and the suppression.
+- `ECHO_MAX_RETURN_DB` overturns loud "echo" to `near-too-loud-for-echo`.
+- The `[ECHO-GATE]` line also carries `erl_db` and `latched`.
+
 Implemented in `app.py`:
 - `evaluate_echo_gate(call_state)` helper (defined before `reset_delta_trace`):
   near = tail `ECHO_NEAR_BYTES_16K` of `preroll_pcm16` (16k); far = last
@@ -637,25 +720,33 @@ sites are app.py ~2317 (barge-in flush) and ~2528 (tool-call prepend).
 
 ## 6. Exact commands to reproduce (DO NOT run automatically — operator preference)
 
+Windows dev machine, Git Bash, from the repo root. Python 3.12 venv (3.14 has
+no `audioop`). Prefix `PYTHONIOENCODING=utf-8` when printing app log lines
+(the console is cp1252).
+
 ```bash
-cd /home/ubuntu/AU-Admission-Assist
+cd ~/local/AU-Admission-Assist
 
 # whole suite
-venv/bin/python -m unittest discover -s tests
+venv312/Scripts/python.exe -m unittest discover -s tests -t .
 
-# the failing acceptance file only
-venv/bin/python -m unittest tests.test_bug_condition_exploration -v
+# the acceptance file only
+venv312/Scripts/python.exe -m unittest tests.test_bug_condition_exploration -v
 
-# individual failing cases
-venv/bin/python -m unittest tests.test_bug_condition_exploration.TestCaseATruncationReproduction
-venv/bin/python -m unittest tests.test_bug_condition_exploration.TestCaseBUpstreamAdmission
-venv/bin/python -m unittest tests.test_bug_condition_exploration.TestGateSuppressesEchoAcrossTheRealisticDomain
-venv/bin/python -m unittest tests.test_bug_condition_exploration.TestCaseDAnomalyInvisibility
+# individual cases
+venv312/Scripts/python.exe -m unittest tests.test_bug_condition_exploration.TestCaseATruncationReproduction
+venv312/Scripts/python.exe -m unittest tests.test_bug_condition_exploration.TestCaseBUpstreamAdmission
+venv312/Scripts/python.exe -m unittest tests.test_bug_condition_exploration.TestGateSuppressesEchoAcrossTheRealisticDomain
+venv312/Scripts/python.exe -m unittest tests.test_bug_condition_exploration.TestCaseDAnomalyInvisibility
+venv312/Scripts/python.exe -m unittest tests.test_bug_condition_exploration.TestEchoTailIsNotAdmittedUpstream
 
 # the AUTHORITATIVE gate proof (PASSES — real-recording correlation 0.97)
-venv/bin/python -m unittest tests.test_bargein_unit -v
+venv312/Scripts/python.exe -m unittest tests.test_bargein_unit -v
 
-# the line-pin re-pin (mechanical, unrelated to the harness issue)
+# aec.py integrity (includes the sha256 pin)
+venv312/Scripts/python.exe -m unittest tests.test_preservation_4_7_aec_integrity -v
+
+# the line-pin re-pin, needed whenever app.py gains or loses lines
 grep -n GEMINI_MODEL app.py   # then update the pinned list in
                               # tests/test_preservation_4_8_resumption_recording_stats.py::test_model_identifier_is_recorded
 ```
@@ -697,7 +788,7 @@ gate executes and measures a real-but-too-low value):
 
 ---
 
-## 8. Remaining tasks (6–8) not started
+## 8. Redesign Tasks 6–8 (6 and 7 done, 8 open)
 
 - **#6** concern (b) upstream echo rejection. **Tail gate DONE (section 5.8).**
   The "subsumed by revert-and-continue" judgment was wrong: the post-playback
@@ -710,6 +801,69 @@ gate executes and measures a real-but-too-low value):
   voice at the start of a barge-in turn. Watch for this in #8.
 - **#7** full verification: whole suite green (modulo the intentional-failure
   philosophy), aec integrity, byte-stream neutrality where expected.
+  **DONE 2026-09-23.** Checks (results in section 2):
+  - Suite: 212 OK (2 skipped, 1 expected failure).
+  - aec integrity: 11/11, in this tree and in a fresh clone.
+  - Neutrality: in-suite proofs pass, and the kill switch plus gate byte-neutrality were verified ad hoc.
+  - §2/§3 reconciled.
+
+  **The 8 items that did not reconcile, and the operator's decisions
+  (2026-09-23).** Items 7 and 8 are in `be6c19f`; items 1-6 are in the
+  docs-and-comments commit after it.
+  1. *"All decision logic in bargein.py" constraint.* Amended in
+     `docs/spec/tasks.md`: pure decision logic in bargein.py; call_state-coupled
+     gate helpers (`apply_echo_latch`, the `ECHO_MAX_RETURN_DB` override,
+     `far_window_has_playback`) may live in app.py. No code moved.
+  2. *5.8 "NOT greenlit".* Marked implemented. The greenlight was not recorded;
+     the operator ratified it on 2026-09-23.
+  3. *Scope text and checkboxes.* Done checkboxes ticked, each partial one with
+     a status note. "Authorised scope" and "attribution-neutral" marked
+     SUPERSEDED.
+  4. *Two numberings.* This file now says "Redesign Task N"; mapping to the spec
+     is in section 3.
+  5. *Stale "parked" text.* Fixed in app.py, bargein.py, tests/__init__.py, the
+     harness README, bengali.py, echo.py and the test docstrings listed. The
+     logged value `not-measured[concern-a-parked]` is kept verbatim.
+     test_bug_condition_exploration.py keeps its literal 350 with a corrected
+     comment, and the new `TestDesignLiterals` asserts it equals
+     `app.ANOMALOUS_TRUNCATION_MS`. Hashes in section 1.
+  6. *Historical sections.* Sections 5 and 7 left as history; section 6 now has
+     the Windows `venv312` commands.
+  7. *Line endings.* `.gitattributes` added (`* text=auto eol=lf`). Verified in a
+     fresh clone in a temp dir: `aec.py` sha256 unchanged, so no re-pin, and
+     `tests.test_preservation_4_7_aec_integrity` 11/11 (run with dummy
+     `PLIVO_AUTH_ID`/`PLIVO_AUTH_TOKEN`; see new item C below).
+  8. *gitignore and spec files.* `.gitignore` now has `CALL_RECORDINGS/`,
+     `*.m4a` and `*.kiro-halt`. Git history holds no call recordings: the only
+     audio ever committed is the six `playback_audio_files/*.wav` system
+     prompts. `tasks.md` and `redesign-audio-pipeline.md` are copied to
+     `docs/spec/` (tracked); `.kiro/` stays ignored, and the citations in this
+     file, CLAUDE.md, app.py and bargein.py point at `docs/spec/`.
+
+  **New items found while doing the above. Reported, not acted on:**
+  - A. *Decision logic in app.py not named by the amendment.* The grapheme
+    helpers (`grapheme_clusters`, `leading_clusters`,
+    `ends_mid_grapheme_cluster`, `boundary_splits_grapheme_cluster`,
+    `shared_leading_cluster_count`), the commit gate (`arm_commit_gate`,
+    `disarm_commit_gate`, `commit_gate_verdict`, `commit_gate_discard`) and
+    `delta_trace_verdict`. Recorded as open under the amended constraint in
+    tasks.md. Operator: extend the amendment, or schedule a move.
+  - B. *5.13 does not hold as written.* It says not to re-baseline golden
+    records, and section 4 lists intentional re-baselines. Left unticked with a
+    note. Operator ruling needed.
+  - C. *A clone without `.env` cannot import app.* app.py builds the Plivo
+    `RestClient` at module import, which raises without credentials, so every
+    test that imports app errors on a fresh checkout. `.env` is frozen and this
+    was not changed.
+  - D. *Stale test name.* `test_preservation_4_9_falsifier.py::test_activity_floor_constant_is_deferred`
+    now asserts the constant exists. Not renamed (item 5 covered text, not
+    test names).
+  - E. *design.md and bugfix.md are still only under the gitignored `.kiro/`.*
+    tasks.md cites both. Item 8 named only the two spec files.
+  - F. *tasks.md body still has `venv/bin/python` commands* (tasks 2 and 9).
+    A standing-constraint note gives the Windows command instead of editing
+    each one.
+  - G. *Spec tasks 6, 7 and 8 are partial.* See their status notes in tasks.md.
 - **#8** validation-call guidance + tuning notes for the live tune loop (Phase 5).
   **Build this around the latch limitation first (section 5.7), not only
   threshold calibration.** Across real calls, count `[LATCH-END]` episodes with

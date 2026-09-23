@@ -3,7 +3,8 @@
 These tests exist to prove the harness itself works before anything depends on
 it. They assert:
 
-* discovery runs under ``venv/bin/python -m unittest discover -s tests -v``;
+* discovery runs under ``python -m unittest discover -s tests -t .`` (here:
+  ``venv312/Scripts/python.exe``);
 * importing ``app`` is side-effect-contained (no production log writes);
 * the mirrored ``call_state`` key set still matches app.py's literal;
 * ``FakePlivoWS`` / ``FakeSession`` / ``FakeClock`` behave as documented;

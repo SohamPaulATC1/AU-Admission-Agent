@@ -119,8 +119,8 @@ def envelope(pcm16: bytes, bin_ms: float = 10.0, rate: int = 8000) -> np.ndarray
     """Short-term energy envelope, for describing test inputs.
 
     Note this is a *test-side* helper for characterising the fixtures we build.
-    It is not ``bargein.envelope`` -- ``bargein.py`` belongs to parked task 5.5
-    and is not created by this pass.
+    It is deliberately not ``bargein.envelope``: the harness keeps its own
+    measure so it does not certify test inputs with the code under test.
     """
     samples = np.frombuffer(pcm16, dtype=np.int16).astype(np.float64) / 32768.0
     bin_samples = max(1, int(round(bin_ms / 1000.0 * rate)))
@@ -138,8 +138,8 @@ def normalised_envelope_correlation(
 
     Used only to *characterise the synthetic inputs this harness builds* -- to
     show that a case labelled "echo-correlated" really is. It is explicitly NOT
-    a stand-in for the parked ``bargein.echo_correlation``, and no production
-    code path computes anything like it today.
+    a stand-in for ``bargein.echo_correlation`` (the production gate), which
+    searches a lag range and is tested on its own in ``test_bargein_unit``.
     """
     near_env = envelope(near_pcm8, bin_ms)
     far_env = envelope(far_pcm8, bin_ms)

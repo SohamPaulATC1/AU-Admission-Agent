@@ -18,11 +18,13 @@ does:
 * and when it *is* armed, every transition is logged, so the gate's influence can
   be separated from what the instrumentation merely revealed.
 
-WHAT IS DELIBERATELY NOT CLAIMED HERE. Nothing in this file measures echo. There
-is no far-end level test, no envelope match, no lag estimate: those are concern
-(a), task 5.7, PARKED PENDING REDESIGN. The trigger-provenance line names them as
-``far_end_evidence=not-measured[concern-a-parked]`` and that is asserted as a
-placeholder, not as evidence.
+WHAT IS DELIBERATELY NOT CLAIMED HERE. Nothing in this file measures echo. The
+far-end level, envelope match and lag are concern (a), task 5.7, which was
+parked when this file was written and is now implemented as redesigned; its
+tests are ``test_bargein_unit`` and ``test_bug_condition_exploration``. When no
+gate decision exists, the trigger-provenance line still names the evidence as
+``far_end_evidence=not-measured[concern-a-parked]`` (a kept, historical log
+value) and that is asserted as a placeholder, not as evidence.
 """
 
 from __future__ import annotations
@@ -908,11 +910,11 @@ class TestCommitGateArmingFromTheRealTruncationPath(unittest.TestCase):
 
 
 class TestGraphemeHelpers(unittest.TestCase):
-    """The minimum from ``bargein.py``'s surface that 5.1 and 5.10 needed.
+    """The minimum from ``bargein.py``'s spec surface that 5.1 and 5.10 needed.
 
-    These migrate to ``bargein.py`` verbatim when task 5.5 unparks; they are
-    covered here rather than in a ``bargein`` test file so nothing suggests the
-    parked module exists.
+    They were written in app.py before ``bargein.py`` existed and are still
+    there; the redesign did not migrate them (an open operator item, HANDOFF
+    section 8 #7). They are tested here, against ``app``, for that reason.
     """
 
     def test_the_four_verified_bengali_segmentations(self):

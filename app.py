@@ -102,9 +102,9 @@ AGC_SMOOTHING_ALPHA = 0.08         # Slow alpha to prevent volume pumping
 #   GRAPHEME_COMMIT_MS      -- how much audio the commit gate withholds while
 #       armed, so a leading Bengali CV+visarga cluster is emitted whole or not at
 #       all rather than as a repeated partial fragment.
-# The other three constants named by the design (ECHO_CORR_THRESHOLD,
-# ECHO_AMBIGUOUS_ONSET_FRAMES, FAR_END_ACTIVE_FLOOR_DB) belong to concern (a),
-# task 5.7, which is PARKED PENDING REDESIGN and must not be implemented here.
+# Of the other three constants the design names, ECHO_CORR_THRESHOLD and
+# FAR_END_ACTIVE_FLOOR_DB live with the redesigned echo gate below. The two-tier
+# gate's ECHO_AMBIGUOUS_ONSET_FRAMES was dropped by the redesign (task 5.7).
 ANOMALOUS_TRUNCATION_MS = 350
 GRAPHEME_COMMIT_MS = 240
 
@@ -141,7 +141,7 @@ COMMIT_GATE_ENABLED = os.getenv("COMMIT_GATE_ENABLED", "0").strip().lower() in (
 FAREND_MAX_PAD_SAMPLES = 60 * PLIVO_SAMPLE_RATE
 
 # --- Audio-pipeline redesign: corroborated barge-in gate (concerns a + b) -----
-# See .kiro/specs/bengali-grapheme-stutter-fix/redesign-audio-pipeline.md.
+# See docs/spec/redesign-audio-pipeline.md.
 # The barge-in gate corroborates a while-speaking VAD onset against the far-end
 # (what the assistant is playing) before truncating: if the near-end energy
 # envelope correlates with the aligned far-end above ECHO_CORR_THRESHOLD, the
@@ -481,12 +481,12 @@ def calculate_rms_db(pcm_data):
 # =============================================================================
 # Grapheme-cluster helpers  (tasks 5.1 and 5.10)
 # =============================================================================
-# TEMPORARY HOME. The design puts every pure decision helper in ``bargein.py``
-# (task 5.5), but that module is PARKED with concern (a). These four functions
-# are the minimum that tasks 5.1 and 5.10 cannot be written without, so they live
-# here as pure module-level functions with no I/O and no global state. **They
-# migrate to ``bargein.py`` verbatim when 5.5 unparks**; nothing else from
-# ``bargein.py``'s surface is built here.
+# PRE-REDESIGN HOME. Tasks 5.1 and 5.10 needed these pure helpers before
+# ``bargein.py`` existed (task 5.5 was parked with concern (a) at the time), so
+# they were written here as pure module-level functions with no I/O and no
+# global state. The redesign created ``bargein.py`` but did not migrate them.
+# Under the tasks.md constraint pure decision logic belongs in ``bargein.py``;
+# whether to move these is an open operator item (HANDOFF section 8, #7).
 #
 # ``regex``'s ``\X`` is UAX #29 extended grapheme clusters. The four Bengali
 # expectations in the spec were verified against the installed ``regex``
@@ -978,12 +978,12 @@ def commit_gate_discard(call_state, reason):
     )
 
 
-# Placeholder for the trigger-evidence fields that belong to concern (a).
-# Task 5.7 is PARKED PENDING REDESIGN, so the far-end level, the tracked lag and
-# the envelope-match measure do not exist. They are named as explicitly
-# not-measured rather than omitted silently or filled with a fabricated number,
-# because a future reader of this log needs to know the difference between
-# "measured and unremarkable" and "never measured".
+# Placeholder for the trigger-evidence fields when no gate decision was taken
+# for a trigger (gate disabled, or the onset fell outside playback and its tail).
+# The string predates the redesign and is kept verbatim because it is a logged
+# value that log queries may match; "concern-a-parked" in it is historical. It
+# names the evidence as not-measured rather than omitting or faking it, so a
+# reader can tell "measured and unremarkable" from "never measured".
 FAR_END_EVIDENCE_NOT_MEASURED = "not-measured[concern-a-parked]"
 
 
@@ -2871,7 +2871,7 @@ async def send_plivo_audio(plivo_ws, call_state,session,plivo_client):
         There is no pacing sleep here and none is introduced: outbound spacing is
         governed by model chunk arrival, and measured inter-frame gaps are 0.0 ms,
         not 20.0 ms (task 4.5). Adding pacing would be a behavioural change to
-        requirement 3.9 and is outside this pass's authorised scope.
+        requirement 3.9. The redesign paces the AEC reference instead, below.
         """
         # Redesign Part 1: DO NOT feed the AEC here. Feeding at send time loaded
         # the canceller's reference in a burst far ahead of playout (measured

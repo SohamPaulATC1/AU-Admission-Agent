@@ -31,13 +31,13 @@ Boundary cases the design calls out:
   351 as neighbours).
 * a turn whose first chunk is shorter than 20 ms -- EXERCISED.
 * far-end energy exactly at the activity floor -- EXERCISED as a *signal level*
-  (-60.0 dBFS RMS fed through ``aec.add_far_end``); the constant
-  ``FAR_END_ACTIVE_FLOOR_DB`` itself is DEFERRED, since it belongs to parked
-  task 5.7 and must not be defined by this pass.
-* correlation exactly at ``ECHO_CORR_THRESHOLD`` -- DEFERRED. Unfixed code
-  computes no correlation anywhere and the constant is parked, so there is no
-  quantity to sit a boundary on. See the skipped test below for the reason and
-  for what would make it exercisable.
+  (-60.0 dBFS RMS fed through ``aec.add_far_end``). The constant
+  ``FAR_END_ACTIVE_FLOOR_DB`` was deferred while task 5.7 was parked; the
+  redesign defines it, and its boundary is now EXERCISED too.
+* correlation exactly at ``ECHO_CORR_THRESHOLD`` -- was DEFERRED (no
+  correlation existed); now EXERCISED on the ``bargein`` surface: a decision
+  whose correlation equals the threshold is echo (``>=``). See
+  ``TestBoundaryCorrelationAtThreshold``.
 """
 
 from __future__ import annotations

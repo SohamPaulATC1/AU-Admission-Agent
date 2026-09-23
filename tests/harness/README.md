@@ -3,12 +3,19 @@
 Run the suite with:
 
 ```
-venv/bin/python -m unittest discover -s tests -v
+venv312/Scripts/python.exe -m unittest discover -s tests -t .
 ```
 
-## No production code was modified
+(Python 3.12 venv on Windows; 3.13+ has no `audioop`, which app.py imports.)
 
-`app.py`, `aec.py`, `requirements.txt` and `.env` are untouched by this pass. No
+## No production code was modified (to build the harness)
+
+This section records the Task 2 harness decision. `app.py` has since been
+changed by the fix and the audio-pipeline redesign, and the line numbers in the
+table below are as of Task 2 and have moved; find the functions by name.
+`aec.py`, `requirements.txt` and `.env` are still untouched.
+
+At Task 2, `app.py`, `aec.py`, `requirements.txt` and `.env` were untouched. No
 refactor — not even a behaviour-identical extraction — proved necessary, because
 the three coroutines that carry the audio path are **already module-level
 functions**, not nested inside `handle_media_stream`:

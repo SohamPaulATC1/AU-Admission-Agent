@@ -171,7 +171,9 @@ class TestInterruptedTurnFromTheModel(unittest.TestCase):
         With ``assistant_speaking`` False after the interruption, the next
         ``model_turn`` flushes ``user_text_buffer`` to
         "\U0001F5E3\uFE0F [USER]: ..." -- which is how ``I'm sorry.`` reached the
-        log as a caller turn. Recorded, not fixed: concern (b) is parked.
+        log as a caller turn. This pins the log path only, which is unchanged.
+        Concern (b) is fixed upstream (the echo gate and the post-playback tail
+        gate stop echo opening the turn; HANDOFF section 5.8), not here.
         """
         self.assertEqual(self.log.matching("[USER]:"), ["\U0001F5E3\uFE0F [USER]: I'm sorry."])
         self.assertIn({"role": "user", "text": "I'm sorry."}, self.call_state["conversation_log"])
