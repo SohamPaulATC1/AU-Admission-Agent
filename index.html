@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AU Admission Assist AI Calling Dashboard</title>
+    <meta name="description" content="AI-powered outbound calling dashboard for AU Admission Assist. Dispatch and monitor voice agent calls in real-time.">
+    <link rel="icon" href="/atc.png?v=1" type="image/png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Light Theme (Editorial Brutalism Default) */
+            --bg-primary: #f4f4f0; /* Warm off-white/cream */
+            --bg-secondary: #ffffff;
+            --bg-card: #f4f4f0;
+            --text-primary: #000000;
+            --text-secondary: #52525b;
+            
+            --border-color: #000000;
+            --border-width: 1px;
+            
+            --accent: #c9243f;
+            --accent-hover: #a01c32;
+            --gold-primary: #d4af37;
+            
+            --success: #16a34a;
+            --warning: #d97706;
+            --danger: #dc2626;
+            --neutral: #e5e5e5;
+        }
+
+        [data-theme="dark"] {
+            --bg-primary: #121212;
+            --bg-secondary: #1a1a1a;
+            --bg-card: #121212;
+            --text-primary: #ffffff;
+            --text-secondary: #a1a1aa;
+            
+            --border-color: #ffffff;
+            
+            --accent: #ff2a55;
+            --accent-hover: #ff5577;
+            
+            --success: #4ade80;
+            --warning: #fbbf24;
+            --danger: #f87171;
+            --neutral: #27272a;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: "Space Grotesk", sans-serif;
+            color: var(--text-primary);
+            background-color: var(--bg-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+            /* No ambient backgrounds, just solid color */
+            transition: background-color 0.2s, color 0.2s;
+        }
+
+        /* ─── Typography ─── */
+        h1, h2, h3, h4, .brand-text {
+            font-family: "Syne", sans-serif;
+            font-weight: 700;
+            letter-spacing: -0.03em;
+        }
+
+        /* ─── Top Nav ─── */
+        .top-nav {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            height: 72px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0;
+            background: var(--bg-primary);
+            border-bottom: var(--border-width) solid var(--border-color);
+            z-index: 100;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            height: 100%;
+            padding: 0 2rem;
+            border-right: var(--border-width) solid var(--border-color);
+        }
+        
+        .brand-logo {
+            display: block;
+            height: 32px;
+            width: auto;
+            object-fit: contain;
+        }
+
+        .brand .brand-text {
+            font-size: 1.35rem;
+            color: var(--text-primary);
+            white-space: nowrap;
+        }
+
+        .nav-right {
+            display: flex;
+            align-items: center;
+            height: 100%;
+        }
+
+        .sse-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            height: 100%;
+            padding: 0 1.5rem;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            border-left: var(--border-width) solid var(--border-color);
+            color: var(--text-primary);
+        }
+
+        .sse-indicator .dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: var(--text-secondary);
+        }
+
+        .sse-indicator.connected .dot { background: var(--success); }
+        .sse-indicator.error .dot { background: var(--danger); }
+
+        /* ─── Theme Toggle ─── */
+        .theme-toggle {
+            width: 72px;
+            height: 100%;
+            background: transparent;
+            border: none;
+            border-left: var(--border-width) solid var(--border-color);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            transition: background-color 0.2s;
+        }
+
+        .theme-toggle:hover {
+            background-color: var(--accent);
+        }
+        
+        .theme-toggle:hover svg { stroke: #fff; }
+
+        .theme-toggle svg {
+            width: 20px;
+            height: 20px;
+            stroke: var(--text-primary);
+            fill: none;
+            stroke-width: 1.5;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            position: absolute;
+            transition: transform 0.3s, stroke 0.2s;
+        }
+
+        .theme-toggle .icon-sun { opacity: 0; transform: scale(0); }
+        .theme-toggle .icon-moon { opacity: 1; transform: scale(1); }
+
+        [data-theme="light"] .theme-toggle .icon-sun { opacity: 1; transform: scale(1); }
+        [data-theme="light"] .theme-toggle .icon-moon { opacity: 0; transform: scale(0); }
+
+        .partner-brand {
+            display: flex;
+            align-items: center;
+            height: 100%;
+            padding: 0 2rem;
+            border-left: var(--border-width) solid var(--border-color);
+        }
+
+        /* ─── Main Layout ─── */
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 450px;
+            min-height: 100vh;
+            padding-top: 72px;
+        }
+
+        /* ─── Left: Call History ─── */
+        .history-zone {
+            display: flex;
+            flex-direction: column;
+            border-right: var(--border-width) solid var(--border-color);
+            background: var(--bg-primary);
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 2rem;
+            border-bottom: var(--border-width) solid var(--border-color);
+        }
+
+        .section-title {
+            font-size: 3.5rem;
+            line-height: 1;
+            color: var(--text-primary);
+        }
+
+        .active-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.25rem 0.75rem;
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            border: var(--border-width) solid var(--border-color);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+
+        .active-badge .pulse-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: var(--success);
+            animation: blink 1s step-end infinite;
+        }
+
+        @keyframes blink { 50% { opacity: 0; } }
+
+        .call-list {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .call-list::-webkit-scrollbar { width: 8px; }
+        .call-list::-webkit-scrollbar-track { background: var(--bg-primary); border-left: var(--border-width) solid var(--border-color); }
+        .call-list::-webkit-scrollbar-thumb { background: var(--border-color); }
+
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 6rem 2rem;
+            color: var(--text-primary);
+            text-align: center;
+            flex: 1;
+        }
+
+        .empty-icon {
+            font-size: 3rem;
+            margin-bottom: 1.5rem;
+            opacity: 0.5;
+        }
+
+        .empty-state p {
+            font-size: 1.25rem;
+            font-family: "Syne", sans-serif;
+        }
+
+        /* ─── Call Card ─── */
+        .call-entry {
+            display: grid;
+            grid-template-columns: 2fr 3fr 1fr;
+            align-items: center;
+            padding: 1.5rem 2rem;
+            border-bottom: var(--border-width) solid var(--border-color);
+            background: var(--bg-primary);
+            transition: background-color 0.2s;
+        }
+
+        .call-entry:hover {
+            background: var(--bg-secondary);
+        }
+
+        .call-entry.ended {
+            opacity: 0.5;
+            background: var(--bg-primary);
+        }
+
+        .call-entry-info {
+            display: flex;
+            align-items: center;
+            gap: 1.25rem;
+        }
+
+        .caller-avatar {
+            width: 48px; height: 48px;
+            background: var(--text-primary);
+            color: var(--bg-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: "Syne", sans-serif;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+        
+        .call-entry.ended .caller-avatar {
+            background: transparent;
+            color: var(--text-primary);
+            border: var(--border-width) solid var(--border-color);
+        }
+
+        .caller-details {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .caller-name {
+            font-family: "Syne", sans-serif;
+            font-weight: 700;
+            font-size: 1.25rem;
+        }
+
+        .caller-phone {
+            font-weight: 500;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        /* ─── Status Pill ─── */
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            padding: 0.25rem 0.5rem;
+            border: var(--border-width) solid var(--border-color);
+            background: transparent;
+            color: var(--text-primary);
+            width: max-content;
+        }
+
+        .status-pill .pill-dot {
+            width: 6px; height: 6px;
+            border-radius: 50%;
+        }
+
+        .status-pill.queued .pill-dot { background: var(--text-secondary); }
+        .status-pill.ringing .pill-dot { background: var(--warning); }
+        .status-pill.connected .pill-dot { background: var(--success); }
+        .status-pill.ended .pill-dot { background: var(--text-secondary); }
+        .status-pill.failed .pill-dot { background: var(--danger); }
+        .status-pill.transferring .pill-dot { background: var(--gold-primary); }
+
+        /* ─── Call Progress Steps (Editorial Pipeline) ─── */
+        .call-progress {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            padding: 0 1rem;
+        }
+
+        .progress-step {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--neutral);
+        }
+
+        .progress-step.reached { color: var(--text-primary); }
+        .progress-step.current { color: var(--accent); font-weight: 600; }
+        .progress-step.failed-step { color: var(--danger); }
+        .call-entry.ended .progress-step { color: var(--text-primary); }
+        .call-entry.ended .progress-step:not(.reached) { color: var(--text-secondary); }
+
+        .step-label {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .step-arrow {
+            color: var(--neutral);
+            font-size: 0.8rem;
+        }
+        .progress-step.reached + .step-arrow { color: var(--text-primary); }
+        .call-entry.ended .step-arrow { color: var(--text-secondary); }
+
+        /* ─── Call Meta Row ─── */
+        .call-meta {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 0.5rem;
+            text-align: right;
+        }
+
+        .meta-time {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .live-timer {
+            font-family: "Syne", sans-serif;
+            font-size: 1.25rem;
+            color: var(--accent);
+            font-weight: 700;
+        }
+        
+        .call-entry.ended .live-timer {
+            color: var(--text-primary);
+        }
+
+        /* ─── Right: Dispatch Form ─── */
+        .dispatch-zone {
+            display: flex;
+            flex-direction: column;
+            background: var(--bg-secondary);
+            position: sticky;
+            top: 72px;
+            height: calc(100vh - 72px);
+        }
+
+        .dispatch-card {
+            padding: 3rem;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .card-badge {
+            display: inline-block;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--accent);
+            margin-bottom: 2rem;
+            border-bottom: var(--border-width) solid var(--accent);
+            padding-bottom: 0.25rem;
+            width: max-content;
+        }
+
+        .dispatch-card h2 {
+            font-size: 3rem;
+            line-height: 1;
+            margin-bottom: 1rem;
+        }
+
+        .dispatch-card .subtitle {
+            font-size: 1rem;
+            color: var(--text-secondary);
+            margin-bottom: 3rem;
+        }
+
+        .dispatch-form {
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+            flex: 1;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            position: relative;
+        }
+
+        .input-group label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .input-group input {
+            width: 100%;
+            height: 60px;
+            background: transparent;
+            color: var(--text-primary);
+            border: none;
+            border-bottom: var(--border-width) solid var(--text-primary);
+            font-family: "Space Grotesk", sans-serif;
+            font-size: 1.5rem;
+            outline: none;
+            border-radius: 0;
+            transition: border-color 0.2s;
+            padding: 0;
+        }
+
+        .input-group input:focus {
+            border-bottom-color: var(--accent);
+        }
+        
+        .input-group input::placeholder {
+            color: var(--neutral);
+        }
+
+        .input-error {
+            font-size: 0.8rem;
+            color: var(--accent);
+            position: absolute;
+            bottom: -1.5rem;
+            left: 0;
+            display: none;
+        }
+        
+        .input-error.show { display: block; }
+
+        .dispatch-btn {
+            height: 80px;
+            background: var(--accent);
+            color: #ffffff;
+            border: none;
+            font-family: "Syne", sans-serif;
+            font-weight: 700;
+            font-size: 1.5rem;
+            text-transform: uppercase;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 2rem;
+            margin-top: auto;
+            transition: background-color 0.2s;
+        }
+
+        .dispatch-btn:hover {
+            background: var(--accent-hover);
+        }
+
+        .dispatch-btn:disabled {
+            background: var(--neutral);
+            color: var(--text-secondary);
+            cursor: not-allowed;
+        }
+
+        .dispatch-btn .spinner {
+            display: none;
+            width: 24px; height: 24px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: #ffffff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        .dispatch-btn.loading .spinner { display: block; }
+        .dispatch-btn.loading .btn-icon { display: none; }
+
+        .dispatch-btn .btn-icon svg {
+            width: 32px; height: 32px;
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 1.5;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        /* ─── Animations ─── */
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ─── Responsive ─── */
+        @media (max-width: 1200px) {
+            .dashboard { grid-template-columns: 1fr 400px; }
+            .section-title, .dispatch-card h2 { font-size: 2.5rem; }
+            .call-entry { grid-template-columns: 2fr 2fr 1fr; padding: 1.5rem; }
+            .call-progress { display: none; /* Hide progress pipeline on medium screens */ }
+        }
+
+        @media (max-width: 900px) {
+            .dashboard { display: flex; flex-direction: column; }
+            .history-zone { border-right: none; border-bottom: var(--border-width) solid var(--border-color); }
+            .dispatch-zone { position: static; height: auto; border-top: var(--border-width) solid var(--border-color); }
+            .call-list { overflow: visible; }
+        }
+
+        @media (max-width: 600px) {
+            .call-entry { grid-template-columns: 1fr; gap: 1rem; }
+            .call-meta { align-items: flex-start; text-align: left; flex-direction: row; justify-content: space-between; width: 100%; }
+            .brand { padding: 0 1rem; }
+            .sse-indicator { display: none; }
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Nav -->
+    <nav class="top-nav">
+        <div class="brand">
+            <span class="brand-text">AU Admission Assist</span>
+        </div>
+        <div class="nav-right">
+            <div class="sse-indicator" id="sseIndicator">
+                <span class="dot"></span>
+                <span id="sseLabel">Connecting</span>
+            </div>
+            <button class="theme-toggle" id="themeToggle" title="Toggle theme" aria-label="Toggle dark/light mode">
+                <svg class="icon-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                <svg class="icon-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+            </button>
+            <div class="partner-brand">
+                <img src="/atc.png" alt="Adamas Tech" class="brand-logo" style="height: 24px;">
+            </div>
+        </div>
+    </nav>
+
+    <main class="dashboard">
+        <!-- Left: Call List -->
+        <section class="history-zone">
+            <div class="section-header">
+                <h1 class="section-title">Call Feed</h1>
+                <span class="active-badge" id="activeBadge" style="display: none;">
+                    <span class="pulse-dot"></span>
+                    <span id="activeCount">0</span> Live
+                </span>
+            </div>
+            <div class="call-list" id="callList">
+                <div class="empty-state" id="emptyState">
+                    <div class="empty-icon">++</div>
+                    <p>No dispatch history.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Right: Dispatch Form -->
+        <section class="dispatch-zone">
+            <div class="dispatch-card" id="dispatchCard">
+                <span class="card-badge">AI Agent Operations</span>
+                <h2>New Call</h2>
+                <p class="subtitle">Dispatch the voice agent.</p>
+
+                <form class="dispatch-form" id="dispatchForm" novalidate>
+                    <div class="input-group">
+                        <label for="userName">Student Name</label>
+                        <input id="userName" name="userName" type="text" autocomplete="name" placeholder="Enter name" required>
+                        <div class="input-error" id="nameError"></div>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="phoneNumber">Phone Number</label>
+                        <input id="phoneNumber" name="phoneNumber" type="tel" inputmode="numeric" autocomplete="tel" placeholder="10 digits" required>
+                        <div class="input-error" id="phoneError"></div>
+                    </div>
+
+                    <button class="dispatch-btn" id="dispatchBtn" type="submit">
+                        <span class="btn-label">Dispatch</span>
+                        <span class="btn-icon">
+                            <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                        </span>
+                        <span class="spinner" aria-hidden="true"></span>
+                    </button>
+                </form>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // ─── Theme Toggle ───
+        const themeToggle = document.getElementById("themeToggle");
+
+        function setTheme(theme) {
+            document.documentElement.setAttribute("data-theme", theme);
+            localStorage.setItem("au-dash-theme", theme);
+        }
+
+        (function initTheme() {
+            const saved = localStorage.getItem("au-dash-theme");
+            // Default to light for Snowhouse Studio aesthetic
+            if (saved === "dark") {
+                setTheme("dark");
+            } else {
+                setTheme("light");
+            }
+        })();
+
+        themeToggle.addEventListener("click", () => {
+            const current = document.documentElement.getAttribute("data-theme");
+            setTheme(current === "dark" ? "light" : "dark");
+        });
+
+        // ─── State ───
+        const activeCalls = new Map();
+        let liveCount = 0;
+
+        // ─── DOM Refs ───
+        const dispatchForm = document.getElementById("dispatchForm");
+        const dispatchBtn = document.getElementById("dispatchBtn");
+        const userNameInput = document.getElementById("userName");
+        const phoneInput = document.getElementById("phoneNumber");
+        const nameError = document.getElementById("nameError");
+        const phoneError = document.getElementById("phoneError");
+        const callList = document.getElementById("callList");
+        const emptyState = document.getElementById("emptyState");
+        const activeBadge = document.getElementById("activeBadge");
+        const activeCountEl = document.getElementById("activeCount");
+        const sseIndicator = document.getElementById("sseIndicator");
+        const sseLabel = document.getElementById("sseLabel");
+
+        // ─── Helpers ───
+        function escapeHtml(str) {
+            const d = document.createElement("div");
+            d.textContent = str;
+            return d.innerHTML;
+        }
+
+        function cleanPhone(value) {
+            const digits = value.replace(/\D/g, "");
+            return digits.slice(-10);
+        }
+
+        function formatPhoneInput(value) {
+            const digits = cleanPhone(value);
+            if (digits.length <= 5) return digits;
+            return `${digits.slice(0, 5)} ${digits.slice(5)}`;
+        }
+
+        function formatPhoneDisplay(digits) {
+            if (!digits) return "";
+            if (digits.length === 10) return `+91 ${digits.slice(0, 5)} ${digits.slice(5)}`;
+            return digits;
+        }
+
+        function getInitials(name) {
+            if (!name || name === "Unknown") return "?";
+            const parts = name.trim().split(/\s+/);
+            if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+            return parts[0][0].toUpperCase();
+        }
+
+        function formatDuration(ms) {
+            const secs = Math.floor(ms / 1000);
+            const m = Math.floor(secs / 60);
+            const s = secs % 60;
+            return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+        }
+
+        function showError(el, msg) {
+            if (msg) {
+                el.textContent = msg;
+                el.classList.add("show");
+            } else {
+                el.classList.remove("show");
+            }
+        }
+
+        phoneInput.addEventListener("input", () => {
+            phoneInput.value = formatPhoneInput(phoneInput.value);
+            showError(phoneError, "");
+        });
+        userNameInput.addEventListener("input", () => { showError(nameError, ""); });
+
+        function validateInputs() {
+            const userName = userNameInput.value.trim();
+            const rawDigits = phoneInput.value.replace(/\D/g, "");
+            const digits = rawDigits.length > 10 ? rawDigits.slice(-10) : rawDigits;
+            let valid = true;
+
+            showError(nameError, "");
+            showError(phoneError, "");
+
+            if (!userName) { showError(nameError, "Required"); valid = false; }
+            if (!/^\d{10}$/.test(digits)) { showError(phoneError, "Invalid 10-digit number"); valid = false; }
+            else { phoneInput.value = formatPhoneInput(digits); }
+
+            return { valid, userName, phoneDigits: digits };
+        }
+
+        function updateLiveCount() {
+            liveCount = 0;
+            activeCalls.forEach(c => {
+                if (c.status !== "ended" && c.status !== "failed") liveCount++;
+            });
+            activeCountEl.textContent = liveCount;
+            activeBadge.style.display = liveCount > 0 ? "inline-flex" : "none";
+        }
+
+        // ─── Progress Pipeline Builder ───
+        function buildPipeline(status) {
+            const steps = ["Queued", "Ringing", "Connected", "Ended"];
+            const order = { queued: 0, ringing: 1, connected: 2, ended: 3, failed: -1, transferring: 2 };
+            const currentIdx = order[status] ?? 0;
+
+            const html = [];
+            for (let i = 0; i < steps.length; i++) {
+                let cls = "progress-step";
+                if (status === "failed") {
+                    if (i === 0) cls += " failed-step";
+                } else {
+                    if (i < currentIdx) cls += " reached";
+                    if (i === currentIdx) cls += " current reached";
+                }
+
+                html.push(`<span class="${cls}"><span class="step-label">${steps[i]}</span></span>`);
+                if (i < steps.length - 1) {
+                    html.push(`<span class="step-arrow">&rarr;</span>`);
+                }
+            }
+            return html.join("");
+        }
+
+        // ─── Create Call Card ───
+        function getOrCreateCallCard(callId, name, phone) {
+            if (activeCalls.has(callId)) return activeCalls.get(callId);
+
+            emptyState.style.display = "none";
+
+            const card = document.createElement("div");
+            card.className = "call-entry";
+            card.id = `call-${callId}`;
+
+            const initials = getInitials(name);
+            const displayPhone = formatPhoneDisplay(phone || "");
+            const now = new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+
+            card.innerHTML = `
+                <div class="call-entry-info">
+                    <div class="caller-avatar">${escapeHtml(initials)}</div>
+                    <div class="caller-details">
+                        <span class="caller-name">${escapeHtml(name || "Unknown")}</span>
+                        <span class="caller-phone">${escapeHtml(displayPhone)}</span>
+                        <span class="status-pill queued" id="pill-${callId}"><span class="pill-dot"></span> Dispatched</span>
+                    </div>
+                </div>
+                <div class="call-progress" id="progress-${callId}">
+                    ${buildPipeline("queued")}
+                </div>
+                <div class="call-meta" id="meta-${callId}">
+                    <span class="meta-time">${now}</span>
+                </div>
+            `;
+
+            callList.prepend(card);
+
+            const callData = {
+                name: name || "Unknown",
+                phone: phone || "",
+                element: card,
+                status: "queued",
+                startTime: null,
+                timerInterval: null,
+            };
+            activeCalls.set(callId, callData);
+            updateLiveCount();
+
+            return callData;
+        }
+
+        // ─── Update Status ───
+        function updatePill(callId, statusClass, label) {
+            const pill = document.getElementById(`pill-${callId}`);
+            if (!pill) return;
+            pill.className = `status-pill ${statusClass}`;
+            pill.innerHTML = `<span class="pill-dot"></span> ${escapeHtml(label)}`;
+        }
+
+        function updateProgress(callId, status) {
+            const container = document.getElementById(`progress-${callId}`);
+            if (!container) return;
+            container.innerHTML = buildPipeline(status);
+        }
+
+        function startCallTimer(callId) {
+            const callData = activeCalls.get(callId);
+            if (!callData || callData.timerInterval) return;
+
+            callData.startTime = Date.now();
+            const meta = document.getElementById(`meta-${callId}`);
+            if (!meta) return;
+
+            const timerSpan = document.createElement("span");
+            timerSpan.className = "live-timer";
+            timerSpan.id = `timer-${callId}`;
+            timerSpan.textContent = "00:00";
+            meta.prepend(timerSpan);
+
+            callData.timerInterval = setInterval(() => {
+                if (callData.startTime) {
+                    timerSpan.textContent = formatDuration(Date.now() - callData.startTime);
+                }
+            }, 1000);
+        }
+
+        function stopCallTimer(callId) {
+            const callData = activeCalls.get(callId);
+            if (!callData) return;
+            if (callData.timerInterval) {
+                clearInterval(callData.timerInterval);
+                callData.timerInterval = null;
+            }
+            const timerSpan = document.getElementById(`timer-${callId}`);
+            if (timerSpan && callData.startTime) {
+                timerSpan.textContent = formatDuration(Date.now() - callData.startTime);
+            }
+        }
+
+        // ─── Handle SSE Event ───
+        function handleCallEvent(event) {
+            const callId = event.call_id;
+            const type = event.type;
+            const data = event.data || {};
+
+            if (type === "call_queued" || type === "call_failed") {
+                getOrCreateCallCard(callId || `tmp-${Date.now()}`, data.name, data.phone);
+            }
+
+            let callData = activeCalls.get(callId);
+            let effectiveId = callId;
+
+            if (!callData) {
+                if (data.phone) {
+                    const entry = [...activeCalls.entries()].find(([k, v]) => v.phone === data.phone);
+                    if (entry) {
+                        effectiveId = entry[0];
+                        callData = entry[1];
+                        activeCalls.set(callId, callData);
+                    }
+                }
+                if (!callData) {
+                    callData = activeCalls.get([...activeCalls.keys()].pop());
+                    effectiveId = callData ? [...activeCalls.entries()].find(([k, v]) => v === callData)?.[0] : null;
+                }
+            }
+
+            if (!effectiveId || !callData) return;
+
+            switch (type) {
+                case "call_ringing":
+                    callData.status = "ringing";
+                    updatePill(effectiveId, "ringing", "Ringing");
+                    updateProgress(effectiveId, "ringing");
+                    break;
+                case "call_connected":
+                    callData.status = "connected";
+                    updatePill(effectiveId, "connected", "Live");
+                    updateProgress(effectiveId, "connected");
+                    startCallTimer(effectiveId);
+                    break;
+                case "transfer_started":
+                    callData.status = "transferring";
+                    updatePill(effectiveId, "transferring", "Transferring");
+                    break;
+                case "call_ended":
+                    callData.status = "ended";
+                    stopCallTimer(effectiveId);
+                    updatePill(effectiveId, "ended", "Ended");
+                    updateProgress(effectiveId, "ended");
+                    callData.element.classList.add("ended");
+                    break;
+                case "call_failed":
+                    callData.status = "failed";
+                    stopCallTimer(effectiveId);
+                    updatePill(effectiveId, "failed", "Failed");
+                    updateProgress(effectiveId, "failed");
+                    callData.element.classList.add("ended");
+                    break;
+            }
+            updateLiveCount();
+        }
+
+        // ─── SSE Connection ───
+        function connectSSE() {
+            const evtSource = new EventSource("/call-events");
+            evtSource.onopen = () => {
+                sseIndicator.className = "sse-indicator connected";
+                sseLabel.textContent = "Live";
+            };
+            evtSource.onmessage = (e) => {
+                try { handleCallEvent(JSON.parse(e.data)); } catch (err) {}
+            };
+            evtSource.onerror = () => {
+                sseIndicator.className = "sse-indicator error";
+                sseLabel.textContent = "Reconnecting";
+            };
+            return evtSource;
+        }
+
+        connectSSE();
+
+        // ─── Form Submit ───
+        async function triggerBackendCall(name, phoneDigits) {
+            try {
+                const response = await fetch("/trigger-call", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", "X-API-Key": "default-dev-token" },
+                    body: JSON.stringify({ user_name: name, phone_number: phoneDigits }),
+                });
+
+                let payload = {};
+                try { payload = await response.json(); } catch (e) {}
+
+                if (!response.ok) return { ok: false, message: payload.message || "Failed to queue call.", callId: null };
+                return { ok: true, message: payload.message || "Call queued.", callId: payload.call_uuid || null };
+            } catch (error) {
+                return { ok: false, message: "Network error.", callId: null };
+            }
+        }
+
+        dispatchForm.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            const result = validateInputs();
+            if (!result.valid) return;
+
+            dispatchBtn.classList.add("loading");
+            dispatchBtn.disabled = true;
+
+            const backendResult = await triggerBackendCall(result.userName, result.phoneDigits);
+
+            if (backendResult.ok && backendResult.callId) {
+                getOrCreateCallCard(backendResult.callId, result.userName, result.phoneDigits);
+            } else if (!backendResult.ok) {
+                const tmpId = `failed-${Date.now()}`;
+                getOrCreateCallCard(tmpId, result.userName, result.phoneDigits);
+                const callData = activeCalls.get(tmpId);
+                if (callData) {
+                    callData.status = "failed";
+                    updatePill(tmpId, "failed", "Failed");
+                    updateProgress(tmpId, "failed");
+                    callData.element.classList.add("ended");
+                }
+                updateLiveCount();
+            }
+
+            dispatchBtn.classList.remove("loading");
+            dispatchBtn.disabled = false;
+            userNameInput.value = "";
+            phoneInput.value = "";
+        });
+    </script>
+</body>
+</html>

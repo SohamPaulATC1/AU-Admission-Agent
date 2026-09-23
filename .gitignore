@@ -1,0 +1,50 @@
+# Environment / secrets
+.env
+*credentials*.json
+project-*.json
+
+# Python
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+
+# Logs
+*.log
+Gemini_Assistant.log
+
+# Call recordings — caller PII, must never enter version control (task 5.4a).
+# Covers both the inbound debug WAV and the paired *_farend.wav.
+debug_recordings/
+*.wav
+# ...but the playback fixtures ARE source: the disclaimer audio app.py loads at
+# startup and the test-suite echo fixtures live here and must stay committable.
+!playback_audio_files/
+!playback_audio_files/*.wav
+
+# Local databases / persisted state
+*.sqlite3
+transfer_context.sqlite3
+senco_chroma_db/
+chroma_db/
+*.db
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+
+# Kiro
+.kiro/
+
+# --- ltm-power ---
+ltm/store/*.jsonl
+ltm/runtime/*
+ltm/reports/*
+ltm/snapshots/*
+# --- /ltm-power ---
+venv312/
