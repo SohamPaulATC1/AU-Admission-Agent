@@ -78,6 +78,14 @@ tests/test_instrumentation_5_4.py                         e7f529fc6acfd2df077f1f
 tests/harness/echo.py                                     d834ea3dc5271fcf531fd858c4735221c354284cbde57b3ad744634e766b8121
 ```
 
+Updated again 2026-09-23 after the item B approval: the app.py grapheme-helper
+comment was fixed (comment-only, same line count, `GEMINI_MODEL` pins hold).
+aec.py and bargein.py unchanged.
+
+```
+app.py                                                    cb93d45b78ce13aaf6ade71ba94907fb1a9acfd39400db9dc4caedffd9e4c84c
+```
+
 These hashes are of the LF working tree. Since `be6c19f` the repo has a
 `.gitattributes` with `* text=auto eol=lf`. A fresh clone on this machine
 (`core.autocrlf=true`) checks out `aec.py` with the same sha256, and
@@ -316,6 +324,13 @@ Manual VAD kept (`automatic_activity_detection` stays disabled) per design Part 
 
 ## 4. Test reconciliations already applied (all intentional baseline updates)
 
+**Operator-approved 2026-09-23** as intentional redesign changes (section 8,
+#7 item B): every task 4 re-baseline below, i.e. the 4_7 and 4_9 entries in
+this list and the 4_1 / 4_8 / 4_9 entries under "Task 4 re-baselines made
+for task 5", including every `GEMINI_MODEL` line re-pin. These are the only
+re-baselines tasks.md 5.13 allows.
+
+
 - `test_harness_smoke.py`: `test_parked_constants_absent` → renamed
   `test_corroborated_gate_constants` (ECHO_CORR_THRESHOLD + FAR_END_ACTIVE_FLOOR_DB
   now exist; `ECHO_AMBIGUOUS_ONSET_FRAMES` intentionally NEVER implemented — the
@@ -332,6 +347,21 @@ Manual VAD kept (`automatic_activity_detection` stays disabled) per design Part 
 - `test_preservation_4_9_falsifier.py`: two previously-deferred boundary tests
   flipped to real tests; added `import bargein`.
 - `test_bug_condition_exploration.py`: extensively reworked — see section 5.
+
+Task 4 re-baselines made for task 5 (each marked "INTENTIONAL BASELINE
+UPDATE" in the test itself):
+- `test_preservation_4_1_bargein.py`:
+  `test_short_mode_is_now_distinguishable_but_existing_lines_are_unchanged`
+  (5.3: only new diagnostic lines differ).
+- `test_preservation_4_8_resumption_recording_stats.py`: `test_far_end_recording_is_paired_with_the_inbound_one`
+  (5.4a); `test_log_call_stats_golden_record` (5.2 adds the `🧬 [MODEL]` line);
+  `test_model_identifier_is_recorded` (5.2); the `GEMINI_MODEL` line pin,
+  re-pinned mechanically whenever app.py's line count changes (sections 5.7
+  and 5.8; currently `[51, 1381, 1845, 1855, 2257]`).
+- `test_preservation_4_9_falsifier.py`: `GOLDEN_BARGEIN_LOGS` gains the
+  `🧭 [TRIGGER]` line (5.3);
+  `test_349_350_351_split_only_in_the_new_diagnostic_lines` and
+  `test_the_350_ms_literal_is_now_a_constant_in_app_py` (5.3/5.10).
 
 ---
 
@@ -870,36 +900,13 @@ gate executes and measures a real-but-too-low value):
     commit gate functions, `delta_trace_verdict`). **Decision:** the tasks.md
     amendment now names them; no code moved.
   - B. *5.13 vs the re-baselines.* **Decision:** 5.13 amended to allow only the
-    deliberate re-baselines listed in section 4, and ticked only if those are
-    recorded as approved. **They are not, so 5.13 is NOT ticked.** For the
-    operator:
-    1. Listed in section 4 for task 4 tests, recorded as "intentional" but with
-       no operator approval on record:
-       - 4_7: `add_far_end` moved to the inbound loop (one call site);
-         `clearAudio` sites paired with `reset_far_reference` (x4), with the one
-         bare `reset_far_end` inside that helper; per-frame call order now
-         `add_far_end, process, rnnoise`.
-       - 4_9: the two previously-deferred boundary tests flipped to real tests
-         (`test_activity_floor_constant_is_defined`,
-         `TestBoundaryCorrelationAtThreshold.test_correlation_constant_now_exists`).
-    2. Task 4 re-baselines NOT listed in section 4 at all, each marked
-       "INTENTIONAL BASELINE UPDATE" in the test itself:
-       - 4_1 `test_short_mode_is_now_distinguishable_but_existing_lines_are_unchanged`
-         (task 5.3: only new diagnostic lines differ).
-       - 4_8 `test_far_end_recording_is_paired_with_the_inbound_one` (5.4a).
-       - 4_8 `test_log_call_stats_golden_record` (5.2 adds the `🧬 [MODEL]` line).
-       - 4_8 `test_model_identifier_is_recorded` (5.2), and the `GEMINI_MODEL`
-         line pin in the same class, re-pinned after every app.py change. The
-         section 5.7 re-pin is on the operator-approved list; the section 5.8
-         re-pin is not.
-       - 4_9 `GOLDEN_BARGEIN_LOGS` gains the `🧭 [TRIGGER]` line (5.3).
-       - 4_9 `test_349_350_351_split_only_in_the_new_diagnostic_lines` (5.3/5.10).
-       - 4_9 `test_the_350_ms_literal_is_now_a_constant_in_app_py` (5.3/5.10).
-       The ones that only add `[ANOMALY]`/diagnostic lines (4_1, the `[MODEL]`
-       and `[TRIGGER]` lines) arguably fall under 5.13's own "permitted
-       additions" clause. The rest need either approval or a listing in
-       section 4.
-    Only the section 5.7 test changes carry a recorded operator approval.
+    deliberate re-baselines listed in section 4. The first pass found them not
+    recorded as approved (the 4_7/4_9 entries were only "intentional", and the
+    4_1/4_8/4_9 re-baselines made for 5.2, 5.3, 5.4a and 5.10 were not in
+    section 4 at all). **Operator, 2026-09-23: all of them approved as
+    intentional redesign changes, including the `GEMINI_MODEL` re-pins.**
+    Section 4 now lists and records them; 5.13 is ticked in both tasks.md
+    copies.
   - C. *A clone without `.env` cannot import app.* **Decision:** app.py not
     changed. Documented in section 6: a fresh-clone test run needs dummy
     `PLIVO_AUTH_ID` and `PLIVO_AUTH_TOKEN`.
@@ -920,9 +927,10 @@ gate executes and measures a real-but-too-low value):
     the verified segmentations checked against `app.grapheme_clusters`), so no
     new test. The `অন্তঃ` echo-trigger scenario is a Redesign Task 8 live check.
 
-  **Stale after A, not fixed (app.py is off limits):** the comment above the
-  grapheme helpers in app.py (~484-489) still calls their location "an open
-  operator item (HANDOFF section 8 #7)". It is now decided (A).
+  **Stale comment after A, fixed 2026-09-23:** the comment above the grapheme
+  helpers in app.py now says their location was decided (the tasks.md
+  amendment). Comment-only, same line count, so the `GEMINI_MODEL` pins hold.
+
 - **#8** validation-call guidance + tuning notes for the live tune loop (Phase 5).
   **Also a live check (operator, 2026-09-23, section 8 #7 item G):** the spec
   task 6 `অন্তঃ` scenario, an echo-triggered barge-in landing inside the

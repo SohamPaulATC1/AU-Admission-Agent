@@ -485,8 +485,8 @@ def calculate_rms_db(pcm_data):
 # ``bargein.py`` existed (task 5.5 was parked with concern (a) at the time), so
 # they were written here as pure module-level functions with no I/O and no
 # global state. The redesign created ``bargein.py`` but did not migrate them.
-# Under the tasks.md constraint pure decision logic belongs in ``bargein.py``;
-# whether to move these is an open operator item (HANDOFF section 8, #7).
+# Decided 2026-09-23: they stay here, as named in the amended bargein.py
+# constraint in docs/spec/tasks.md (HANDOFF section 8, #7 item A).
 #
 # ``regex``'s ``\X`` is UAX #29 extended grapheme clusters. The four Bengali
 # expectations in the spec were verified against the installed ``regex``

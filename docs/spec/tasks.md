@@ -182,7 +182,7 @@
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 3.10, 3.11_
 
 - [ ] 5. Fix for the echo-driven false barge-in loop that truncates the leading grapheme cluster
-  - **Status 2026-09-23: open. 5.11 needs a live call and 5.13 waits on the re-baseline approvals (see its note). Everything else under 5 is done.**
+  - **Status 2026-09-23: open. 5.11 needs a live call. Everything else under 5 is done, including 5.13 (re-baselines approved 2026-09-23).**
 
   - [x] 5.1 Concern (d) — per-delta trace instrumentation in `app.py`
     - **Land this before any behavioural change.** It is what definitively settles upstream-vs-downstream (gap 1), it is low-risk, and it is independently valuable even if the offline verdict in task 1 re-scopes concerns (a) and (b).
@@ -362,11 +362,9 @@
     - **EXPECTED OUTCOME: test PASSES** (confirms the bug is fixed).
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6_
 
-  - [ ] 5.13 Verify preservation tests still pass
+  - [x] 5.13 Verify preservation tests still pass
     - **AMENDED 2026-09-23 (operator):** the only re-baselines allowed are the deliberate ones listed in `docs/HANDOFF.md` §4.
-    - **Status 2026-09-23: NOT ticked.** The task 4 tests pass, but the tick waits on two things, both listed for the operator in `docs/HANDOFF.md` §8 #7 item B:
-      - The §4 re-baselines of task 4 tests (4_7 and 4_9) are recorded as intentional, but not as operator-approved.
-      - Several task 4 tests were re-baselined for tasks 5.2, 5.3, 5.4a and 5.10 and are not in §4 at all, so the amended rule does not yet allow them.
+    - **Status 2026-09-23: done.** The task 4 tests pass. The operator approved every re-baseline listed in `docs/HANDOFF.md` §4 (4_1, 4_7, 4_8, 4_9 and the `GEMINI_MODEL` re-pins) as intentional redesign changes on 2026-09-23; see §8 #7 item B.
     - **Property 2: Preservation** - Non-Echo Inputs Behave Identically
     - **IMPORTANT**: re-run the SAME tests from task 4 against the same golden records. Do NOT write new tests and do NOT re-baseline the golden records against the fixed code, except for the re-baselines listed in `docs/HANDOFF.md` §4 (amendment above).
     - Assert equality of the outbound μ-law byte stream, barge-in frame count, side-effect ordering, preroll flush contents, tool-call deferral sequence, silence watchdog schedule, session resumption path, debug recording, and every existing log line's format — excluding the new `⚠️ [ANOMALY]` and diagnostic lines, which are permitted additions.
