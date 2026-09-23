@@ -26,11 +26,13 @@ Numbering: HANDOFF uses "Redesign Task N"; docs/spec/tasks.md uses 1-10 / 5.x. M
 ### Committed (dev, not pushed)
 - `84eb866`: the state through Redesign Task 6.
 - `be6c19f`: `.gitattributes`, gitignore (`CALL_RECORDINGS/`, `*.m4a`, `*.kiro-halt`), docs/spec/ copies.
-- Then the docs-and-comments commit for Redesign Task 7.
+- `52be2ce`: the docs-and-comments commit for Redesign Task 7.
+- Then the A-G docs/test-name commit (HANDOFF §8 #7): amendment extended, 5.13 amended, fresh-clone note in §6, test rename, design.md and bugfix.md copied to docs/spec/ with the caller number redacted.
 - Never committed: `.env`, credential JSON, `CALL_RECORDINGS/`.
 
 ### Resume here
-1. **Open operator questions** (HANDOFF §8 #7, items A-G): app.py decision logic not named by the amendment; 5.13 vs the §4 re-baselines; a clone without `.env` cannot import app; design.md and bugfix.md still only in `.kiro/`.
-2. **Redesign Task 8:** live-call validation guidance. Build it around the `[LATCH-*]` data first (HANDOFF §8 #8), then threshold tuning. Also check real calls for phantom turns after playback end, to confirm the tail fix live. Not started; wait for the operator.
-3. Known and unaddressed: echo at 160 ms delay truncates mid-playback (frame 12). It is outside the realistic domain and predates this work.
-4. Nothing is pushed. Commit only when asked, and never commit `.env`, credential JSON or `CALL_RECORDINGS/`.
+1. **5.13 is still unticked.** It waits on operator approval of the re-baselines listed in HANDOFF §8 #7 item B (the §4 ones for 4_7/4_9 aren't recorded as approved, and the 5.2/5.3/5.4a/5.10 ones aren't in §4 at all). Tick it only once they are approved.
+2. **Redesign Task 8:** live-call validation guidance. Build it around the `[LATCH-*]` data first (HANDOFF §8 #8), then threshold tuning. Also check real calls for phantom turns after playback end, to confirm the tail fix live, and run the অন্তঃ echo-trigger live check (item G). Not started; wait for the operator.
+3. Stale, and left alone because app.py was frozen for the A-G round: the comment above the grapheme helpers in app.py (~484-489) still calls their location an open operator item.
+4. Known and unaddressed: echo at 160 ms delay truncates mid-playback (frame 12). It is outside the realistic domain and predates this work.
+5. Nothing is pushed. Commit only when asked, and never commit `.env`, credential JSON or `CALL_RECORDINGS/`.

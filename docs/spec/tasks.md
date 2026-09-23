@@ -11,7 +11,7 @@
 - `VAD_THRESHOLD_WHILE_SPEAKING = 0.82` (app.py line 80) and `VAD_SPEECH_ONSET_FRAMES_WHILE_SPEAKING = 4` (app.py line 82) MUST be left at their current values. The design explicitly rejects raising them globally because it taxes every genuine barge-in (3.1). No task in this plan changes them.
 - ~~All behavioural decision logic goes in the new pure module `bargein.py`. `app.py` gets wiring, state fields and logging only.~~
   - **AMENDED 2026-09-23 (operator):** pure decision logic goes in `bargein.py`. Gate helpers coupled to `call_state` may live in `app.py`: `apply_echo_latch`, the `ECHO_MAX_RETURN_DB` override in `evaluate_echo_gate`, and `far_window_has_playback`. No code is to be moved to satisfy this constraint.
-  - Not covered by the amendment and still in `app.py`: the grapheme helpers (`grapheme_clusters`, `leading_clusters`, `ends_mid_grapheme_cluster`, `boundary_splits_grapheme_cluster`, `shared_leading_cluster_count`), the commit gate (`arm_commit_gate`, `disarm_commit_gate`, `commit_gate_verdict`, `commit_gate_discard`) and `delta_trace_verdict`. Open operator question, see `docs/HANDOFF.md` §8.
+  - **EXTENDED 2026-09-23 (operator):** these may also stay in `app.py`: the grapheme helpers (`grapheme_clusters`, `leading_clusters`, `ends_mid_grapheme_cluster`, `boundary_splits_grapheme_cluster`, `shared_leading_cluster_count`), the commit gate (`arm_commit_gate`, `disarm_commit_gate`, `commit_gate_verdict`, `commit_gate_discard`) and `delta_trace_verdict`. No code is to be moved.
 
 ### Post-Task-1 scope gate (added after the INCONCLUSIVE verdict — operator decision: instrumentation first, then redesign)
 
@@ -176,13 +176,13 @@
     - _Requirements: 3.6, 3.11_
 
   - [x] 4.9 Property 2 falsifier over the non-bug domain
-    - **Status 2026-09-23: done. The correlation-at-threshold boundary is exercised on the bargein surface (`TestBoundaryCorrelationAtThreshold`). The activity-floor boundary is exercised by `test_far_end_active_floor_boundary`; its sibling constant check keeps the stale name `test_activity_floor_constant_is_deferred`.**
+    - **Status 2026-09-23: done. The correlation-at-threshold boundary is exercised on the bargein surface (`TestBoundaryCorrelationAtThreshold`). The activity-floor boundary is exercised by `test_far_end_active_floor_boundary`; its sibling constant check was renamed from `test_activity_floor_constant_is_deferred` to `test_activity_floor_constant_is_defined`.**
     - 500–1000 seeded cases asserting the unfixed system's outbound byte stream, barge-in frame count, side-effect ordering and existing-log-line sequence match the golden records.
     - Include the boundary cases the design calls out: trigger at exactly 350 ms, far-end energy exactly at the activity floor, correlation exactly at `ECHO_CORR_THRESHOLD`, and a turn whose first chunk is shorter than 20 ms.
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 3.10, 3.11_
 
 - [ ] 5. Fix for the echo-driven false barge-in loop that truncates the leading grapheme cluster
-  - **Status 2026-09-23: open. 5.11 needs a live call and 5.13 does not hold as written (see its note). Everything else under 5 is done.**
+  - **Status 2026-09-23: open. 5.11 needs a live call and 5.13 waits on the re-baseline approvals (see its note). Everything else under 5 is done.**
 
   - [x] 5.1 Concern (d) — per-delta trace instrumentation in `app.py`
     - **Land this before any behavioural change.** It is what definitively settles upstream-vs-downstream (gap 1), it is low-risk, and it is independently valuable even if the offline verdict in task 1 re-scopes concerns (a) and (b).
@@ -363,9 +363,12 @@
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6_
 
   - [ ] 5.13 Verify preservation tests still pass
-    - **Status 2026-09-23: the task 4 tests pass, but NOT as written. Several golden records were intentionally re-baselined against the redesigned code (`docs/HANDOFF.md` §4), which this task forbids. Needs an operator ruling.**
+    - **AMENDED 2026-09-23 (operator):** the only re-baselines allowed are the deliberate ones listed in `docs/HANDOFF.md` §4.
+    - **Status 2026-09-23: NOT ticked.** The task 4 tests pass, but the tick waits on two things, both listed for the operator in `docs/HANDOFF.md` §8 #7 item B:
+      - The §4 re-baselines of task 4 tests (4_7 and 4_9) are recorded as intentional, but not as operator-approved.
+      - Several task 4 tests were re-baselined for tasks 5.2, 5.3, 5.4a and 5.10 and are not in §4 at all, so the amended rule does not yet allow them.
     - **Property 2: Preservation** - Non-Echo Inputs Behave Identically
-    - **IMPORTANT**: re-run the SAME tests from task 4 against the same golden records. Do NOT write new tests and do NOT re-baseline the golden records against the fixed code.
+    - **IMPORTANT**: re-run the SAME tests from task 4 against the same golden records. Do NOT write new tests and do NOT re-baseline the golden records against the fixed code, except for the re-baselines listed in `docs/HANDOFF.md` §4 (amendment above).
     - Assert equality of the outbound μ-law byte stream, barge-in frame count, side-effect ordering, preroll flush contents, tool-call deferral sequence, silence watchdog schedule, session resumption path, debug recording, and every existing log line's format — excluding the new `⚠️ [ANOMALY]` and diagnostic lines, which are permitted additions.
     - Confirm the byte-conservation invariant from task 4.5 still holds on the fixed outbound stream.
     - Confirm the `aec.py` content hash from task 4.7 is unchanged, and that `requirements.txt` and `.env` are unmodified.
@@ -373,7 +376,7 @@
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 3.10, 3.11_
 
 - [ ] 6. Requirement 2.9 regression test — prove the bug class is closed, not just দুঃখিত
-  - **Status 2026-09-23: partial. `নিঃ` and `পুনঃ` prefixes are in the realistic-domain sweep (no truncation, no `activityStart`). No `অন্তঃ` case and no per-cluster "delivered exactly once" assertion yet.**
+  - **Status 2026-09-23: partial. `নিঃ` and `পুনঃ` prefixes are in the realistic-domain sweep (no truncation, no `activityStart`). No per-cluster "delivered exactly once" assertion yet. At the grapheme-helper level `অন্তঃ` is already unit-tested: `অন্তঃসত্ত্বা` is one of the four verified segmentations checked against `app.grapheme_clusters`, and the conjunct+visarga shapes are in the cluster-invariance table. The `অন্তঃ` echo-trigger scenario itself is not a plain unit test, so it is left as a Redesign Task 8 live check (operator, 2026-09-23).**
   - **Must use a consonant + matra + visarga cluster other than `দুঃ`.** This is the headline regression test and it deliberately avoids the single reported word. Design: Integration Tests → "Requirement 2.9 — different cluster, bug class closed".
   - **Primary case — `নিঃ` in `নিঃশব্দে`**: different consonant *and* different matra from `দুঃ`. Cluster = ন U+09A8 + ি U+09BF + ঃ U+0983; verified segmentation `নিঃশব্দ → ['নিঃ','শ','ব্দ']`. Script a turn transcribed `আমি নিঃশব্দে বলছি`, inject an echo-correlated trigger at 130 ms, and assert: no truncation, `নিঃ` present exactly once in the delivered audio, outbound bytes equal model bytes, and the suppressed trigger logged with its correlation evidence.
   - **Conjunct + visarga case — `অন্তঃ`**: the hardest shape, verified as `অন্তঃসত্ত্বা → ['অ','ন্তঃ','স','ত্ত্বা']` where `ন্তঃ` is U+09A8 + U+09CD + U+09A4 + U+0983. Same scenario, same assertions.

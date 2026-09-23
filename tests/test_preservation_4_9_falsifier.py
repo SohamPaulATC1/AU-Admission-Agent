@@ -1,6 +1,7 @@
 """Task 4.9 -- Property 2 falsifier over the non-bug input domain.
 
-Non-bug domain, per design.md Property 2: far-end inactive, OR near-end
+Non-bug domain, per design.md Property 2 (``docs/spec/design.md``): far-end
+inactive, OR near-end
 uncorrelated with far-end, OR the trigger arriving after
 ``ANOMALOUS_TRUNCATION_MS`` (350 ms) of delivered playback.
 
@@ -442,7 +443,7 @@ class TestBoundaryFarEndAtTheActivityFloor(unittest.TestCase):
                          "a far-end at the activity floor changed the observable behaviour")
         self.assertIsNotNone(with_far[0])
 
-    def test_activity_floor_constant_is_deferred(self):
+    def test_activity_floor_constant_is_defined(self):
         # BASELINE UPDATE (audio-pipeline redesign): the constant now exists and
         # the far-end activity floor is a real quantity, no longer deferred.
         self.assertTrue(hasattr(app, "FAR_END_ACTIVE_FLOOR_DB"))

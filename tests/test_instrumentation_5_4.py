@@ -100,7 +100,7 @@ class TestUpstreamDuplicationIsFlagged(unittest.TestCase):
         self.assertEqual(verdict["duplicate_model_chunk_hashes"], 1)
         self.assertEqual(verdict["duplicate_sent_chunk_hashes"], 0)
         # counters equal: everything the model sent was queued, nothing was sent
-        # twice locally. This is the shape design.md (d)(2) calls upstream.
+        # twice locally. This is the shape docs/spec/design.md (d)(2) calls upstream.
         self.assertEqual(verdict["queued_bytes"], verdict["model_ulaw_equivalent_bytes"])
         self.assertEqual(verdict["sent_bytes"], 0, "the sender is not running in this scenario")
 
@@ -913,8 +913,9 @@ class TestGraphemeHelpers(unittest.TestCase):
     """The minimum from ``bargein.py``'s spec surface that 5.1 and 5.10 needed.
 
     They were written in app.py before ``bargein.py`` existed and are still
-    there; the redesign did not migrate them (an open operator item, HANDOFF
-    section 8 #7). They are tested here, against ``app``, for that reason.
+    there; the redesign did not migrate them, and the operator decided on
+    2026-09-23 that they stay (the amended constraint in docs/spec/tasks.md).
+    They are tested here, against ``app``, for that reason.
     """
 
     def test_the_four_verified_bengali_segmentations(self):

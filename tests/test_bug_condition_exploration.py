@@ -2,8 +2,8 @@
 
 Property 1: Bug Condition -- Echo-Driven Truncation Cuts a Grapheme Cluster.
 
-Every assertion below encodes the **fixed** behaviour from design.md Property 1.
-When task 3 wrote them they failed against the unfixed code, and that failure
+Every assertion below encodes the **fixed** behaviour from design.md Property 1
+(``docs/spec/design.md``). When task 3 wrote them they failed against the unfixed code, and that failure
 was the evidence that the defect existed. With the fix and the audio-pipeline
 redesign in place they pass. Do not weaken these assertions to make a later
 failure go away: a failure here is now a regression.

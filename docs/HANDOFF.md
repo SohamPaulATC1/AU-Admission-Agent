@@ -67,6 +67,17 @@ app.py                                                    0f1e075b93ab4015567b44
 tests/test_bug_condition_exploration.py                   4ccb3e074cdc58524fc50f33b3f5bc1d5bff61cfffd25feadc754384420d0ed8
 ```
 
+Updated again 2026-09-23 after the section 8, #7 A-G decisions (docs and test
+names only). aec.py, bargein.py and app.py unchanged (the two hashes above
+still hold, and so do the `GEMINI_MODEL` pins). Changed test files:
+
+```
+tests/test_bug_condition_exploration.py                   ca974ef9689aecf17e8bbdb3729c037c314775623bb775d350d28f8168141e36
+tests/test_preservation_4_9_falsifier.py                  9a21b21ea049d9a3a70e65502f0bb8cd36449fdeafd70558bb6e0c09aced6622
+tests/test_instrumentation_5_4.py                         e7f529fc6acfd2df077f1fe59a3098dbce4809863d1cc0847b51e74bf19e3f37
+tests/harness/echo.py                                     d834ea3dc5271fcf531fd858c4735221c354284cbde57b3ad744634e766b8121
+```
+
 These hashes are of the LF working tree. Since `be6c19f` the repo has a
 `.gitattributes` with `* text=auto eol=lf`. A fresh clone on this machine
 (`core.autocrlf=true`) checks out `aec.py` with the same sha256, and
@@ -139,9 +150,12 @@ correlation.**
 
 ## 3. What is DONE and wired (Redesign Tasks 1–7 complete)
 
-Task list lives in the session todo and in `docs/spec/tasks.md` (tracked
-copy; the Kiro working copy under the gitignored
-`.kiro/specs/bengali-grapheme-stutter-fix/` is kept identical). Progress:
+Task list lives in the session todo and in `docs/spec/tasks.md`. The spec
+set (`bugfix.md`, `design.md`, `tasks.md`, `redesign-audio-pipeline.md`) is
+tracked in `docs/spec/` (copies; the Kiro working copy under the gitignored
+`.kiro/specs/bengali-grapheme-stutter-fix/` is kept identical, except that the
+tracked `bugfix.md` and `design.md` have the caller's number redacted; see
+section 8, #7 item E). Progress:
 **7/8 complete; Redesign Task 8 needs live calls.** Redesign Task 6 is in
 section 5.8, Redesign Task 7 in section 8.
 
@@ -724,6 +738,15 @@ Windows dev machine, Git Bash, from the repo root. Python 3.12 venv (3.14 has
 no `audioop`). Prefix `PYTHONIOENCODING=utf-8` when printing app log lines
 (the console is cp1252).
 
+**Fresh clone (no `.env`).** app.py builds the Plivo `RestClient` at import,
+which raises without credentials, so every test that imports app errors. Run
+with dummy values; nothing is sent anywhere:
+
+```bash
+PLIVO_AUTH_ID=MAXXXXXXXXXXXXXXXXXX PLIVO_AUTH_TOKEN=dummy-offline-test \
+  venv312/Scripts/python.exe -m unittest discover -s tests -t .
+```
+
 ```bash
 cd ~/local/AU-Admission-Assist
 
@@ -840,31 +863,70 @@ gate executes and measures a real-but-too-low value):
      `docs/spec/` (tracked); `.kiro/` stays ignored, and the citations in this
      file, CLAUDE.md, app.py and bargein.py point at `docs/spec/`.
 
-  **New items found while doing the above. Reported, not acted on:**
-  - A. *Decision logic in app.py not named by the amendment.* The grapheme
-    helpers (`grapheme_clusters`, `leading_clusters`,
-    `ends_mid_grapheme_cluster`, `boundary_splits_grapheme_cluster`,
-    `shared_leading_cluster_count`), the commit gate (`arm_commit_gate`,
-    `disarm_commit_gate`, `commit_gate_verdict`, `commit_gate_discard`) and
-    `delta_trace_verdict`. Recorded as open under the amended constraint in
-    tasks.md. Operator: extend the amendment, or schedule a move.
-  - B. *5.13 does not hold as written.* It says not to re-baseline golden
-    records, and section 4 lists intentional re-baselines. Left unticked with a
-    note. Operator ruling needed.
-  - C. *A clone without `.env` cannot import app.* app.py builds the Plivo
-    `RestClient` at module import, which raises without credentials, so every
-    test that imports app errors on a fresh checkout. `.env` is frozen and this
-    was not changed.
-  - D. *Stale test name.* `test_preservation_4_9_falsifier.py::test_activity_floor_constant_is_deferred`
-    now asserts the constant exists. Not renamed (item 5 covered text, not
-    test names).
-  - E. *design.md and bugfix.md are still only under the gitignored `.kiro/`.*
-    tasks.md cites both. Item 8 named only the two spec files.
-  - F. *tasks.md body still has `venv/bin/python` commands* (tasks 2 and 9).
-    A standing-constraint note gives the Windows command instead of editing
-    each one.
-  - G. *Spec tasks 6, 7 and 8 are partial.* See their status notes in tasks.md.
+  **New items A-G, found while doing the above, and the operator's decisions
+  (2026-09-23).** All in one docs/test-name commit; app.py, bargein.py and
+  aec.py untouched.
+  - A. *Decision logic in app.py not named by the amendment* (grapheme helpers,
+    commit gate functions, `delta_trace_verdict`). **Decision:** the tasks.md
+    amendment now names them; no code moved.
+  - B. *5.13 vs the re-baselines.* **Decision:** 5.13 amended to allow only the
+    deliberate re-baselines listed in section 4, and ticked only if those are
+    recorded as approved. **They are not, so 5.13 is NOT ticked.** For the
+    operator:
+    1. Listed in section 4 for task 4 tests, recorded as "intentional" but with
+       no operator approval on record:
+       - 4_7: `add_far_end` moved to the inbound loop (one call site);
+         `clearAudio` sites paired with `reset_far_reference` (x4), with the one
+         bare `reset_far_end` inside that helper; per-frame call order now
+         `add_far_end, process, rnnoise`.
+       - 4_9: the two previously-deferred boundary tests flipped to real tests
+         (`test_activity_floor_constant_is_defined`,
+         `TestBoundaryCorrelationAtThreshold.test_correlation_constant_now_exists`).
+    2. Task 4 re-baselines NOT listed in section 4 at all, each marked
+       "INTENTIONAL BASELINE UPDATE" in the test itself:
+       - 4_1 `test_short_mode_is_now_distinguishable_but_existing_lines_are_unchanged`
+         (task 5.3: only new diagnostic lines differ).
+       - 4_8 `test_far_end_recording_is_paired_with_the_inbound_one` (5.4a).
+       - 4_8 `test_log_call_stats_golden_record` (5.2 adds the `🧬 [MODEL]` line).
+       - 4_8 `test_model_identifier_is_recorded` (5.2), and the `GEMINI_MODEL`
+         line pin in the same class, re-pinned after every app.py change. The
+         section 5.7 re-pin is on the operator-approved list; the section 5.8
+         re-pin is not.
+       - 4_9 `GOLDEN_BARGEIN_LOGS` gains the `🧭 [TRIGGER]` line (5.3).
+       - 4_9 `test_349_350_351_split_only_in_the_new_diagnostic_lines` (5.3/5.10).
+       - 4_9 `test_the_350_ms_literal_is_now_a_constant_in_app_py` (5.3/5.10).
+       The ones that only add `[ANOMALY]`/diagnostic lines (4_1, the `[MODEL]`
+       and `[TRIGGER]` lines) arguably fall under 5.13's own "permitted
+       additions" clause. The rest need either approval or a listing in
+       section 4.
+    Only the section 5.7 test changes carry a recorded operator approval.
+  - C. *A clone without `.env` cannot import app.* **Decision:** app.py not
+    changed. Documented in section 6: a fresh-clone test run needs dummy
+    `PLIVO_AUTH_ID` and `PLIVO_AUTH_TOKEN`.
+  - D. *Stale test name.* **Done:** `test_activity_floor_constant_is_deferred`
+    renamed to `test_activity_floor_constant_is_defined`. Its only other
+    references were the tasks.md note and this item. Suite still 212.
+  - E. *design.md and bugfix.md only in `.kiro/`.* **Done:** copied into
+    `docs/spec/`. The caller's phone number (in `bugfix.md` line 14 and
+    `design.md` line 70) is replaced with `[number redacted]` in the tracked
+    copies, because caller data is PII and was never in git history. The
+    `.kiro/` originals keep it. tasks.md and the redesign note cite them by bare
+    name, which now resolves in `docs/spec/`. The test docstrings that cite
+    design.md now give the path.
+  - F. *tasks.md body still has `venv/bin/python` commands.* **Decision:** left
+    as is.
+  - G. *Spec tasks 6, 7 and 8 partial.* **Decision:** left partial as recorded.
+    `অন্তঃ` already has a plain grapheme-helper unit test (`অন্তঃসত্ত্বা` is in
+    the verified segmentations checked against `app.grapheme_clusters`), so no
+    new test. The `অন্তঃ` echo-trigger scenario is a Redesign Task 8 live check.
+
+  **Stale after A, not fixed (app.py is off limits):** the comment above the
+  grapheme helpers in app.py (~484-489) still calls their location "an open
+  operator item (HANDOFF section 8 #7)". It is now decided (A).
 - **#8** validation-call guidance + tuning notes for the live tune loop (Phase 5).
+  **Also a live check (operator, 2026-09-23, section 8 #7 item G):** the spec
+  task 6 `অন্তঃ` scenario, an echo-triggered barge-in landing inside the
+  conjunct plus visarga. The helper-level segmentation is already unit-tested.
   **Build this around the latch limitation first (section 5.7), not only
   threshold calibration.** Across real calls, count `[LATCH-END]` episodes with
   `holds>0` and `ended_by` not `break-*` (caller possibly never heard). Measure

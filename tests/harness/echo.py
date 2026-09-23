@@ -3,7 +3,8 @@
 Delay 20-400 ms, attenuation 6-30 dB, additive noise, over the
 ``playback_audio_files/*.wav`` fixtures already in the repo.
 
-Honest limitation, restated from design.md: this is a model of an echo path, not
+Honest limitation, restated from design.md (``docs/spec/design.md``): this is a
+model of an echo path, not
 a room. It is a pure delay-and-attenuate with optional white noise -- no room
 impulse response, no handset nonlinearity, no codec. It is sufficient to build a
 near-end signal that is a *known* function of the far-end (which is what the
