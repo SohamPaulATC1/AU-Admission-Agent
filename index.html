@@ -4,50 +4,84 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AU Admission Assist AI Calling Dashboard</title>
-    <meta name="description" content="AI-powered outbound calling dashboard for AU Admission Assist. Dispatch and monitor voice agent calls in real-time.">
-    <link rel="icon" href="/atc.png?v=1" type="image/png">
+    <title>AU Admission Assist | Adamas University Voice Agent</title>
+    <meta name="description"
+        content="AI-powered outbound admissions calling dashboard for Adamas University. Dispatch and monitor conversational voice agents in real-time.">
+    <link rel="icon" href="/atc.png?v=2" type="image/png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=Merriweather:ital,wght@0,300;0,400;0,700;1,300&family=JetBrains+Mono:wght@400;500;600&display=swap"
+        rel="stylesheet">
     <style>
         :root {
-            /* Light Theme (Editorial Brutalism Default) */
-            --bg-primary: #f4f4f0; /* Warm off-white/cream */
+            /* Adamas University Official Light Theme */
+            --bg-primary: #f4f7fb;
             --bg-secondary: #ffffff;
-            --bg-card: #f4f4f0;
-            --text-primary: #000000;
-            --text-secondary: #52525b;
-            
-            --border-color: #000000;
+            --bg-card: #ffffff;
+            --bg-surface: #ffffff;
+            --bg-subtle: #edf2f9;
+
+            --text-primary: #0a1b2d;
+            --text-secondary: #4a627d;
+            --text-muted: #849bb3;
+
+            --border-color: #d6e2ee;
+            --border-subtle: #e9f0f8;
             --border-width: 1px;
-            
-            --accent: #c9243f;
-            --accent-hover: #a01c32;
-            --gold-primary: #d4af37;
-            
-            --success: #16a34a;
+
+            /* Adamas Brand Primary Blue & Signature Teal */
+            --accent: #005aab;
+            --accent-hover: #004585;
+            --accent-light: #e8f2fc;
+
+            --brand-teal: #00c1a1;
+            --brand-teal-hover: #00a388;
+            --brand-teal-light: #e6f9f5;
+            --gold-primary: #00c1a1;
+
+            --success: #00c1a1;
             --warning: #d97706;
-            --danger: #dc2626;
-            --neutral: #e5e5e5;
+            --danger: #e11d48;
+            --neutral: #cbd5e1;
+
+            --card-shadow: 0 4px 18px -2px rgba(0, 35, 75, 0.06), 0 1px 4px -1px rgba(0, 35, 75, 0.03);
+            --card-shadow-hover: 0 10px 28px -4px rgba(0, 35, 75, 0.12), 0 3px 8px -2px rgba(0, 35, 75, 0.05);
+            --focus-ring: 0 0 0 3px rgba(0, 90, 171, 0.18);
         }
 
         [data-theme="dark"] {
-            --bg-primary: #121212;
-            --bg-secondary: #1a1a1a;
-            --bg-card: #121212;
-            --text-primary: #ffffff;
-            --text-secondary: #a1a1aa;
-            
-            --border-color: #ffffff;
-            
-            --accent: #ff2a55;
-            --accent-hover: #ff5577;
-            
-            --success: #4ade80;
+            /* Adamas University Midnight Navy Dark Theme */
+            --bg-primary: #040c17;
+            --bg-secondary: #091a2e;
+            --bg-card: #0c2038;
+            --bg-surface: #0c2038;
+            --bg-subtle: #102947;
+
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+
+            --border-color: #17385c;
+            --border-subtle: #122b46;
+
+            --accent: #2185d0;
+            --accent-hover: #4ba3e3;
+            --accent-light: rgba(33, 133, 208, 0.15);
+
+            --brand-teal: #00d6b3;
+            --brand-teal-hover: #33e2c6;
+            --brand-teal-light: rgba(0, 214, 179, 0.15);
+            --gold-primary: #00d6b3;
+
+            --success: #00d6b3;
             --warning: #fbbf24;
-            --danger: #f87171;
-            --neutral: #27272a;
+            --danger: #fb7185;
+            --neutral: #334155;
+
+            --card-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.5);
+            --card-shadow-hover: 0 12px 30px -4px rgba(0, 0, 0, 0.7);
+            --focus-ring: 0 0 0 3px rgba(33, 133, 208, 0.28);
         }
 
         * {
@@ -57,605 +91,1564 @@
         }
 
         body {
-            font-family: "Space Grotesk", sans-serif;
+            font-family: "Montserrat", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             color: var(--text-primary);
             background-color: var(--bg-primary);
             min-height: 100vh;
             overflow-x: hidden;
-            /* No ambient backgrounds, just solid color */
-            transition: background-color 0.2s, color 0.2s;
+            transition: background-color 0.25s ease, color 0.25s ease;
+            -webkit-font-smoothing: antialiased;
         }
 
         /* ─── Typography ─── */
-        h1, h2, h3, h4, .brand-text {
-            font-family: "Syne", sans-serif;
+        h1,
+        h2,
+        h3,
+        h4,
+        .brand-text {
+            font-family: "Montserrat", sans-serif;
             font-weight: 700;
-            letter-spacing: -0.03em;
+            letter-spacing: -0.02em;
         }
 
         /* ─── Top Nav ─── */
         .top-nav {
             position: fixed;
-            top: 0; left: 0; right: 0;
+            top: 0;
+            left: 0;
+            right: 0;
             height: 72px;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 0;
-            background: var(--bg-primary);
+            padding: 0 2rem;
+            background: var(--bg-secondary);
             border-bottom: var(--border-width) solid var(--border-color);
+            box-shadow: 0 2px 10px rgba(0, 20, 50, 0.04);
             z-index: 100;
+            transition: background-color 0.25s, border-color 0.25s;
+        }
+
+        .brand-container {
+            display: flex;
+            align-items: center;
+            gap: 1.25rem;
+            height: 100%;
         }
 
         .brand {
             display: flex;
             align-items: center;
-            height: 100%;
-            padding: 0 2rem;
-            border-right: var(--border-width) solid var(--border-color);
+            gap: 1.25rem;
+            text-decoration: none;
+            cursor: pointer;
         }
-        
+
         .brand-logo {
             display: block;
-            height: 32px;
+            height: 48px;
             width: auto;
+            max-width: 220px;
             object-fit: contain;
         }
 
+        [data-theme="dark"] .brand-logo {
+            background: #ffffff;
+            padding: 4px 8px;
+            border-radius: 6px;
+        }
+
+        .brand-divider {
+            height: 28px;
+            width: 1px;
+            background: var(--border-color);
+        }
+
+        .brand-info {
+            display: flex;
+            flex-direction: column;
+            gap: 0.1rem;
+        }
+
         .brand .brand-text {
-            font-size: 1.35rem;
-            color: var(--text-primary);
+            font-size: 1.15rem;
+            font-weight: 800;
+            color: var(--accent);
+            letter-spacing: -0.01em;
+            line-height: 1.2;
             white-space: nowrap;
+        }
+
+        [data-theme="dark"] .brand .brand-text {
+            color: #ffffff;
+        }
+
+        .brand-subtext {
+            font-size: 0.72rem;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
         }
 
         .nav-right {
             display: flex;
             align-items: center;
+            gap: 1rem;
             height: 100%;
         }
 
+        /* ─── SSE Live Indicator ─── */
         .sse-indicator {
-            display: flex;
+            display: inline-flex;
             align-items: center;
-            gap: 0.5rem;
-            height: 100%;
-            padding: 0 1.5rem;
-            font-size: 0.8rem;
+            gap: 0.55rem;
+            padding: 0.45rem 0.95rem;
+            border-radius: 9999px;
+            font-size: 0.78rem;
             font-weight: 600;
+            letter-spacing: 0.04em;
             text-transform: uppercase;
-            border-left: var(--border-width) solid var(--border-color);
-            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            background: var(--bg-subtle);
+            color: var(--text-secondary);
+            transition: all 0.25s ease;
         }
 
         .sse-indicator .dot {
-            width: 8px; height: 8px;
+            width: 8px;
+            height: 8px;
             border-radius: 50%;
-            background: var(--text-secondary);
+            background: var(--text-muted);
+            position: relative;
         }
 
-        .sse-indicator.connected .dot { background: var(--success); }
-        .sse-indicator.error .dot { background: var(--danger); }
+        .sse-indicator.connected {
+            border-color: rgba(0, 193, 161, 0.4);
+            background: var(--brand-teal-light);
+            color: #007d68;
+        }
+
+        [data-theme="dark"] .sse-indicator.connected {
+            color: var(--brand-teal);
+            background: rgba(0, 214, 179, 0.12);
+        }
+
+        .sse-indicator.connected .dot {
+            background: var(--brand-teal);
+            box-shadow: 0 0 0 0 rgba(0, 193, 161, 0.7);
+            animation: pulse-ring 2s infinite;
+        }
+
+        .sse-indicator.error {
+            border-color: rgba(225, 29, 72, 0.35);
+            background: rgba(225, 29, 72, 0.08);
+            color: var(--danger);
+        }
+
+        .sse-indicator.error .dot {
+            background: var(--danger);
+        }
+
+        @keyframes pulse-ring {
+            0% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(0, 193, 161, 0.7);
+            }
+
+            70% {
+                transform: scale(1);
+                box-shadow: 0 0 0 6px rgba(0, 193, 161, 0);
+            }
+
+            100% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(0, 193, 161, 0);
+            }
+        }
 
         /* ─── Theme Toggle ─── */
         .theme-toggle {
-            width: 72px;
-            height: 100%;
-            background: transparent;
-            border: none;
-            border-left: var(--border-width) solid var(--border-color);
+            width: 40px;
+            height: 40px;
+            background: var(--bg-subtle);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
             position: relative;
-            transition: background-color 0.2s;
+            transition: all 0.2s ease;
+            color: var(--text-primary);
         }
 
         .theme-toggle:hover {
-            background-color: var(--accent);
+            background: var(--accent-light);
+            border-color: var(--accent);
+            color: var(--accent);
+            transform: translateY(-1px);
         }
-        
-        .theme-toggle:hover svg { stroke: #fff; }
 
         .theme-toggle svg {
-            width: 20px;
-            height: 20px;
-            stroke: var(--text-primary);
+            width: 19px;
+            height: 19px;
+            stroke: currentColor;
             fill: none;
-            stroke-width: 1.5;
+            stroke-width: 1.8;
             stroke-linecap: round;
             stroke-linejoin: round;
             position: absolute;
-            transition: transform 0.3s, stroke 0.2s;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
         }
 
-        .theme-toggle .icon-sun { opacity: 0; transform: scale(0); }
-        .theme-toggle .icon-moon { opacity: 1; transform: scale(1); }
+        .theme-toggle .icon-sun {
+            opacity: 0;
+            transform: scale(0.4) rotate(-90deg);
+        }
 
-        [data-theme="light"] .theme-toggle .icon-sun { opacity: 1; transform: scale(1); }
-        [data-theme="light"] .theme-toggle .icon-moon { opacity: 0; transform: scale(0); }
+        .theme-toggle .icon-moon {
+            opacity: 1;
+            transform: scale(1) rotate(0);
+        }
 
+        [data-theme="light"] .theme-toggle .icon-sun {
+            opacity: 1;
+            transform: scale(1) rotate(0);
+        }
+
+        [data-theme="light"] .theme-toggle .icon-moon {
+            opacity: 0;
+            transform: scale(0.4) rotate(90deg);
+        }
+
+        /* ─── Partner Brand Badge ─── */
         .partner-brand {
             display: flex;
             align-items: center;
-            height: 100%;
-            padding: 0 2rem;
-            border-left: var(--border-width) solid var(--border-color);
+            gap: 0.6rem;
+            padding: 0.4rem 0.8rem;
+            border-radius: 8px;
+            background: var(--bg-subtle);
+            border: 1px solid var(--border-color);
         }
 
-        /* ─── Main Layout ─── */
+        .partner-badge-text {
+            font-size: 0.72rem;
+            font-weight: 700;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        /* ─── Main Dashboard Layout ─── */
         .dashboard {
             display: grid;
-            grid-template-columns: 1fr 450px;
-            min-height: 100vh;
-            padding-top: 72px;
+            grid-template-columns: 1fr 440px;
+            gap: 2rem;
+            max-width: 1600px;
+            margin: 0 auto;
+            min-height: calc(100vh - 72px);
+            padding: calc(72px + 2rem) 2rem 2rem 2rem;
         }
 
-        /* ─── Left: Call History ─── */
+        /* ─── Left: History Zone ─── */
         .history-zone {
             display: flex;
             flex-direction: column;
-            border-right: var(--border-width) solid var(--border-color);
-            background: var(--bg-primary);
+            gap: 1.5rem;
+            min-width: 0;
         }
 
         .section-header {
             display: flex;
-            align-items: center;
+            align-items: flex-end;
             justify-content: space-between;
-            padding: 2rem;
-            border-bottom: var(--border-width) solid var(--border-color);
+            padding-bottom: 1.25rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .section-header-left {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
         }
 
         .section-title {
-            font-size: 3.5rem;
-            line-height: 1;
+            font-size: 2.25rem;
+            font-weight: 800;
+            line-height: 1.1;
             color: var(--text-primary);
+            letter-spacing: -0.03em;
+        }
+
+        .section-subtitle {
+            font-size: 0.92rem;
+            color: var(--text-secondary);
+            font-weight: 500;
         }
 
         .active-badge {
             display: inline-flex;
             align-items: center;
-            gap: 0.5rem;
-            padding: 0.25rem 0.75rem;
-            font-size: 0.85rem;
-            font-weight: 600;
+            gap: 0.55rem;
+            padding: 0.45rem 1rem;
+            font-size: 0.82rem;
+            font-weight: 700;
             text-transform: uppercase;
-            border: var(--border-width) solid var(--border-color);
-            background: var(--bg-primary);
-            color: var(--text-primary);
+            letter-spacing: 0.04em;
+            border-radius: 9999px;
+            border: 1px solid rgba(0, 193, 161, 0.4);
+            background: var(--brand-teal-light);
+            color: #007d68;
+            box-shadow: 0 2px 8px rgba(0, 193, 161, 0.15);
+        }
+
+        [data-theme="dark"] .active-badge {
+            color: var(--brand-teal);
+            background: rgba(0, 214, 179, 0.15);
         }
 
         .active-badge .pulse-dot {
-            width: 8px; height: 8px;
+            width: 8px;
+            height: 8px;
             border-radius: 50%;
-            background: var(--success);
-            animation: blink 1s step-end infinite;
+            background: var(--brand-teal);
+            animation: pulse-ring 1.5s infinite;
         }
-
-        @keyframes blink { 50% { opacity: 0; } }
 
         .call-list {
             display: flex;
             flex-direction: column;
+            gap: 1rem;
             flex: 1;
             overflow-y: auto;
+            padding-right: 0.3rem;
         }
 
-        .call-list::-webkit-scrollbar { width: 8px; }
-        .call-list::-webkit-scrollbar-track { background: var(--bg-primary); border-left: var(--border-width) solid var(--border-color); }
-        .call-list::-webkit-scrollbar-thumb { background: var(--border-color); }
+        .call-list::-webkit-scrollbar {
+            width: 6px;
+        }
 
+        .call-list::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .call-list::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 9999px;
+        }
+
+        .call-list::-webkit-scrollbar-thumb:hover {
+            background: var(--text-muted);
+        }
+
+        /* ─── Empty State ─── */
         .empty-state {
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            padding: 6rem 2rem;
-            color: var(--text-primary);
+            padding: 5rem 2rem;
+            color: var(--text-secondary);
             text-align: center;
-            flex: 1;
+            background: var(--bg-secondary);
+            border: 1.5px dashed var(--border-color);
+            border-radius: 16px;
+            margin-top: 0.5rem;
         }
 
-        .empty-icon {
-            font-size: 3rem;
-            margin-bottom: 1.5rem;
-            opacity: 0.5;
+        .empty-icon-wrap {
+            width: 64px;
+            height: 64px;
+            border-radius: 16px;
+            background: var(--accent-light);
+            color: var(--accent);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1.25rem;
         }
 
-        .empty-state p {
-            font-size: 1.25rem;
-            font-family: "Syne", sans-serif;
+        .empty-icon-wrap svg {
+            width: 32px;
+            height: 32px;
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 1.8;
+            stroke-linecap: round;
+            stroke-linejoin: round;
         }
 
-        /* ─── Call Card ─── */
+        .empty-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 0.4rem;
+        }
+
+        .empty-desc {
+            font-size: 0.9rem;
+            max-width: 360px;
+            line-height: 1.5;
+            color: var(--text-muted);
+        }
+
+        /* ─── Call Entry Card ─── */
         .call-entry {
             display: grid;
-            grid-template-columns: 2fr 3fr 1fr;
+            grid-template-columns: 260px 1fr 110px;
             align-items: center;
-            padding: 1.5rem 2rem;
-            border-bottom: var(--border-width) solid var(--border-color);
-            background: var(--bg-primary);
-            transition: background-color 0.2s;
+            gap: 1.5rem;
+            padding: 1.25rem 1.5rem;
+            border-radius: 14px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-card);
+            box-shadow: var(--card-shadow);
+            transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
         }
 
         .call-entry:hover {
-            background: var(--bg-secondary);
+            transform: translateY(-2px);
+            box-shadow: var(--card-shadow-hover);
+            border-color: rgba(0, 90, 171, 0.35);
         }
 
         .call-entry.ended {
-            opacity: 0.5;
-            background: var(--bg-primary);
+            opacity: 0.65;
+            background: var(--bg-secondary);
+            box-shadow: none;
+        }
+
+        .call-entry.ended:hover {
+            opacity: 0.9;
         }
 
         .call-entry-info {
             display: flex;
             align-items: center;
-            gap: 1.25rem;
+            gap: 1rem;
+            min-width: 0;
         }
 
         .caller-avatar {
-            width: 48px; height: 48px;
-            background: var(--text-primary);
-            color: var(--bg-primary);
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #005aab 0%, #002d59 100%);
+            color: #ffffff;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-family: "Syne", sans-serif;
             font-weight: 700;
-            font-size: 1.1rem;
+            font-size: 1.15rem;
+            letter-spacing: -0.02em;
+            box-shadow: 0 4px 10px rgba(0, 90, 171, 0.25);
+            flex-shrink: 0;
         }
-        
+
+        [data-theme="dark"] .caller-avatar {
+            background: linear-gradient(135deg, #1e88e5 0%, #0d47a1 100%);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+        }
+
         .call-entry.ended .caller-avatar {
-            background: transparent;
-            color: var(--text-primary);
-            border: var(--border-width) solid var(--border-color);
+            background: var(--bg-subtle);
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+            box-shadow: none;
         }
 
         .caller-details {
             display: flex;
             flex-direction: column;
             gap: 0.25rem;
+            min-width: 0;
         }
 
         .caller-name {
-            font-family: "Syne", sans-serif;
             font-weight: 700;
-            font-size: 1.25rem;
+            font-size: 1.1rem;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            line-height: 1.25;
         }
 
         .caller-phone {
+            font-family: "JetBrains Mono", monospace;
             font-weight: 500;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             color: var(--text-secondary);
+            letter-spacing: -0.01em;
         }
 
         /* ─── Status Pill ─── */
         .status-pill {
             display: inline-flex;
             align-items: center;
-            gap: 0.5rem;
-            font-size: 0.75rem;
-            font-weight: 600;
+            gap: 0.4rem;
+            font-size: 0.72rem;
+            font-weight: 700;
             text-transform: uppercase;
-            padding: 0.25rem 0.5rem;
-            border: var(--border-width) solid var(--border-color);
-            background: transparent;
-            color: var(--text-primary);
+            letter-spacing: 0.05em;
+            padding: 0.25rem 0.65rem;
+            border-radius: 9999px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-subtle);
+            color: var(--text-secondary);
             width: max-content;
+            margin-top: 0.15rem;
         }
 
         .status-pill .pill-dot {
-            width: 6px; height: 6px;
+            width: 6px;
+            height: 6px;
             border-radius: 50%;
         }
 
-        .status-pill.queued .pill-dot { background: var(--text-secondary); }
-        .status-pill.ringing .pill-dot { background: var(--warning); }
-        .status-pill.connected .pill-dot { background: var(--success); }
-        .status-pill.ended .pill-dot { background: var(--text-secondary); }
-        .status-pill.failed .pill-dot { background: var(--danger); }
-        .status-pill.transferring .pill-dot { background: var(--gold-primary); }
+        .status-pill.queued {
+            border-color: var(--border-color);
+            background: var(--bg-subtle);
+            color: var(--text-secondary);
+        }
 
-        /* ─── Call Progress Steps (Editorial Pipeline) ─── */
+        .status-pill.queued .pill-dot {
+            background: var(--text-muted);
+        }
+
+        .status-pill.ringing {
+            border-color: rgba(217, 119, 6, 0.35);
+            background: rgba(217, 119, 6, 0.1);
+            color: #b45309;
+        }
+
+        [data-theme="dark"] .status-pill.ringing {
+            color: #fcd34d;
+        }
+
+        .status-pill.ringing .pill-dot {
+            background: var(--warning);
+            animation: blink 1s infinite;
+        }
+
+        .status-pill.connected {
+            border-color: rgba(0, 193, 161, 0.4);
+            background: var(--brand-teal-light);
+            color: #007d68;
+        }
+
+        [data-theme="dark"] .status-pill.connected {
+            color: var(--brand-teal);
+        }
+
+        .status-pill.connected .pill-dot {
+            background: var(--brand-teal);
+            animation: pulse-ring 1.8s infinite;
+        }
+
+        .status-pill.transferring {
+            border-color: rgba(0, 90, 171, 0.35);
+            background: var(--accent-light);
+            color: var(--accent);
+        }
+
+        .status-pill.transferring .pill-dot {
+            background: var(--accent);
+        }
+
+        .status-pill.ended {
+            border-color: var(--border-color);
+            background: var(--bg-subtle);
+            color: var(--text-muted);
+        }
+
+        .status-pill.ended .pill-dot {
+            background: var(--text-muted);
+        }
+
+        .status-pill.failed {
+            border-color: rgba(225, 29, 72, 0.35);
+            background: rgba(225, 29, 72, 0.08);
+            color: var(--danger);
+        }
+
+        .status-pill.failed .pill-dot {
+            background: var(--danger);
+        }
+
+        /* ─── Call Progress Pipeline ─── */
         .call-progress {
             display: flex;
             align-items: center;
-            gap: 1.5rem;
-            padding: 0 1rem;
+            justify-content: center;
+            gap: 0.75rem;
+            padding: 0.5rem 1rem;
+            background: var(--bg-subtle);
+            border-radius: 10px;
+            border: 1px solid var(--border-subtle);
         }
 
         .progress-step {
             display: flex;
             align-items: center;
-            gap: 0.5rem;
-            color: var(--neutral);
+            gap: 0.35rem;
+            color: var(--text-muted);
+            font-size: 0.76rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            transition: color 0.2s ease;
         }
 
-        .progress-step.reached { color: var(--text-primary); }
-        .progress-step.current { color: var(--accent); font-weight: 600; }
-        .progress-step.failed-step { color: var(--danger); }
-        .call-entry.ended .progress-step { color: var(--text-primary); }
-        .call-entry.ended .progress-step:not(.reached) { color: var(--text-secondary); }
+        .progress-step.reached {
+            color: var(--text-primary);
+            font-weight: 700;
+        }
+
+        .progress-step.current {
+            color: var(--accent);
+            font-weight: 800;
+        }
+
+        [data-theme="dark"] .progress-step.current {
+            color: var(--brand-teal);
+        }
+
+        .progress-step.failed-step {
+            color: var(--danger);
+            font-weight: 700;
+        }
 
         .step-label {
-            font-size: 0.8rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
+            white-space: nowrap;
         }
 
         .step-arrow {
-            color: var(--neutral);
-            font-size: 0.8rem;
+            color: var(--border-color);
+            font-size: 0.85rem;
+            line-height: 1;
         }
-        .progress-step.reached + .step-arrow { color: var(--text-primary); }
-        .call-entry.ended .step-arrow { color: var(--text-secondary); }
 
-        /* ─── Call Meta Row ─── */
+        .progress-step.reached+.step-arrow {
+            color: var(--accent);
+        }
+
+        [data-theme="dark"] .progress-step.reached+.step-arrow {
+            color: var(--brand-teal);
+        }
+
+        .call-entry.ended .step-arrow {
+            color: var(--text-muted);
+        }
+
+        /* ─── Call Meta ─── */
         .call-meta {
             display: flex;
             flex-direction: column;
             align-items: flex-end;
-            gap: 0.5rem;
+            justify-content: center;
+            gap: 0.35rem;
             text-align: right;
         }
 
         .meta-time {
-            font-size: 0.8rem;
-            color: var(--text-secondary);
+            font-size: 0.78rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            font-family: "JetBrains Mono", monospace;
         }
 
         .live-timer {
-            font-family: "Syne", sans-serif;
-            font-size: 1.25rem;
-            color: var(--accent);
+            font-family: "JetBrains Mono", monospace;
+            font-size: 1.15rem;
             font-weight: 700;
-        }
-        
-        .call-entry.ended .live-timer {
-            color: var(--text-primary);
+            color: var(--brand-teal);
+            letter-spacing: -0.02em;
+            background: var(--brand-teal-light);
+            padding: 0.2rem 0.5rem;
+            border-radius: 6px;
+            border: 1px solid rgba(0, 193, 161, 0.25);
         }
 
-        /* ─── Right: Dispatch Form ─── */
+        [data-theme="dark"] .live-timer {
+            background: rgba(0, 214, 179, 0.12);
+        }
+
+        .call-entry.ended .live-timer {
+            color: var(--text-muted);
+            background: var(--bg-subtle);
+            border-color: var(--border-color);
+        }
+
+        /* ─── Right: Dispatch Console ─── */
         .dispatch-zone {
             display: flex;
             flex-direction: column;
-            background: var(--bg-secondary);
             position: sticky;
-            top: 72px;
-            height: calc(100vh - 72px);
+            top: calc(72px + 2rem);
+            height: fit-content;
         }
 
         .dispatch-card {
-            padding: 3rem;
-            flex: 1;
+            background: var(--bg-secondary);
+            border-radius: 18px;
+            border: 1px solid var(--border-color);
+            box-shadow: var(--card-shadow);
+            padding: 2.25rem;
             display: flex;
             flex-direction: column;
+            gap: 1.75rem;
+        }
+
+        .dispatch-card-header {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
         }
 
         .card-badge {
-            display: inline-block;
-            font-size: 0.8rem;
-            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.72rem;
+            font-weight: 800;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
+            letter-spacing: 0.08em;
             color: var(--accent);
-            margin-bottom: 2rem;
-            border-bottom: var(--border-width) solid var(--accent);
-            padding-bottom: 0.25rem;
+            background: var(--accent-light);
+            border: 1px solid rgba(0, 90, 171, 0.2);
+            padding: 0.3rem 0.75rem;
+            border-radius: 6px;
             width: max-content;
         }
 
+        [data-theme="dark"] .card-badge {
+            color: #38bdf8;
+            background: rgba(56, 189, 248, 0.12);
+            border-color: rgba(56, 189, 248, 0.25);
+        }
+
         .dispatch-card h2 {
-            font-size: 3rem;
-            line-height: 1;
-            margin-bottom: 1rem;
+            font-size: 1.85rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            letter-spacing: -0.02em;
+            line-height: 1.15;
         }
 
         .dispatch-card .subtitle {
-            font-size: 1rem;
+            font-size: 0.88rem;
             color: var(--text-secondary);
-            margin-bottom: 3rem;
+            line-height: 1.45;
         }
 
         .dispatch-form {
             display: flex;
             flex-direction: column;
-            gap: 2rem;
-            flex: 1;
+            gap: 1.25rem;
         }
 
         .input-group {
             display: flex;
             flex-direction: column;
-            gap: 0.5rem;
+            gap: 0.45rem;
             position: relative;
         }
 
         .input-group label {
-            font-size: 0.85rem;
-            font-weight: 600;
+            font-size: 0.78rem;
+            font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.05em;
+            color: var(--text-secondary);
+        }
+
+        .input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
         }
 
         .input-group input {
             width: 100%;
-            height: 60px;
-            background: transparent;
+            height: 52px;
+            background: var(--bg-primary);
             color: var(--text-primary);
-            border: none;
-            border-bottom: var(--border-width) solid var(--text-primary);
-            font-family: "Space Grotesk", sans-serif;
-            font-size: 1.5rem;
+            border: 1.5px solid var(--border-color);
+            border-radius: 10px;
+            font-family: "Montserrat", sans-serif;
+            font-size: 1.05rem;
+            font-weight: 500;
+            padding: 0 1rem;
             outline: none;
-            border-radius: 0;
-            transition: border-color 0.2s;
-            padding: 0;
+            transition: all 0.2s ease;
         }
 
         .input-group input:focus {
-            border-bottom-color: var(--accent);
+            border-color: var(--accent);
+            box-shadow: var(--focus-ring);
+            background: var(--bg-surface);
         }
-        
+
         .input-group input::placeholder {
-            color: var(--neutral);
+            color: var(--text-muted);
+            font-weight: 400;
         }
 
         .input-error {
-            font-size: 0.8rem;
-            color: var(--accent);
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--danger);
             position: absolute;
-            bottom: -1.5rem;
-            left: 0;
+            bottom: -1.25rem;
+            left: 0.2rem;
             display: none;
         }
-        
-        .input-error.show { display: block; }
 
+        .input-error.show {
+            display: block;
+        }
+
+        /* ─── Dispatch Button ─── */
         .dispatch-btn {
-            height: 80px;
-            background: var(--accent);
+            height: 56px;
+            background: linear-gradient(135deg, #005aab 0%, #004585 100%);
             color: #ffffff;
             border: none;
-            font-family: "Syne", sans-serif;
+            border-radius: 12px;
+            font-family: "Montserrat", sans-serif;
             font-weight: 700;
-            font-size: 1.5rem;
-            text-transform: uppercase;
+            font-size: 1.05rem;
+            letter-spacing: 0.02em;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 0 2rem;
-            margin-top: auto;
-            transition: background-color 0.2s;
+            padding: 0 1.5rem;
+            margin-top: 0.5rem;
+            box-shadow: 0 4px 16px rgba(0, 90, 171, 0.3);
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        [data-theme="dark"] .dispatch-btn {
+            background: linear-gradient(135deg, #1e88e5 0%, #1565c0 100%);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
         }
 
         .dispatch-btn:hover {
-            background: var(--accent-hover);
+            background: linear-gradient(135deg, #006dd0 0%, #003666 100%);
+            box-shadow: 0 8px 24px rgba(0, 90, 171, 0.45);
+            transform: translateY(-1px);
+        }
+
+        .dispatch-btn:active {
+            transform: translateY(0);
         }
 
         .dispatch-btn:disabled {
             background: var(--neutral);
-            color: var(--text-secondary);
+            color: var(--text-muted);
             cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
         }
 
         .dispatch-btn .spinner {
             display: none;
-            width: 24px; height: 24px;
-            border: 2px solid rgba(255,255,255,0.3);
+            width: 22px;
+            height: 22px;
+            border: 2.5px solid rgba(255, 255, 255, 0.3);
             border-top-color: #ffffff;
             border-radius: 50%;
-            animation: spin 0.8s linear infinite;
+            animation: spin 0.75s linear infinite;
         }
 
-        .dispatch-btn.loading .spinner { display: block; }
-        .dispatch-btn.loading .btn-icon { display: none; }
+        .dispatch-btn.loading .spinner {
+            display: block;
+        }
+
+        .dispatch-btn.loading .btn-icon {
+            display: none;
+        }
+
+        .dispatch-btn .btn-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s ease;
+        }
+
+        .dispatch-btn:hover .btn-icon {
+            transform: translateX(3px);
+        }
 
         .dispatch-btn .btn-icon svg {
-            width: 32px; height: 32px;
+            width: 24px;
+            height: 24px;
             stroke: currentColor;
             fill: none;
-            stroke-width: 1.5;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        /* ─── Institutional Info Note ─── */
+        .university-info-box {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.85rem;
+            padding: 1rem;
+            border-radius: 10px;
+            background: var(--bg-subtle);
+            border: 1px solid var(--border-subtle);
+            font-size: 0.8rem;
+            line-height: 1.45;
+            color: var(--text-secondary);
+        }
+
+        .university-info-box svg {
+            width: 20px;
+            height: 20px;
+            color: var(--accent);
+            flex-shrink: 0;
+            margin-top: 1px;
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 2;
             stroke-linecap: round;
             stroke-linejoin: round;
         }
 
         /* ─── Animations ─── */
-        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
 
-        /* ─── Responsive ─── */
+        @keyframes blink {
+            50% {
+                opacity: 0.3;
+            }
+        }
+
+        /* ─── Responsive Adjustments ─── */
         @media (max-width: 1200px) {
-            .dashboard { grid-template-columns: 1fr 400px; }
-            .section-title, .dispatch-card h2 { font-size: 2.5rem; }
-            .call-entry { grid-template-columns: 2fr 2fr 1fr; padding: 1.5rem; }
-            .call-progress { display: none; /* Hide progress pipeline on medium screens */ }
+            .dashboard {
+                grid-template-columns: 1fr 380px;
+                gap: 1.5rem;
+                padding-top: calc(72px + 1.5rem);
+            }
+
+            .section-title {
+                font-size: 2rem;
+            }
+
+            .call-entry {
+                grid-template-columns: 220px 1fr 100px;
+                padding: 1rem 1.25rem;
+            }
         }
 
-        @media (max-width: 900px) {
-            .dashboard { display: flex; flex-direction: column; }
-            .history-zone { border-right: none; border-bottom: var(--border-width) solid var(--border-color); }
-            .dispatch-zone { position: static; height: auto; border-top: var(--border-width) solid var(--border-color); }
-            .call-list { overflow: visible; }
+        @media (max-width: 992px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+                gap: 2rem;
+            }
+
+            .dispatch-zone {
+                position: static;
+                order: -1;
+            }
+
+            .top-nav {
+                padding: 0 1.25rem;
+            }
+
+            .brand-subtext {
+                display: none;
+            }
         }
 
-        @media (max-width: 600px) {
-            .call-entry { grid-template-columns: 1fr; gap: 1rem; }
-            .call-meta { align-items: flex-start; text-align: left; flex-direction: row; justify-content: space-between; width: 100%; }
-            .brand { padding: 0 1rem; }
-            .sse-indicator { display: none; }
+        @media (max-width: 680px) {
+            .dashboard {
+                padding: calc(72px + 1rem) 1rem 1rem 1rem;
+            }
+
+            .call-entry {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+
+            .call-progress {
+                justify-content: flex-start;
+                overflow-x: auto;
+            }
+
+            .call-meta {
+                align-items: flex-start;
+                text-align: left;
+                flex-direction: row;
+                justify-content: space-between;
+                width: 100%;
+            }
+
+            .partner-brand {
+                display: none;
+            }
+
+            .brand-divider {
+                display: none;
+            }
+        }
+
+        /* Filter Bar */
+        .filter-bar {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-bottom: 24px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            transition: box-shadow 0.2s;
+        }
+
+        .filter-bar:hover {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.025);
+        }
+
+        .filter-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .filter-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .filter-icon {
+            display: flex;
+            align-items: center;
+            color: var(--text-muted);
+        }
+
+        .filter-to {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .filter-select,
+        .filter-input {
+            padding: 10px 14px;
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            font-weight: 500;
+            outline: none;
+            transition: all 0.2s ease;
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.01);
+        }
+
+        .filter-select:focus,
+        .filter-input:focus {
+            border-color: var(--accent);
+            box-shadow: var(--focus-ring);
+            background: var(--bg-surface);
+        }
+
+        .search-group {
+            flex: 1;
+            min-width: 180px;
+        }
+
+        .input-with-icon {
+            position: relative;
+            display: flex;
+            align-items: center;
+            width: 100%;
+        }
+
+        .input-with-icon .input-icon {
+            position: absolute;
+            left: 12px;
+            color: var(--text-muted);
+            pointer-events: none;
+        }
+
+        .filter-input-with-icon {
+            width: 100%;
+            padding-left: 36px;
+        }
+
+        .btn-apply-filters {
+            padding: 10px 24px;
+            background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            margin-left: auto;
+        }
+
+        .btn-apply-filters:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        .btn-apply-filters:active {
+            transform: translateY(0);
+        }
+
+        /* Custom Date Picker */
+        .date-picker-wrapper {
+            position: relative;
+        }
+
+        .date-picker-btn {
+            padding: 10px 16px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 240px;
+            transition: all 0.2s ease;
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.01);
+        }
+
+        .date-picker-btn:hover {
+            border-color: var(--accent);
+            background: var(--bg-surface);
+        }
+
+        .date-picker-btn svg {
+            color: var(--accent);
+        }
+
+        .date-picker-popup {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            margin-top: 8px;
+            background: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.15);
+            padding: 16px;
+            z-index: 100;
+            display: none;
+            flex-direction: column;
+            gap: 16px;
+            min-width: 500px;
+        }
+
+        .date-picker-popup.show {
+            display: flex;
+        }
+
+        .dp-presets {
+            display: flex;
+            gap: 8px;
+            border-bottom: 1px solid var(--border-subtle);
+            padding-bottom: 12px;
+        }
+
+        .dp-preset {
+            background: none;
+            border: none;
+            color: var(--accent);
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+
+        .dp-preset:hover {
+            text-decoration: underline;
+        }
+
+        .dp-calendars {
+            display: flex;
+            gap: 20px;
+        }
+
+        .dp-calendar {
+            flex: 1;
+        }
+
+        .dp-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .dp-nav {
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+
+        .dp-nav:hover {
+            background: var(--bg-subtle);
+        }
+
+        .dp-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 2px;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+
+        .dp-day-name {
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            margin-bottom: 8px;
+        }
+
+        .dp-day {
+            padding: 6px 0;
+            cursor: pointer;
+            border-radius: 4px;
+            color: var(--text-primary);
+        }
+
+        .dp-day:hover:not(.empty) {
+            background: var(--bg-subtle);
+        }
+
+        .dp-day.empty {
+            cursor: default;
+        }
+
+        .dp-day.in-range {
+            background: var(--accent-light);
+            border-radius: 0;
+        }
+
+        .dp-day.selected {
+            background: var(--accent);
+            color: white;
+        }
+
+        .dp-inputs {
+            display: flex;
+            gap: 20px;
+            border-top: 1px solid var(--border-subtle);
+            padding-top: 12px;
+        }
+
+        .dp-inputs div {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            flex: 1;
+        }
+
+        .dp-inputs label {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .dp-inputs input {
+            padding: 8px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            outline: none;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+
+        .dp-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            margin-top: 8px;
+        }
+
+        .btn-cancel {
+            padding: 8px 16px;
+            background: none;
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        .btn-apply {
+            padding: 8px 16px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .load-more-btn {
+            width: 100%;
+            padding: 12px;
+            margin-top: 16px;
+            background: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-secondary);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .load-more-btn:hover {
+            background: var(--bg-subtle);
+            color: var(--text-primary);
+        }
+
+        /* History indicator on cards */
+        .call-entry.is-history {
+            opacity: 0.9;
+        }
+
+        .call-entry.is-history .caller-name::after {
+            content: " • History";
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-weight: normal;
         }
     </style>
 </head>
 
 <body>
-    <!-- Nav -->
+    <!-- Top Institutional Navbar -->
     <nav class="top-nav">
-        <div class="brand">
-            <span class="brand-text">AU Admission Assist</span>
+        <div class="brand-container">
+            <div class="brand">
+                <img src="/AU_Logo.png?v=2" alt="Adamas University" class="brand-logo"
+                    onerror="this.onerror=null;this.src='AU_Logo.png'">
+                <div class="brand-divider"></div>
+                <div class="brand-info">
+                    <span class="brand-text">AU Admission Assist</span>
+                    <span class="brand-subtext">Admissions AI Voice Operations</span>
+                </div>
+            </div>
         </div>
+
         <div class="nav-right">
             <div class="sse-indicator" id="sseIndicator">
                 <span class="dot"></span>
                 <span id="sseLabel">Connecting</span>
             </div>
             <button class="theme-toggle" id="themeToggle" title="Toggle theme" aria-label="Toggle dark/light mode">
-                <svg class="icon-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-                <svg class="icon-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+                <svg class="icon-moon" viewBox="0 0 24 24">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                </svg>
+                <svg class="icon-sun" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="5" />
+                    <line x1="12" y1="1" x2="12" y2="3" />
+                    <line x1="12" y1="21" x2="12" y2="23" />
+                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                    <line x1="1" y1="12" x2="3" y2="12" />
+                    <line x1="21" y1="12" x2="23" y2="12" />
+                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+                </svg>
             </button>
-            <div class="partner-brand">
-                <img src="/atc.png" alt="Adamas Tech" class="brand-logo" style="height: 24px;">
+            <div class="partner-brand" title="Adamas Tech Consulting Pvt. Ltd.">
+                <img src="/atc.png" alt="ATC" class="brand-logo" style="height: 20px; width: auto;">
+                <span class="partner-badge-text">ATC</span>
             </div>
         </div>
     </nav>
 
+    <!-- Main Dashboard Container -->
     <main class="dashboard">
-        <!-- Left: Call List -->
+        <!-- Left: Call Feed / Live Telemetry -->
         <section class="history-zone">
             <div class="section-header">
-                <h1 class="section-title">Call Feed</h1>
+                <div class="section-header-left">
+                    <h1 class="section-title">Call Feed</h1>
+                    <span class="section-subtitle">Real-time admissions outreach & AI dialogue telemetry</span>
+                </div>
                 <span class="active-badge" id="activeBadge" style="display: none;">
                     <span class="pulse-dot"></span>
                     <span id="activeCount">0</span> Live
                 </span>
             </div>
+
+            <!-- Filter Bar -->
+            <div class="filter-bar">
+                <div class="filter-row">
+                    <div class="filter-group date-picker-wrapper">
+                        <button class="date-picker-btn" id="datePickerBtn">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                                <line x1="16" y1="2" x2="16" y2="6"></line>
+                                <line x1="8" y1="2" x2="8" y2="6"></line>
+                                <line x1="3" y1="10" x2="21" y2="10"></line>
+                            </svg>
+                            <span id="dateRangeDisplay">All Time</span>
+                        </button>
+                        <div class="date-picker-popup" id="datePickerPopup">
+                            <div class="dp-presets">
+                                <button type="button" class="dp-preset" data-preset="today">Today</button>
+                                <button type="button" class="dp-preset" data-preset="yesterday">Yesterday</button>
+                                <button type="button" class="dp-preset" data-preset="last7">Last 7 Days</button>
+                                <button type="button" class="dp-preset" data-preset="thisMonth">This Month</button>
+                                <button type="button" class="dp-preset" data-preset="all">All Time</button>
+                            </div>
+                            <div class="dp-calendars">
+                                <div class="dp-calendar" id="dpCal1"></div>
+                                <div class="dp-calendar" id="dpCal2"></div>
+                            </div>
+                            <div class="dp-inputs">
+                                <div>
+                                    <label>Start date</label>
+                                    <input type="text" id="dpStartInput" placeholder="YYYY/MM/DD">
+                                </div>
+                                <div>
+                                    <label>End date</label>
+                                    <input type="text" id="dpEndInput" placeholder="YYYY/MM/DD">
+                                </div>
+                            </div>
+                            <div class="dp-actions">
+                                <button type="button" class="btn-cancel" id="dpCancel">Cancel</button>
+                                <button type="button" class="btn-apply" id="dpApply">Apply</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="filter-group">
+                        <span class="filter-label filter-icon">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <polyline points="12 6 12 12 16 14"></polyline>
+                            </svg>
+                        </span>
+                        <select id="startHour" class="filter-select">
+                            <option value="">00:00</option>
+                            <!-- JS will populate -->
+                        </select>
+                        <span class="filter-to">to</span>
+                        <select id="endHour" class="filter-select">
+                            <option value="">23:59</option>
+                            <!-- JS will populate -->
+                        </select>
+                    </div>
+
+                    <div class="filter-group search-group">
+                        <div class="input-with-icon">
+                            <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                            </svg>
+                            <input type="text" id="searchName" class="filter-input filter-input-with-icon"
+                                placeholder="Search Name...">
+                        </div>
+                    </div>
+
+                    <div class="filter-group">
+                        <select id="filterStatus" class="filter-select">
+                            <option value="all">All Statuses</option>
+                            <option value="ended">Ended (Success)</option>
+                            <option value="failed">Failed</option>
+                            <option value="queued">Queued</option>
+                            <option value="connected">Live</option>
+                        </select>
+                    </div>
+
+                    <button class="btn-apply-filters" id="btnApplyFilters">Filter</button>
+                </div>
+            </div>
+
             <div class="call-list" id="callList">
                 <div class="empty-state" id="emptyState">
-                    <div class="empty-icon">++</div>
-                    <p>No dispatch history.</p>
+                    <div class="empty-icon-wrap">
+                        <svg viewBox="0 0 24 24">
+                            <path
+                                d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                        </svg>
+                    </div>
+                    <div class="empty-title">No Active Dispatches</div>
+                    <p class="empty-desc">Outbound admissions calls triggered from the console will stream live
+                        telephonic events and conversation status here.</p>
                 </div>
             </div>
         </section>
 
-        <!-- Right: Dispatch Form -->
+        <!-- Right: Dispatch Console -->
         <section class="dispatch-zone">
             <div class="dispatch-card" id="dispatchCard">
-                <span class="card-badge">AI Agent Operations</span>
-                <h2>New Call</h2>
-                <p class="subtitle">Dispatch the voice agent.</p>
+                <div class="dispatch-card-header">
+                    <span class="card-badge">Admissions Voice Agent</span>
+                    <h2>Initiate Call</h2>
+                    <p class="subtitle">Dispatch the AI counselor to connect with prospective candidates.</p>
+                </div>
 
                 <form class="dispatch-form" id="dispatchForm" novalidate>
                     <div class="input-group">
-                        <label for="userName">Student Name</label>
-                        <input id="userName" name="userName" type="text" autocomplete="name" placeholder="Enter name" required>
+                        <label for="userName">Candidate Name</label>
+                        <div class="input-wrapper">
+                            <input id="userName" name="userName" type="text" autocomplete="name"
+                                placeholder="e.g. Rahul Sen" required>
+                        </div>
                         <div class="input-error" id="nameError"></div>
                     </div>
 
                     <div class="input-group">
-                        <label for="phoneNumber">Phone Number</label>
-                        <input id="phoneNumber" name="phoneNumber" type="tel" inputmode="numeric" autocomplete="tel" placeholder="10 digits" required>
+                        <label for="phoneNumber">Mobile Number</label>
+                        <div class="input-wrapper">
+                            <input id="phoneNumber" name="phoneNumber" type="tel" inputmode="numeric" autocomplete="tel"
+                                placeholder="10-digit mobile number" required>
+                        </div>
                         <div class="input-error" id="phoneError"></div>
                     </div>
 
                     <button class="dispatch-btn" id="dispatchBtn" type="submit">
-                        <span class="btn-label">Dispatch</span>
+                        <span class="btn-label">Dispatch Voice Agent</span>
                         <span class="btn-icon">
-                            <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                            <svg viewBox="0 0 24 24">
+                                <line x1="5" y1="12" x2="19" y2="12" />
+                                <polyline points="12 5 19 12 12 19" />
+                            </svg>
                         </span>
                         <span class="spinner" aria-hidden="true"></span>
                     </button>
                 </form>
+
+                <div class="university-info-box">
+                    <svg viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="16" x2="12" y2="12" />
+                        <line x1="12" y1="8" x2="12.01" y2="8" />
+                    </svg>
+                    <span>Adamas University automated admissions portal. Real-time voice calls powered by Adamas Tech
+                        Consulting engine.</span>
+                </div>
             </div>
         </section>
     </main>
@@ -671,7 +1664,6 @@
 
         (function initTheme() {
             const saved = localStorage.getItem("au-dash-theme");
-            // Default to light for Snowhouse Studio aesthetic
             if (saved === "dark") {
                 setTheme("dark");
             } else {
@@ -727,7 +1719,7 @@
         }
 
         function getInitials(name) {
-            if (!name || name === "Unknown") return "?";
+            if (!name || name === "Unknown") return "AU";
             const parts = name.trim().split(/\s+/);
             if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
             return parts[0][0].toUpperCase();
@@ -764,8 +1756,8 @@
             showError(nameError, "");
             showError(phoneError, "");
 
-            if (!userName) { showError(nameError, "Required"); valid = false; }
-            if (!/^\d{10}$/.test(digits)) { showError(phoneError, "Invalid 10-digit number"); valid = false; }
+            if (!userName) { showError(nameError, "Candidate name is required"); valid = false; }
+            if (!/^\d{10}$/.test(digits)) { showError(phoneError, "Please enter a valid 10-digit mobile number"); valid = false; }
             else { phoneInput.value = formatPhoneInput(digits); }
 
             return { valid, userName, phoneDigits: digits };
@@ -782,7 +1774,7 @@
 
         // ─── Progress Pipeline Builder ───
         function buildPipeline(status) {
-            const steps = ["Queued", "Ringing", "Connected", "Ended"];
+            const steps = ["Dialing", "Answered", "Live", "Ended"];
             const order = { queued: 0, ringing: 1, connected: 2, ended: 3, failed: -1, transferring: 2 };
             const currentIdx = order[status] ?? 0;
 
@@ -811,8 +1803,9 @@
             emptyState.style.display = "none";
 
             const card = document.createElement("div");
-            card.className = "call-entry";
+            card.className = "call-entry appear appear--soft";
             card.id = `call-${callId}`;
+            card.addEventListener("animationend", () => card.classList.add("is-in"), { once: true });
 
             const initials = getInitials(name);
             const displayPhone = formatPhoneDisplay(phone || "");
@@ -822,9 +1815,9 @@
                 <div class="call-entry-info">
                     <div class="caller-avatar">${escapeHtml(initials)}</div>
                     <div class="caller-details">
-                        <span class="caller-name">${escapeHtml(name || "Unknown")}</span>
+                        <span class="caller-name">${escapeHtml(name || "Prospective Student")}</span>
                         <span class="caller-phone">${escapeHtml(displayPhone)}</span>
-                        <span class="status-pill queued" id="pill-${callId}"><span class="pill-dot"></span> Dispatched</span>
+                        <span class="status-pill queued" id="pill-${callId}"><span class="pill-dot"></span> Dialing</span>
                     </div>
                 </div>
                 <div class="call-progress" id="progress-${callId}">
@@ -838,7 +1831,7 @@
             callList.prepend(card);
 
             const callData = {
-                name: name || "Unknown",
+                name: name || "Prospective Student",
                 phone: phone || "",
                 element: card,
                 status: "queued",
@@ -932,7 +1925,7 @@
             switch (type) {
                 case "call_ringing":
                     callData.status = "ringing";
-                    updatePill(effectiveId, "ringing", "Ringing");
+                    updatePill(effectiveId, "ringing", "Answered");
                     updateProgress(effectiveId, "ringing");
                     break;
                 case "call_connected":
@@ -955,7 +1948,15 @@
                 case "call_failed":
                     callData.status = "failed";
                     stopCallTimer(effectiveId);
-                    updatePill(effectiveId, "failed", "Failed");
+                    let failReason = "Failed";
+                    if (data.error) {
+                        const errStr = String(data.error).toLowerCase();
+                        if (errStr.includes("user_busy")) failReason = "Busy / Unreachable";
+                        else if (errStr.includes("no_user_response") || errStr.includes("no_answer")) failReason = "Call Not Received";
+                        else if (errStr.includes("voicemail")) failReason = "Voicemail";
+                        else failReason = "Failed";
+                    }
+                    updatePill(effectiveId, "failed", failReason);
                     updateProgress(effectiveId, "failed");
                     callData.element.classList.add("ended");
                     break;
@@ -971,11 +1972,22 @@
                 sseLabel.textContent = "Live";
             };
             evtSource.onmessage = (e) => {
-                try { handleCallEvent(JSON.parse(e.data)); } catch (err) {}
+                try { handleCallEvent(JSON.parse(e.data)); } catch (err) { }
             };
             evtSource.onerror = () => {
                 sseIndicator.className = "sse-indicator error";
                 sseLabel.textContent = "Reconnecting";
+
+                // If server disconnects, mark all live calls as failed
+                activeCalls.forEach((callData, callId) => {
+                    if (callData.status !== "ended" && callData.status !== "failed") {
+                        handleCallEvent({
+                            call_id: callId,
+                            type: "call_failed",
+                            data: { error: "Server Disconnected" }
+                        });
+                    }
+                });
             };
             return evtSource;
         }
@@ -992,7 +2004,7 @@
                 });
 
                 let payload = {};
-                try { payload = await response.json(); } catch (e) {}
+                try { payload = await response.json(); } catch (e) { }
 
                 if (!response.ok) return { ok: false, message: payload.message || "Failed to queue call.", callId: null };
                 return { ok: true, message: payload.message || "Call queued.", callId: payload.call_uuid || null };
@@ -1031,6 +2043,318 @@
             userNameInput.value = "";
             phoneInput.value = "";
         });
+
+        // --- Date Picker Logic ---
+        let dpStartDate = null;
+        let dpEndDate = null;
+        let dpCurrentMonth = new Date();
+        dpCurrentMonth.setDate(1); // normalized
+
+        function formatYMD(date) {
+            if (!date) return "";
+            const y = date.getFullYear();
+            const m = String(date.getMonth() + 1).padStart(2, '0');
+            const d = String(date.getDate()).padStart(2, '0');
+            return `${y}/${m}/${d}`;
+        }
+
+        function formatDuration(ms) {
+            if (!ms) return "";
+            const s = Math.floor(ms / 1000);
+            const mins = Math.floor(s / 60);
+            const secs = s % 60;
+            return `${mins}m ${secs}s`;
+        }
+
+        function renderCalendar(containerId, date, isRightMonth) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            const monthYear = date.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+            const prevHtml = isRightMonth ? '' : `<span class="dp-nav" id="dpPrev">&lt;</span>`;
+            const nextHtml = isRightMonth ? `<span class="dp-nav" id="dpNext">&gt;</span>` : '';
+
+            let html = `
+                <div class="dp-header">
+                    ${prevHtml}
+                    <span>${monthYear}</span>
+                    ${nextHtml}
+                </div>
+                <div class="dp-grid">
+                    <div class="dp-day-name">Su</div><div class="dp-day-name">Mo</div><div class="dp-day-name">Tu</div>
+                    <div class="dp-day-name">We</div><div class="dp-day-name">Th</div><div class="dp-day-name">Fr</div><div class="dp-day-name">Sa</div>
+            `;
+
+            const firstDay = new Date(date.getFullYear(), date.getMonth(), 1).getDay();
+            const daysInMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+
+            for (let i = 0; i < firstDay; i++) {
+                html += `<div class="dp-day empty"></div>`;
+            }
+
+            for (let i = 1; i <= daysInMonth; i++) {
+                const cellDate = new Date(date.getFullYear(), date.getMonth(), i);
+                const cellTs = cellDate.getTime();
+
+                let cls = "dp-day";
+                if (dpStartDate && dpEndDate && cellTs >= dpStartDate.getTime() && cellTs <= dpEndDate.getTime()) {
+                    cls += " in-range";
+                }
+                if (dpStartDate && cellTs === dpStartDate.getTime()) cls += " selected";
+                if (dpEndDate && cellTs === dpEndDate.getTime()) cls += " selected";
+
+                html += `<div class="${cls}" data-date="${formatYMD(cellDate)}">${i}</div>`;
+            }
+
+            html += `</div>`;
+            container.innerHTML = html;
+        }
+
+        function updateCalendars() {
+            const leftDate = new Date(dpCurrentMonth);
+            const rightDate = new Date(dpCurrentMonth);
+            rightDate.setMonth(rightDate.getMonth() + 1);
+
+            renderCalendar("dpCal1", leftDate, false);
+            renderCalendar("dpCal2", rightDate, true);
+
+            document.getElementById("dpStartInput").value = formatYMD(dpStartDate);
+            document.getElementById("dpEndInput").value = formatYMD(dpEndDate);
+
+            if (document.getElementById("dpPrev")) {
+                document.getElementById("dpPrev").onclick = (e) => {
+                    e.stopPropagation();
+                    dpCurrentMonth.setMonth(dpCurrentMonth.getMonth() - 1);
+                    updateCalendars();
+                };
+            }
+            if (document.getElementById("dpNext")) {
+                document.getElementById("dpNext").onclick = (e) => {
+                    e.stopPropagation();
+                    dpCurrentMonth.setMonth(dpCurrentMonth.getMonth() + 1);
+                    updateCalendars();
+                };
+            }
+
+            document.querySelectorAll(".dp-day:not(.empty)").forEach(el => {
+                el.onclick = (e) => {
+                    e.stopPropagation();
+                    const d = new Date(el.dataset.date);
+                    if (!dpStartDate || (dpStartDate && dpEndDate)) {
+                        dpStartDate = d;
+                        dpEndDate = null;
+                    } else if (d < dpStartDate) {
+                        dpStartDate = d;
+                        dpEndDate = null;
+                    } else {
+                        dpEndDate = d;
+                    }
+                    updateCalendars();
+                };
+            });
+        }
+
+        document.getElementById("datePickerBtn").onclick = (e) => {
+            e.stopPropagation();
+            document.getElementById("datePickerPopup").classList.toggle("show");
+            if (document.getElementById("datePickerPopup").classList.contains("show")) {
+                updateCalendars();
+            }
+        };
+
+        document.getElementById("datePickerPopup").onclick = (e) => {
+            e.stopPropagation();
+        };
+
+        document.addEventListener("click", () => {
+            document.getElementById("datePickerPopup").classList.remove("show");
+        });
+
+        document.getElementById("dpCancel").onclick = () => {
+            document.getElementById("datePickerPopup").classList.remove("show");
+        };
+
+        document.getElementById("dpApply").onclick = () => {
+            document.getElementById("datePickerPopup").classList.remove("show");
+            if (dpStartDate && dpEndDate) {
+                document.getElementById("dateRangeDisplay").textContent = `${formatYMD(dpStartDate)} - ${formatYMD(dpEndDate)}`;
+            } else if (dpStartDate) {
+                document.getElementById("dateRangeDisplay").textContent = `${formatYMD(dpStartDate)} - Ongoing`;
+            } else {
+                document.getElementById("dateRangeDisplay").textContent = `All Time`;
+            }
+            fetchHistory(false);
+        };
+
+        document.querySelectorAll(".dp-preset").forEach(btn => {
+            btn.onclick = (e) => {
+                const p = e.target.dataset.preset;
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                if (p === "today") {
+                    dpStartDate = new Date(today);
+                    dpEndDate = new Date(today);
+                } else if (p === "yesterday") {
+                    const yest = new Date(today);
+                    yest.setDate(yest.getDate() - 1);
+                    dpStartDate = new Date(yest);
+                    dpEndDate = new Date(yest);
+                } else if (p === "last7") {
+                    const past = new Date(today);
+                    past.setDate(past.getDate() - 6);
+                    dpStartDate = new Date(past);
+                    dpEndDate = new Date(today);
+                } else if (p === "thisMonth") {
+                    dpStartDate = new Date(today.getFullYear(), today.getMonth(), 1);
+                    dpEndDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+                } else if (p === "all") {
+                    dpStartDate = null;
+                    dpEndDate = null;
+                }
+
+                if (dpStartDate) {
+                    dpCurrentMonth = new Date(dpStartDate);
+                    dpCurrentMonth.setDate(1);
+                }
+                updateCalendars();
+            };
+        });
+
+        // Populate Hours
+        const startH = document.getElementById("startHour");
+        const endH = document.getElementById("endHour");
+        for (let i = 0; i < 24; i++) {
+            const h = String(i).padStart(2, '0');
+            if (i > 0) startH.innerHTML += `<option value="${i}">${h}:00</option>`;
+            if (i < 23) endH.innerHTML += `<option value="${i}">${h}:59</option>`;
+        }
+
+        function renderHistory(calls, append = false) {
+            const list = document.getElementById("callList");
+            if (!append) {
+                // Clear existing history cards only, leave live ones
+                document.querySelectorAll(".call-entry.is-history").forEach(e => e.remove());
+                if (document.getElementById("loadMoreBtn")) document.getElementById("loadMoreBtn").remove();
+            }
+
+            calls.forEach(call => {
+                // If it's already active via SSE, skip rendering a duplicate history card
+                if (activeCalls.has(call.call_uuid)) return;
+
+                const card = document.createElement("div");
+                card.className = "call-entry is-history ended appear appear--soft";
+                card.addEventListener("animationend", () => card.classList.add("is-in"), { once: true });
+
+                const initials = getInitials(call.name);
+                const displayPhone = formatPhoneDisplay(call.phone || "");
+                const timeStr = new Date(call.created_at).toLocaleString("en-IN", {
+                    month: "short", day: "numeric", hour: "2-digit", minute: "2-digit"
+                });
+
+                let pillClass = call.status;
+                let pillLabel = call.status.charAt(0).toUpperCase() + call.status.slice(1);
+
+                if (call.status === "failed") {
+                    pillLabel = call.fail_reason || "Failed";
+                }
+
+                let extraMeta = "";
+                if (call.duration_sec != null) {
+                    extraMeta += ` • ${formatDuration(call.duration_sec * 1000)}`;
+                }
+                if (call.cost) {
+                    extraMeta += ` • ${call.cost}`;
+                }
+
+                card.innerHTML = `
+                    <div class="call-entry-info">
+                        <div class="caller-avatar">${escapeHtml(initials)}</div>
+                        <div class="caller-details">
+                            <span class="caller-name">${escapeHtml(call.name || "Prospective Student")}</span>
+                            <span class="caller-phone">${escapeHtml(displayPhone)}</span>
+                            <span class="status-pill ${pillClass}"><span class="pill-dot"></span> ${escapeHtml(pillLabel)}</span>
+                        </div>
+                    </div>
+                    <div class="call-progress">
+                        ${buildPipeline(call.status)}
+                    </div>
+                    <div class="call-meta">
+                        <span class="meta-time">${timeStr}${extraMeta}</span>
+                    </div>
+                `;
+
+                list.appendChild(card);
+            });
+
+            if (emptyState.style.display !== "none" && list.children.length > 1) {
+                emptyState.style.display = "none";
+            } else if (list.children.length <= 1) {
+                emptyState.style.display = "flex";
+            }
+        }
+
+        let historyOffset = 0;
+
+        async function fetchHistory(append = false) {
+            if (!append) historyOffset = 0;
+
+            const url = new URL("/api/call-history", window.location.origin);
+            if (dpStartDate) url.searchParams.append("start_date", formatYMD(dpStartDate).replace(/\//g, "-"));
+            if (dpEndDate) url.searchParams.append("end_date", formatYMD(dpEndDate).replace(/\//g, "-"));
+
+            const sH = document.getElementById("startHour").value;
+            const eH = document.getElementById("endHour").value;
+            if (sH) url.searchParams.append("start_hour", sH);
+            if (eH) url.searchParams.append("end_hour", eH);
+
+            const name = document.getElementById("searchName").value;
+            if (name) url.searchParams.append("name", name);
+
+            const status = document.getElementById("filterStatus").value;
+            if (status && status !== "all") url.searchParams.append("status", status);
+
+            url.searchParams.append("offset", historyOffset);
+
+            try {
+                const res = await fetch(url);
+                const data = await res.json();
+
+                renderHistory(data.calls, append);
+
+                if (data.has_more) {
+                    let btn = document.getElementById("loadMoreBtn");
+                    if (!btn) {
+                        btn = document.createElement("button");
+                        btn.id = "loadMoreBtn";
+                        btn.className = "load-more-btn";
+                        btn.textContent = "Load More";
+                        btn.onclick = () => {
+                            historyOffset += 50;
+                            fetchHistory(true);
+                        };
+                        document.getElementById("callList").parentElement.appendChild(btn);
+                    }
+                } else {
+                    const btn = document.getElementById("loadMoreBtn");
+                    if (btn) btn.remove();
+                }
+
+            } catch (err) {
+                console.error("Failed to load history", err);
+            }
+        }
+
+        document.getElementById("btnApplyFilters").onclick = () => fetchHistory(false);
+        // Load default history on load
+        window.addEventListener("DOMContentLoaded", () => {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            dpStartDate = new Date(today);
+            dpEndDate = new Date(today);
+            document.getElementById("dateRangeDisplay").textContent = `${formatYMD(dpStartDate)} - ${formatYMD(dpEndDate)}`;
+            fetchHistory(false);
+        });
     </script>
 </body>
+
 </html>

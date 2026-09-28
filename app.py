@@ -140,6 +140,22 @@ COMMIT_GATE_ENABLED = os.getenv("COMMIT_GATE_ENABLED", "0").strip().lower() in (
 # continuous (see the recorder in send_plivo_audio). 60 s at 8 kHz.
 FAREND_MAX_PAD_SAMPLES = 60 * PLIVO_SAMPLE_RATE
 
+# Aligned inbound-loop recordings, file suffix -> what is written (8 kHz each):
+# nearraw = caller audio from Plivo before AEC, farref = the playout-paced far
+# reference fed to the AEC and far_shadow, aecout = AEC output before the output
+# guard below and RNNoise (what passed downstream is recomputable per frame).
+ALIGNED_RECORDING_KINDS = ("nearraw", "farref", "aecout")
+
+# AEC output guard (TEST2 follow-up). An echo canceller may only remove energy.
+# TEST2's aligned recordings showed the handset already cancels echo (raw near
+# -72 dBFS during playback) while aec.py's filter, adapting on near-silent
+# reference frames, drifted and subtracted a filtered copy of the assistant's
+# voice from a silent line: AEC output -48..-27 dBFS, i.e. echo it created, which
+# opened phantom barge-ins. Per frame, if the AEC output is louder than its input
+# the raw input is passed on instead. aec.py and its adaptation are untouched.
+# Kill-switch: AEC_OUTPUT_GUARD_ENABLED=0.
+AEC_OUTPUT_GUARD_ENABLED = os.getenv("AEC_OUTPUT_GUARD_ENABLED", "1").strip().lower() in ("1", "true", "yes")
+
 # --- Audio-pipeline redesign: corroborated barge-in gate (concerns a + b) -----
 # See docs/spec/redesign-audio-pipeline.md.
 # The barge-in gate corroborates a while-speaking VAD onset against the far-end
@@ -575,6 +591,57 @@ def _short_hash(payload):
     return hashlib.sha1(payload).hexdigest()[:12]
 
 
+def write_aligned_frames(call_state, near_raw, far_ref, aec_out, ref_queue_depth):
+    """Persist one inbound block to the three aligned recordings.
+
+    Observation only: the buffers are the ones the inbound loop already holds,
+    and nothing is returned. ``aec_out`` is normally the same length as
+    ``near_raw`` (one 160-sample AEC block per Plivo frame); if the canceller
+    ever buffers, the anchor line's ``aec_samples`` exposes the drift. Every
+    write is wrapped so a debug recorder can never break a live call.
+    """
+    writers = call_state.get("debug_aligned_wav_writers")
+    if not writers:
+        return
+    for kind, pcm in (("nearraw", near_raw), ("farref", far_ref), ("aecout", aec_out)):
+        writer = writers.get(kind)
+        if writer:
+            try:
+                writer.writeframes(pcm)
+            except Exception:
+                pass
+    call_state["aligned_frames_written"] += 1
+    call_state["aligned_near_samples_written"] += len(near_raw) // 2
+    call_state["aligned_aec_samples_written"] += len(aec_out) // 2
+    frame = call_state["aligned_frames_written"]
+    if frame % LOG_EVERY_N_CHUNKS == 1:
+        logger.info(
+            f"🎛️ [ALIGNED-REC] frame={frame} t_mono={time.monotonic():.6f} "
+            f"near_samples={call_state['aligned_near_samples_written']} "
+            f"aec_samples={call_state['aligned_aec_samples_written']} "
+            f"ref_queue_depth={ref_queue_depth} "
+            f"far_silent_frames={call_state['far_silent_frames']} "
+            f"aec_guard_fallbacks={call_state['aec_guard_fallback_frames']}"
+        )
+
+
+def guard_aec_output(call_state, near_raw, aec_out):
+    """Return the frame to pass downstream: ``aec_out``, or ``near_raw`` if louder.
+
+    Only whole frames the canceller returned at the input's length are judged;
+    anything else (empty, buffered) passes through as the canceller returned it.
+    Silent in-call (the pinned log sequences stay as they are): the counters are
+    reported on the [ALIGNED-REC] anchors and in the call stats.
+    """
+    if not AEC_OUTPUT_GUARD_ENABLED or not aec_out or len(aec_out) != len(near_raw):
+        return aec_out
+    call_state["aec_guard_frames_checked"] += 1
+    if audioop.rms(aec_out, 2) <= audioop.rms(near_raw, 2):
+        return aec_out
+    call_state["aec_guard_fallback_frames"] += 1
+    return near_raw
+
+
 def reset_far_reference(call_state):
     """Reset the AEC far-end reference and the playout-paced feed together.
 
@@ -1003,12 +1070,100 @@ def _format_echo_evidence(decision):
 
 app = Quart(__name__)
 
+CALL_HISTORY_DB_PATH = "call_history.db"
+
+def init_call_history_db():
+    with sqlite3.connect(CALL_HISTORY_DB_PATH) as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS calls (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                call_uuid TEXT UNIQUE,
+                name TEXT,
+                phone TEXT,
+                status TEXT,
+                fail_reason TEXT,
+                cost TEXT,
+                end_reason TEXT,
+                created_at TEXT,
+                updated_at TEXT,
+                duration_sec INTEGER,
+                connected_at TEXT
+            )
+        """)
+        conn.commit()
+
+init_call_history_db()
+
+def persist_call_event_sync(call_uuid, event_type, data):
+    if not call_uuid:
+        return
+    now_ist_str = datetime.now(ist_tz).strftime("%Y-%m-%d %H:%M:%S")
+    try:
+        with sqlite3.connect(CALL_HISTORY_DB_PATH) as conn:
+            data = data or {}
+            
+            if event_type == "call_queued":
+                name = data.get("name", "Unknown")
+                phone = data.get("phone", "")
+                conn.execute("""
+                    INSERT INTO calls (call_uuid, name, phone, status, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(call_uuid) DO UPDATE SET
+                        status=excluded.status, updated_at=excluded.updated_at
+                """, (call_uuid, name, phone, "queued", now_ist_str, now_ist_str))
+            
+            elif event_type == "call_ringing":
+                conn.execute("UPDATE calls SET status='ringing', updated_at=? WHERE call_uuid=?", (now_ist_str, call_uuid))
+                
+            elif event_type == "call_connected":
+                conn.execute("UPDATE calls SET status='connected', updated_at=?, connected_at=? WHERE call_uuid=?", 
+                             (now_ist_str, now_ist_str, call_uuid))
+                             
+            elif event_type in ("call_ended", "call_failed"):
+                if event_type == "call_ended":
+                    status = "ended"
+                    cost = data.get("cost")
+                    end_reason = data.get("reason")
+                    fail_reason = None
+                else:
+                    status = "failed"
+                    cost = None
+                    end_reason = None
+                    fail_reason = data.get("error")
+                
+                row = conn.execute("SELECT connected_at FROM calls WHERE call_uuid=?", (call_uuid,)).fetchone()
+                duration_sec = None
+                if row and row[0]:
+                    try:
+                        conn_time = datetime.strptime(row[0], "%Y-%m-%d %H:%M:%S")
+                        duration_sec = int((datetime.now(ist_tz).replace(tzinfo=None) - conn_time).total_seconds())
+                    except Exception as e:
+                        logger.error(f"Error parsing connected_at {row[0]}: {e}")
+                        
+                conn.execute("""
+                    UPDATE calls 
+                    SET status=?, updated_at=?, cost=?, end_reason=?, fail_reason=?, duration_sec=?
+                    WHERE call_uuid=?
+                """, (status, now_ist_str, cost, end_reason, fail_reason, duration_sec, call_uuid))
+                
+            conn.commit()
+    except Exception as e:
+        logger.error(f"Error persisting call event {event_type} for {call_uuid}: {e}")
+
 # --- SSE (Server-Sent Events) Infrastructure for Dashboard ---
 call_event_subscribers = set()
 
 def emit_call_event(call_id, event_type, data=None):
     """Fire-and-forget: push a JSON event to all connected dashboard browsers."""
     global call_event_subscribers
+    
+    if call_id and event_type in ["call_queued", "call_ringing", "call_connected", "call_ended", "call_failed"]:
+        try:
+            loop = asyncio.get_running_loop()
+            loop.run_in_executor(None, persist_call_event_sync, call_id, event_type, data)
+        except RuntimeError:
+            pass  # Fallback if no loop
+
     try:
         payload = json.dumps({
             "call_id": str(call_id) if call_id else "",
@@ -1053,6 +1208,74 @@ async def call_events_stream():
         }
     )
 
+@app.route('/api/call-history')
+async def get_call_history():
+    args = dict(request.args)
+    
+    def fetch_history():
+        start_date = args.get('start_date')
+        end_date = args.get('end_date')
+        start_hour = args.get('start_hour')
+        end_hour = args.get('end_hour')
+        name_filter = args.get('name')
+        status_filter = args.get('status')
+        limit = min(int(args.get('limit', 50)), 200)
+        offset = int(args.get('offset', 0))
+        
+        query = "SELECT call_uuid, name, phone, status, fail_reason, cost, end_reason, created_at, duration_sec FROM calls WHERE 1=1"
+        params = []
+        
+        if start_date:
+            query += " AND date(created_at) >= ?"
+            params.append(start_date)
+        if end_date:
+            query += " AND date(created_at) <= ?"
+            params.append(end_date)
+        if start_hour is not None and start_hour != "":
+            query += " AND cast(strftime('%H', created_at) as integer) >= ?"
+            params.append(int(start_hour))
+        if end_hour is not None and end_hour != "":
+            query += " AND cast(strftime('%H', created_at) as integer) <= ?"
+            params.append(int(end_hour))
+        if name_filter:
+            query += " AND name LIKE ?"
+            params.append(f"%{name_filter}%")
+        if status_filter and status_filter.lower() != "all":
+            query += " AND status = ?"
+            params.append(status_filter.lower())
+            
+        query += " ORDER BY datetime(created_at) DESC LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
+        
+        try:
+            with sqlite3.connect(CALL_HISTORY_DB_PATH) as conn:
+                conn.row_factory = sqlite3.Row
+                rows = conn.execute(query, params).fetchall()
+                
+                count_query = query.replace("SELECT call_uuid, name, phone, status, fail_reason, cost, end_reason, created_at, duration_sec", "SELECT count(*)", 1)
+                count_query = count_query.split(" ORDER BY")[0]
+                total = conn.execute(count_query, params[:-2]).fetchone()[0]
+                
+            calls = []
+            for r in rows:
+                d = dict(r)
+                if d["created_at"]:
+                    d["created_at"] = d["created_at"].replace(" ", "T") + "+05:30"
+                calls.append(d)
+                
+            return {
+                "calls": calls,
+                "total": total,
+                "has_more": offset + limit < total
+            }
+        except Exception as e:
+            logger.error(f"Error fetching call history: {e}")
+            return {"calls": [], "total": 0, "has_more": False}
+    
+    loop = asyncio.get_running_loop()
+    result = await loop.run_in_executor(None, fetch_history)
+    return result
+
 plivo_client = plivo.RestClient(auth_id=os.getenv('PLIVO_AUTH_ID'), auth_token=os.getenv('PLIVO_AUTH_TOKEN'))
 
 @app.route('/playback_audio_files/<path:filename>')
@@ -1064,6 +1287,12 @@ async def serve_audio(filename):
 @app.route('/atc.png', methods=['GET'])
 async def serve_atc_logo():
     return await send_file('atc.png')
+
+@app.route('/AU_Logo.png', methods=['GET'])
+async def serve_au_logo():
+    res = await send_file('AU_Logo.png')
+    res.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    return res
 
 @app.route("/", methods=["GET"])
 async def serve_dashboard():
@@ -1344,10 +1573,16 @@ async def connect_live_with_timeout(client, model, config):
 
 
 async def coordinate_call_tasks(task_map, call_state):
-    done, pending = await asyncio.wait(
-        task_map.values(),
-        return_when=asyncio.FIRST_COMPLETED,
-    )
+    try:
+        done, pending = await asyncio.wait(
+            task_map.values(),
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+    except asyncio.CancelledError:
+        for task in task_map.values():
+            task.cancel()
+        await asyncio.gather(*task_map.values(), return_exceptions=True)
+        raise
     completed_names = {
         name for name, task in task_map.items() if task in done
     }
@@ -1388,17 +1623,31 @@ def log_call_stats(call_state):
         f"🔒 [LATCH] holds={latch['holds']} episodes_broken={latch['episodes_broken']} "
         f"episodes_unbroken={latch['episodes_unbroken']} max_rise_db={max_rise}"
     )
+    checked = call_state.get("aec_guard_frames_checked", 0)
+    fallbacks = call_state.get("aec_guard_fallback_frames", 0)
+    share = f"{100.0 * fallbacks / checked:.1f}%" if checked else "n/a"
+    logger.info(
+        f"🛡️ [AEC-GUARD] enabled={AEC_OUTPUT_GUARD_ENABLED} fallback_frames={fallbacks} "
+        f"checked={checked} share={share}"
+    )
     logger.info(f"Tokens Used - Text In: {call_state['tokens_text_in']}, Audio In: {call_state['tokens_audio_in']}, Text Out: {call_state['tokens_text_out']}, Audio Out: {call_state['tokens_audio_out']}")
     logger.info(f"Last usage_metadata.total_token_count seen: {call_state['last_usage_total_token_count']}")
     logger.info(f"usage_metadata.total_token_count updates: {call_state['usage_total_updates']}, non-monotonic transitions: {call_state['usage_total_non_monotonic_count']}")
     logger.info(f"Estimated Call Cost (lower-bound): ${total_cost:.6f}")
     logger.info(f"⚠️  Note: Actual cost is higher due to compounding — past tokens are re-billed each turn.")
     logger.info("====================================")
-    emit_call_event(call_state.get("call_uuid"), "call_ended", {
-        "reason": call_state.get("end_call_summary", "call completed"),
-        "cost": f"${total_cost:.4f}",
-        "phone": call_state.get("from_number", ""),
-    })
+    reason = call_state.get("end_call_summary", "call completed")
+    if reason and reason not in ["call completed", "user hung up", "AI triggered endCall", "Plivo disconnected", "customer hung up"]:
+        emit_call_event(call_state.get("call_uuid"), "call_failed", {
+            "phone": call_state.get("from_number", ""),
+            "error": f"Agent Error: {reason}"
+        })
+    else:
+        emit_call_event(call_state.get("call_uuid"), "call_ended", {
+            "reason": reason,
+            "cost": f"${total_cost:.4f}",
+            "phone": call_state.get("from_number", ""),
+        })
 
 
 async def play_disclaimer(plivo_ws, call_state, disclaimer_finished_event):
@@ -1607,6 +1856,21 @@ async def handle_media_stream():
         "farend_t0_mono": None,
         "farend_pad_samples": 0,
 
+        # Aligned inbound-loop recordings (TEST1 follow-up). Three 8 kHz files
+        # written one frame per processed inbound block, so they line up
+        # sample-for-sample by construction: raw near-end (pre-AEC), the
+        # playout-paced far reference the AEC and gate actually used, and the
+        # AEC output (pre-RNNoise). Observation only.
+        "debug_aligned_wav_writers": {},
+        "aligned_frames_written": 0,
+        "aligned_near_samples_written": 0,
+        "aligned_aec_samples_written": 0,
+
+        # AEC output guard (TEST2 follow-up): frames judged, and frames where
+        # the AEC output was louder than its input so the raw input was used.
+        "aec_guard_frames_checked": 0,
+        "aec_guard_fallback_frames": 0,
+
         # Per-delta trace and byte counters — task 5.1. Observability only.
         "delta_trace": [],
         "delta_trace_dropped": 0,
@@ -1675,6 +1939,23 @@ async def handle_media_stream():
             )
         except Exception as e:
             logger.warning(f"⚠️ Could not open far-end debug WAV file: {e}")
+
+        # Aligned inbound-loop recordings. The pair above cannot be globally
+        # aligned (send-time far-end vs a near-end that catches up a backlog
+        # after the disclaimer), which left the TEST1 echo delay unmeasurable.
+        # These three are written in the same loop iteration, so frame N of each
+        # is the same 20 ms. Each opened on its own so one failure costs one file.
+        for kind in ALIGNED_RECORDING_KINDS:
+            try:
+                aligned_path = f"debug_recordings/{safe_name}_{timestamp_str}_{kind}.wav"
+                aligned_wf = wave.open(aligned_path, "wb")
+                aligned_wf.setnchannels(1)
+                aligned_wf.setsampwidth(2)  # 16-bit
+                aligned_wf.setframerate(PLIVO_SAMPLE_RATE)  # 8 kHz
+                call_state["debug_aligned_wav_writers"][kind] = aligned_wf
+                logger.info(f"🎛️ [ALIGNED-REC] recording started: {aligned_path}")
+            except Exception as e:
+                logger.warning(f"⚠️ Could not open aligned debug WAV '{kind}': {e}")
 
         disclaimer_task = asyncio.create_task(
             play_disclaimer(plivo_ws, call_state, disclaimer_finished)
@@ -1880,7 +2161,7 @@ async def handle_media_stream():
                             stream_plivo_to_gemini(plivo_ws, session, call_state)
                         ),
                         "gemini_output": asyncio.create_task(
-                            stream_gemini_to_plivo(session, plivo_ws, call_state, plivo_client)
+                             stream_gemini_to_plivo(session, plivo_ws, call_state, plivo_client)
                         ),
                         "plivo_output": asyncio.create_task(
                             send_plivo_audio(plivo_ws, call_state, session, plivo_client)
@@ -1953,6 +2234,16 @@ async def handle_media_stream():
                 )
             except Exception as e:
                 logger.warning(f"⚠️ Error closing far-end debug WAV: {e}")
+        for kind, aligned_wf in call_state.get("debug_aligned_wav_writers", {}).items():
+            try:
+                aligned_wf.close()
+            except Exception as e:
+                logger.warning(f"⚠️ Error closing aligned debug WAV '{kind}': {e}")
+        if call_state.get("debug_aligned_wav_writers"):
+            logger.info(
+                f"🎛️ [ALIGNED-REC] recordings saved: "
+                f"{call_state['aligned_frames_written']} frames @ {PLIVO_SAMPLE_RATE} Hz"
+            )
         log_call_stats(call_state)
 
 async def stream_plivo_to_gemini(plivo_ws, session, call_state):
@@ -2004,12 +2295,15 @@ async def stream_plivo_to_gemini(plivo_ws, session, call_state):
                         call_state["far_silent_frames"] + 1, ECHO_TAIL_FRAMES)
                 call_state["aec"].add_far_end(far_ref)
                 call_state["far_shadow"].append(far_ref)
+                raw_pcm_8k = pcm_8k
 
                 # Acoustic echo cancellation FIRST — strip the AI's echoed voice
                 # (speakerphone) before any noise suppression / VAD sees it. When
                 # the AI isn't speaking the far-end is silent and this is a
                 # near-transparent passthrough.
                 pcm_8k = call_state["aec"].process(pcm_8k)
+                write_aligned_frames(call_state, raw_pcm_8k, far_ref, pcm_8k, len(ref_queue))
+                pcm_8k = guard_aec_output(call_state, raw_pcm_8k, pcm_8k)
                 if not pcm_8k:
                     continue
 
@@ -3205,6 +3499,45 @@ async def send_plivo_audio(plivo_ws, call_state,session,plivo_client):
         logger.error(f"Error in send_plivo_audio: {e}")
         raise
 
+call_ringing_status = {}
+
+@app.route('/plivo-ringing', methods=['GET', 'POST'])
+async def plivo_ringing():
+    data = await request.form if request.method == 'POST' else request.args
+    call_uuid = data.get('CallUUID')
+    if call_uuid:
+        call_ringing_status[call_uuid] = True
+        logger.info(f"🔔 Plivo Ringing Callback: CallUUID={call_uuid} is physically ringing.")
+    return "OK", 200
+
+@app.route('/plivo-hangup', methods=['GET', 'POST'])
+async def plivo_hangup():
+    data = await request.form if request.method == 'POST' else request.args
+    call_uuid = data.get('CallUUID')
+    hangup_cause = data.get('HangupCause')
+    hangup_cause_code = data.get('HangupCauseCode')
+    to_number = data.get('To', '')
+    
+    if to_number.startswith('+91'):
+        to_number = to_number[3:]
+        
+    logger.info(f"☎️ Plivo Hangup Callback: CallUUID={call_uuid}, Cause={hangup_cause} ({hangup_cause_code})")
+    
+    if hangup_cause == "USER_BUSY":
+        # Note: We cannot reliably distinguish between "Switched Off" and "Manually Rejected"
+        # because Indian telecom carriers send a 180 Ringing signal (Early Media) while playing 
+        # the "switched off" audio message, and then return 486 Busy (3010) after ~21 seconds.
+        hangup_cause = "USER_BUSY"
+            
+    # Clean up state just in case
+    if call_uuid in call_ringing_status:
+        call_ringing_status.pop(call_uuid, None)
+    
+    if hangup_cause and hangup_cause != "NORMAL_CLEARING":
+        emit_call_event(call_uuid, "call_failed", {"phone": to_number, "error": hangup_cause})
+        
+    return "OK", 200
+
 @app.route("/trigger-call", methods=["POST"])
 async def trigger_call():
     api_key = request.headers.get("X-API-Key")
@@ -3224,6 +3557,8 @@ async def trigger_call():
     encoded_phone = urllib.parse.quote(target_phone_number)
     
     answer_url = f"{PUBLIC_BASE_URL}/outbound-webhook?user_name={encoded_name}&phone_number={encoded_phone}"
+    hangup_url = f"{PUBLIC_BASE_URL}/plivo-hangup"
+    ring_url = f"{PUBLIC_BASE_URL}/plivo-ringing"
     
     try:
         logger.info(f"Initiating outbound call to {target_phone_number} via Dashboard...")
@@ -3233,6 +3568,10 @@ async def trigger_call():
             to_="+91" + target_phone_number,
             answer_url=answer_url,
             answer_method='GET',
+            ring_url=ring_url,
+            ring_method='POST',
+            hangup_url=hangup_url,
+            hangup_method='POST'
         )
         logger.info(f"✅ Outbound call successfully queued: {call_made}")
         call_id = str(getattr(call_made, 'request_uuid', call_made))
@@ -3250,4 +3589,5 @@ if __name__ == "__main__":
     
     hconfig = HypercornConfig()
     hconfig.bind = [f"0.0.0.0:{PORT}"]
+    hconfig.graceful_timeout = 0.5
     asyncio.run(hypercorn.asyncio.serve(app, hconfig))

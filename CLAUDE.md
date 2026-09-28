@@ -2,6 +2,34 @@ Active work: see docs/HANDOFF.md and docs/spec/tasks.md (tracked copy; keep .kir
 
 Other standing rules: do not read .env or credential JSON. Tests are stdlib unittest only (no pytest/hypothesis). API_AUTH_TOKEN issue is noted in HANDOFF §10, not to be fixed. Every new call_state key must be added to the mirror in tests/harness/appctl.py (guarded by test_harness_smoke). Run the suite with `venv312/Scripts/python.exe -m unittest discover -s tests -t .` (Python 3.12 venv; 3.14 has no audioop). Don't write test code through bash heredocs: escapes like `\x00` / `\n` get mangled. Use the Edit tool or a .py script file. Printing app log lines needs `PYTHONIOENCODING=utf-8` (Windows console is cp1252).
 
+## Session state (2026-09-25)
+
+### Done
+- **Dashboard UI Enhancements**:
+  - Replaced dashboard pipeline text to Dialing -> Answered -> Live -> Ended.
+  - Replaced generic failed pill with descriptive labels (Call Not Received, Busy / Unreachable, Voicemail).
+  - Updated logo to AU_Logo.png and adjusted CSS.
+- **Plivo AMD & Hangup Handling**:
+  - Implemented `/plivo-hangup` webhook to gracefully capture and emit detailed hangup causes.
+  - Removed Plivo Answering Machine Detection (`machine_detection`) to prevent false-positive hang-ups on humans due to early media and background noise.
+- **Backend/Frontend Error Resilience**:
+  - Fixed `Task exception was never retrieved` by properly catching `asyncio.CancelledError` in `coordinate_call_tasks` and cleaning up orphaned tasks when Plivo abruptly disconnects.
+  - Updated `log_call_stats` to emit `call_failed` instead of `call_ended` when internal errors (e.g., Gemini crash) terminate the call.
+  - Hardened `index.html` SSE `onerror` handler to automatically fail hanging "Live" calls on server disconnect/restart instead of leaving them stranded.
+## Session state (2026-09-28)
+
+### Done
+- **Persistent Call History (Full Implementation)**:
+  - Implemented SQLite database layer (`call_history.db`) in `app.py` to persist `call_queued`, `call_ringing`, `call_connected`, `call_failed`, and `call_ended` events across server restarts.
+  - Added a paginated `GET /api/call-history` endpoint with date range, hour range, name search, and status filtering.
+  - Built a frontend Filter Bar in `index.html` featuring a custom vanilla-JS dual-month DatePicker and robust history list rendering without relying on bulky libraries.
+  - Cleanly merged live SSE status tracking with paginated historical data in the Call Feed UI.
+- **Dashboard UI Enhancements**:
+  - Modernized the aesthetic of the Filter Bar UI (sleeker inputs, smooth box shadows, gradient buttons, and SVG icons replacing emojis).
+- **Server Reliability**:
+  - Fixed slow server shutdown on `Ctrl+C` by configuring Hypercorn's `graceful_timeout` to `0.5` seconds, cleanly overriding the default waiting behavior on infinite SSE connections.
+
+
 ## Session state (2026-09-23)
 
 Numbering: HANDOFF uses "Redesign Task N"; docs/spec/tasks.md uses 1-10 / 5.x. Mapping in HANDOFF §3.
