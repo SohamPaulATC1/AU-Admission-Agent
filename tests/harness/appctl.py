@@ -168,6 +168,17 @@ def new_call_state(
         "farend_t0_mono": None,
         "farend_pad_samples": 0,
 
+        # --- TEST1 follow-up: aligned inbound-loop recordings (nearraw / farref /
+        # aecout, 8 kHz). Empty dict = recorders off, the offline default.
+        "debug_aligned_wav_writers": {},
+        "aligned_frames_written": 0,
+        "aligned_near_samples_written": 0,
+        "aligned_aec_samples_written": 0,
+
+        # --- TEST2 follow-up: AEC output guard counters.
+        "aec_guard_frames_checked": 0,
+        "aec_guard_fallback_frames": 0,
+
         # --- task 5.1: per-delta trace and the three per-turn byte counters.
         "delta_trace": [],
         "delta_trace_dropped": 0,
@@ -249,6 +260,8 @@ DIAGNOSTIC_LOG_TAGS = (
     "[COMMIT-GATE]",  # 5.10 arm / withhold / release / discard / disarm
     "[MODEL]",        # 5.2 model identity
     "[FAR-END]",      # 5.4a far-end recorder and its alignment metadata
+    "[ALIGNED-REC]",  # TEST1 follow-up: aligned nearraw/farref/aecout recorders
+    "[AEC-GUARD]",    # TEST2 follow-up: AEC output louder than input, raw passed
     "[LATCH-HOLD]",   # onset held only by the echo latch
     "[LATCH-END]",    # how a latch episode ended (broken vs dropped)
     "[LATCH]",        # per-call latch summary in call stats

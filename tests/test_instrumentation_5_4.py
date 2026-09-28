@@ -30,6 +30,7 @@ value) and that is asserted as a placeholder, not as evidence.
 from __future__ import annotations
 
 import asyncio
+import audioop
 import logging
 import os
 import tempfile
@@ -624,6 +625,260 @@ class TestFarEndRecorder(unittest.TestCase):
 
         ws, block = asyncio.run(scenario())
         self.assertEqual(ws.outbound_ulaw, block)
+
+
+# =============================================================================
+# TEST1 follow-up — aligned inbound-loop recordings (nearraw / farref / aecout)
+# =============================================================================
+
+class _ExplodingWriter:
+    def writeframes(self, _payload):
+        raise OSError("disk full")
+
+
+class TestAlignedRecorders(unittest.TestCase):
+    """The three aligned recordings are written frame-for-frame by the inbound loop.
+
+    ``stream_plivo_to_gemini`` is driven for real, with far frames already in
+    ``farend_ref_queue``, so the files hold exactly the buffers production code
+    handed to the AEC: the decoded near-end, the popped far reference (silence
+    once the queue runs dry) and the canceller's output.
+    """
+
+    NEAR_FRAMES = 12
+    FAR_FRAMES = 5
+
+    @staticmethod
+    def _far_frames(count):
+        # Amplitude-modulated tone: a real far-end shape, not digital silence.
+        t = np.arange(count * FRAME_BYTES) / float(app.PLIVO_SAMPLE_RATE)
+        tone = 0.3 * np.sin(2 * np.pi * 440 * t) * (0.5 + 0.5 * np.sin(2 * np.pi * 3 * t))
+        pcm = (tone * 32767).astype("<i2").tobytes()
+        step = FRAME_BYTES * 2
+        return [pcm[i * step:(i + 1) * step] for i in range(count)]
+
+    def _run(self, *, record: bool, writers=None):
+        async def scenario():
+            clock = FakeClock()
+            ws = FakePlivoWS(clock)
+            session = FakeSession()
+            call_state = live_call_state()
+            call_state["farend_ref_queue"].extend(self._far_frames(self.FAR_FRAMES))
+
+            paths = {}
+            if writers is not None:
+                call_state["debug_aligned_wav_writers"] = writers
+            elif record:
+                directory = tempfile.mkdtemp()
+                for kind in app.ALIGNED_RECORDING_KINDS:
+                    paths[kind] = os.path.join(directory, f"{kind}.wav")
+                    writer = wave.open(paths[kind], "wb")
+                    writer.setnchannels(1)
+                    writer.setsampwidth(2)
+                    writer.setframerate(app.PLIVO_SAMPLE_RATE)
+                    call_state["debug_aligned_wav_writers"][kind] = writer
+
+            near = scenarios.caller_speech_frames(self.NEAR_FRAMES)
+            with clock.install(), LogCapture() as log:
+                async with InboundDriver(call_state, ws, session) as driver:
+                    for frame in near:
+                        await driver.feed_pcm8(frame)
+
+            if record and writers is None:
+                for writer in call_state["debug_aligned_wav_writers"].values():
+                    writer.close()
+            return call_state, ws, session, log, paths, near
+
+        return asyncio.run(scenario())
+
+    @staticmethod
+    def _read(path):
+        with wave.open(path, "rb") as handle:
+            return (handle.getnchannels(), handle.getsampwidth(), handle.getframerate(),
+                    handle.readframes(handle.getnframes()))
+
+    def test_three_files_align_frame_for_frame_at_eight_kilohertz(self):
+        call_state, ws, session, log, paths, near = self._run(record=True)
+        files = {kind: self._read(path) for kind, path in paths.items()}
+        self.assertEqual(set(files), {"nearraw", "farref", "aecout"})
+        for kind, (channels, width, rate, _data) in files.items():
+            self.assertEqual((channels, width, rate), (1, 2, 8000), kind)
+
+        expected_near = b"".join(app.ulaw_to_pcm(app.pcm_to_ulaw(frame)) for frame in near)
+        self.assertEqual(files["nearraw"][3], expected_near,
+                         "nearraw must be the decoded Plivo audio, before the AEC")
+
+        silent = self.NEAR_FRAMES - self.FAR_FRAMES
+        expected_far = b"".join(self._far_frames(self.FAR_FRAMES)) + app._FAR_SILENCE_FRAME * silent
+        self.assertEqual(files["farref"][3], expected_far,
+                         "farref must be the playout-paced reference, silence once drained")
+
+        # Same length for all three: frame N of each file is the same 20 ms.
+        lengths = {kind: len(data) for kind, (_c, _w, _r, data) in files.items()}
+        self.assertEqual(len(set(lengths.values())), 1, lengths)
+        self.assertEqual(lengths["nearraw"], self.NEAR_FRAMES * FRAME_BYTES * 2)
+        self.assertEqual(call_state["aligned_frames_written"], self.NEAR_FRAMES)
+        self.assertEqual(call_state["aligned_near_samples_written"], self.NEAR_FRAMES * FRAME_BYTES)
+        self.assertEqual(call_state["aligned_aec_samples_written"], self.NEAR_FRAMES * FRAME_BYTES)
+
+        anchors = _diagnostics(log, "[ALIGNED-REC]")
+        self.assertTrue(anchors, "at least one alignment anchor at INFO")
+        self.assertIn("frame=1 ", anchors[0])
+        # One far frame was popped for frame 1, so four were still queued.
+        self.assertIn(f"ref_queue_depth={self.FAR_FRAMES - 1}", anchors[0])
+        for field in ("t_mono=", "near_samples=", "aec_samples=", "far_silent_frames=",
+                      "aec_guard_fallbacks="):
+            self.assertIn(field, anchors[0], f"missing {field}")
+
+    def test_recorders_on_versus_off_is_byte_identical_on_every_observable(self):
+        on_state, on_ws, on_session, on_log, _paths, _near = self._run(record=True)
+        off_state, off_ws, off_session, off_log, _none, _near = self._run(record=False)
+
+        self.assertEqual(on_session.sent, off_session.sent, "Gemini receives the same stream")
+        self.assertEqual(on_ws.events, off_ws.events)
+        self.assertEqual(list(on_state["far_shadow"]), list(off_state["far_shadow"]))
+        self.assertEqual(on_state["chunk_count"], off_state["chunk_count"])
+        self.assertEqual(on_log.existing_lines, off_log.existing_lines)
+        self.assertEqual(_diagnostics(off_log, "[ALIGNED-REC]"), [])
+        self.assertEqual(off_state["aligned_frames_written"], 0)
+
+    def test_a_broken_writer_never_breaks_the_call(self):
+        writers = {kind: _ExplodingWriter() for kind in app.ALIGNED_RECORDING_KINDS}
+        broken_state, _ws, broken_session, _log, _paths, _near = self._run(record=True, writers=writers)
+        _state, _ws, off_session, _log, _none, _near = self._run(record=False)
+        self.assertEqual(broken_session.sent, off_session.sent)
+        self.assertEqual(broken_state["aligned_frames_written"], self.NEAR_FRAMES)
+
+
+# =============================================================================
+# TEST2 follow-up — AEC output guard: the canceller may only remove energy
+# =============================================================================
+
+class _ScalingAec:
+    """Stand-in canceller: output = input * gain, so louder or quieter at will."""
+
+    def __init__(self, gain):
+        self.gain = gain
+
+    def add_far_end(self, _pcm16):
+        pass
+
+    def process(self, pcm16):
+        samples = np.frombuffer(pcm16, dtype="<i2").astype(np.float64) * self.gain
+        return np.clip(samples, -32768, 32767).astype("<i2").tobytes()
+
+
+class TestAecOutputGuard(unittest.TestCase):
+    NEAR_FRAMES = 12
+
+    @staticmethod
+    def _frame(level):
+        t = np.arange(FRAME_BYTES) / float(app.PLIVO_SAMPLE_RATE)
+        return (level * np.sin(2 * np.pi * 300 * t) * 32767).astype("<i2").tobytes()
+
+    def _run_loop(self, aec):
+        async def scenario():
+            clock = FakeClock()
+            ws = FakePlivoWS(clock)
+            session = FakeSession()
+            call_state = live_call_state(aec=aec)
+            with clock.install(), LogCapture() as log:
+                async with InboundDriver(call_state, ws, session) as driver:
+                    for frame in scenarios.caller_speech_frames(self.NEAR_FRAMES):
+                        await driver.feed_pcm8(frame)
+            return call_state, session, log
+
+        return asyncio.run(scenario())
+
+    def test_louder_output_is_replaced_by_the_raw_input(self):
+        call_state = live_call_state(with_denoiser=False, with_aec=False)
+        raw, louder = self._frame(0.01), self._frame(0.2)
+        with LogCapture() as log:
+            first = app.guard_aec_output(call_state, raw, louder)
+            second = app.guard_aec_output(call_state, raw, louder)
+        self.assertEqual(first, raw)
+        self.assertEqual(second, raw)
+        self.assertEqual(call_state["aec_guard_frames_checked"], 2)
+        self.assertEqual(call_state["aec_guard_fallback_frames"], 2)
+        # Silent in-call: the falsifier's pinned log sequences must not change.
+        self.assertEqual(log.lines, [])
+
+    def test_quieter_or_equal_output_is_kept(self):
+        call_state = live_call_state(with_denoiser=False, with_aec=False)
+        raw, quieter = self._frame(0.2), self._frame(0.05)
+        self.assertEqual(app.guard_aec_output(call_state, raw, quieter), quieter)
+        self.assertEqual(app.guard_aec_output(call_state, raw, raw), raw)
+        self.assertEqual(call_state["aec_guard_frames_checked"], 2)
+        self.assertEqual(call_state["aec_guard_fallback_frames"], 0)
+
+    def test_empty_or_buffered_output_passes_unjudged(self):
+        call_state = live_call_state(with_denoiser=False, with_aec=False)
+        raw = self._frame(0.01)
+        self.assertEqual(app.guard_aec_output(call_state, raw, b""), b"")
+        short = self._frame(0.5)[:100]
+        self.assertEqual(app.guard_aec_output(call_state, raw, short), short)
+        self.assertEqual(call_state["aec_guard_frames_checked"], 0)
+
+    def test_kill_switch_passes_the_aec_output_through(self):
+        call_state = live_call_state(with_denoiser=False, with_aec=False)
+        raw, louder = self._frame(0.01), self._frame(0.2)
+        with mock.patch.object(app, "AEC_OUTPUT_GUARD_ENABLED", False):
+            self.assertEqual(app.guard_aec_output(call_state, raw, louder), louder)
+        self.assertEqual(call_state["aec_guard_frames_checked"], 0)
+
+    def test_inbound_loop_sends_raw_audio_when_the_aec_adds_energy(self):
+        """A canceller that amplifies must look, downstream, like no canceller."""
+        injecting_state, injecting, _log = self._run_loop(_ScalingAec(4.0))
+        _state, identity, _log = self._run_loop(_ScalingAec(1.0))
+        self.assertTrue(any(kind == "audio" for kind, _ in identity.sent))
+        self.assertEqual(injecting.sent, identity.sent)
+        self.assertEqual(injecting_state["aec_guard_fallback_frames"], self.NEAR_FRAMES)
+
+    def test_inbound_loop_keeps_an_aec_that_removes_energy(self):
+        cancelling_state, cancelling, _log = self._run_loop(_ScalingAec(0.25))
+        _state, identity, _log = self._run_loop(_ScalingAec(1.0))
+        self.assertNotEqual(cancelling.sent, identity.sent)
+        self.assertEqual(cancelling_state["aec_guard_fallback_frames"], 0)
+        self.assertEqual(cancelling_state["aec_guard_frames_checked"], self.NEAR_FRAMES)
+
+    def test_real_canceller_on_real_echo_keeps_every_frame_it_improves(self):
+        """Real aec.py on a synthetic echo of real speech, frame by frame: the
+        guard keeps the AEC output wherever it removed energy and passes the raw
+        input only where it added some, so the guarded stream is never louder
+        than either. (Measured while writing this: on this echo aec.py's output
+        is louder than its input on roughly half the echo frames.)"""
+        from tests.harness.appctl import AcousticEchoCanceller
+
+        far = echo.load_pcm8k("recorded.wav")[: 8000 * 2 * 6]
+        near = echo.synth_echo(far, delay_ms=60, attenuation_db=12, noise_db=-70,
+                               length_samples=len(far) // 2)
+        canceller = AcousticEchoCanceller(frame_size=FRAME_BYTES)
+        call_state = live_call_state(with_denoiser=False, with_aec=False)
+        step = FRAME_BYTES * 2
+        guarded, unguarded, kept = bytearray(), bytearray(), 0
+        for i in range(len(far) // step):
+            canceller.add_far_end(far[i * step:(i + 1) * step])
+            raw = near[i * step:(i + 1) * step]
+            out = canceller.process(raw)
+            passed = app.guard_aec_output(call_state, raw, out)
+            if audioop.rms(out, 2) <= audioop.rms(raw, 2):
+                self.assertEqual(passed, out, f"frame {i}: an improving AEC frame was dropped")
+                kept += 1
+            else:
+                self.assertEqual(passed, raw, f"frame {i}: an energy-adding AEC frame got through")
+            guarded += passed
+            unguarded += out
+        self.assertGreater(kept, 0, "the fixture must exercise real cancellation")
+        self.assertLessEqual(echo.rms_db(bytes(guarded)), echo.rms_db(bytes(unguarded)))
+        self.assertEqual(call_state["aec_guard_frames_checked"], len(far) // step)
+
+    def test_call_stats_report_the_guard(self):
+        call_state = live_call_state(with_denoiser=False, with_aec=False,
+                                     aec_guard_frames_checked=200, aec_guard_fallback_frames=50)
+        with LogCapture() as log:
+            app.log_call_stats(call_state)
+        self.assertEqual(_diagnostics(log, "[AEC-GUARD]"), [
+            "🛡️ [AEC-GUARD] enabled=True fallback_frames=50 checked=200 share=25.0%"])
 
 
 # =============================================================================

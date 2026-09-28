@@ -212,9 +212,16 @@ class TestDebugRecording(unittest.TestCase):
         """
         with open(APP_PY, "r", encoding="utf-8") as handle:
             source = handle.read()
-        # disclaimer read + inbound debug write + far-end debug write
-        self.assertEqual(source.count("wave.open("), 3)
-        self.assertEqual(len(re.findall(r'debug_recordings/\{safe_name\}', source)), 2)
+        # disclaimer read + inbound debug write + far-end debug write + the one
+        # loop that opens the aligned nearraw/farref/aecout writers (BASELINE
+        # UPDATE, TEST1 follow-up: was 3 and 2 before the aligned recordings).
+        self.assertEqual(source.count("wave.open("), 4)
+        self.assertEqual(len(re.findall(r'debug_recordings/\{safe_name\}', source)), 3)
+        self.assertIn(
+            'aligned_path = f"debug_recordings/{safe_name}_{timestamp_str}_{kind}.wav"',
+            source,
+        )
+        self.assertIn("aligned_wf.setframerate(PLIVO_SAMPLE_RATE)", source)
         self.assertIn('debug_wav_path = f"debug_recordings/{safe_name}_{timestamp_str}.wav"', source)
         self.assertIn(
             'farend_wav_path = f"debug_recordings/{safe_name}_{timestamp_str}_farend.wav"',
@@ -296,8 +303,11 @@ class TestCallStats(unittest.TestCase):
         # and again when the echo latch (ECHO_LATCH_BREAK_DB, apply_echo_latch)
         # was added, and again for the echo return ceiling and the latch
         # hold/end field logging, and again for the post-playback echo tail
-        # gate (ECHO_TAIL_FRAMES, far_window_has_playback).
-        self.assertEqual(references, [51, 1381, 1845, 1855, 2257])
+        # gate (ECHO_TAIL_FRAMES, far_window_has_playback), and again for the
+        # aligned inbound-loop recordings (ALIGNED_RECORDING_KINDS,
+        # write_aligned_frames), and again for the AEC output guard
+        # (AEC_OUTPUT_GUARD_ENABLED, guard_aec_output).
+        self.assertEqual(references, [51, 1448, 1951, 1961, 2376])
 
 
 if __name__ == "__main__":
