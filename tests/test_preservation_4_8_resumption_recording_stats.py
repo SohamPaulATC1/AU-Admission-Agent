@@ -306,8 +306,14 @@ class TestCallStats(unittest.TestCase):
         # gate (ECHO_TAIL_FRAMES, far_window_has_playback), and again for the
         # aligned inbound-loop recordings (ALIGNED_RECORDING_KINDS,
         # write_aligned_frames), and again for the AEC output guard
-        # (AEC_OUTPUT_GUARD_ENABLED, guard_aec_output).
-        self.assertEqual(references, [51, 1448, 1951, 1961, 2376])
+        # (AEC_OUTPUT_GUARD_ENABLED, guard_aec_output), and again for the
+        # dashboard / persistent call-history work (hangup webhook, SQLite
+        # call history, /api/call-history), and again for the AEC_IMPL switch
+        # (aec / aec1) that now sits after load_dotenv(), above the definition,
+        # and again when its comment grew a line for the default flip to aec1,
+        # and again for the GEMINI_BACKEND switch (studio / vertex) and its
+        # credential helpers.
+        self.assertEqual(references, [64, 1721, 2233, 2243, 2659])
 
 
 if __name__ == "__main__":

@@ -2,6 +2,8 @@
 .env
 *credentials*.json
 project-*.json
+# Vertex AI service-account key (GEMINI_BACKEND=vertex).
+silver-shift-*.json
 
 # Python
 venv/

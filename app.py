@@ -19,7 +19,6 @@ import regex
 import collections
 import bargein
 from pyrnnoise import RNNoise
-from aec import AcousticEchoCanceller
 import numpy as np
 import urllib.parse
 
@@ -28,6 +27,20 @@ from google import genai
 from google.genai import types
 
 load_dotenv()
+
+# AEC implementation (path B trial, 2026-09-28; default flipped to aec1 for the
+# live trial, 2026-09-29). "aec" = stock aec.py (byte-identical); "aec1" =
+# aec1.py, the same canceller with gated adaptation, a step-size ceiling,
+# leakage and a two-path divergence reset. Same public API, so the two can be
+# run side by side. An unknown value fails at startup rather than silently
+# running the wrong canceller. Set AEC_IMPL=aec in the shell to fall back.
+AEC_IMPL = os.getenv("AEC_IMPL", "aec1").strip().lower()
+if AEC_IMPL == "aec":
+    from aec import AcousticEchoCanceller
+elif AEC_IMPL == "aec1":
+    from aec1 import AcousticEchoCanceller
+else:
+    raise ValueError(f"AEC_IMPL must be 'aec' or 'aec1', got {AEC_IMPL!r}")
 
 # --- Logging Setup ---
 ist_tz = timezone(timedelta(hours=5, minutes=30))
@@ -52,6 +65,27 @@ GEMINI_MODEL = "gemini-3.8-live"
 PUBLIC_BASE_URL = os.getenv('PUBLIC_BASE_URL')
 HUMAN_TRANSFER_NUMBER = os.getenv('HUMAN_TRANSFER_NUMBER')
 PLIVO_PHONE_NUMBER = os.getenv('FROM_NUMBER')
+
+# Gemini backend (2026-09-29). "vertex" = Vertex AI (Gemini Enterprise Agent
+# Platform) authenticated with the service-account key, the production path;
+# "studio" = Google AI Studio with GOOGLE_API_KEY, the development path and the
+# rollback. Same model ID, same Live API, same config on both. An unknown value
+# fails at startup. Set GEMINI_BACKEND=studio in the shell to fall back.
+GEMINI_BACKEND = os.getenv("GEMINI_BACKEND", "vertex").strip().lower()
+if GEMINI_BACKEND not in ("vertex", "studio"):
+    raise ValueError(f"GEMINI_BACKEND must be 'vertex' or 'studio', got {GEMINI_BACKEND!r}")
+VERTEX_PROJECT = os.getenv("VERTEX_PROJECT", "silver-shift-490819-k0")
+# gemini-3.8-live is served only from the us and eu multi-regions and
+# us-central1 (no global, no India region). EC2 is in ap-south-1 (Mumbai), and
+# eu is the nearest of the three. VERTEX_LOCATION=us-central1 is the fallback.
+VERTEX_LOCATION = os.getenv("VERTEX_LOCATION", "eu").strip().lower()
+VERTEX_CREDENTIALS_PATH = os.getenv(
+    "VERTEX_CREDENTIALS_PATH",
+    os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                 "silver-shift-490819-k0-1b9ed54b2663.json"),
+)
+# Refresh the access token (1 h lifetime) when less than this much is left.
+VERTEX_TOKEN_REFRESH_MARGIN_SECONDS = 300
 
 PORT = 8000
 
@@ -1538,8 +1572,79 @@ async def supervise_call(call_state, plivo_client):
         await asyncio.sleep(SUPERVISOR_POLL_INTERVAL)
 
 
+_vertex_credentials = None
+_vertex_token_lock = asyncio.Lock()
+
+
+def vertex_base_url(location):
+    """google-genai 1.66 builds https://{location}-aiplatform.googleapis.com/,
+    which is right for a region such as us-central1 but not for the us / eu
+    multi-regions, whose hostnames are aiplatform.{us,eu}.rep.googleapis.com.
+    Returns the override, or None when the SDK default is correct."""
+    if location in ("us", "eu"):
+        return f"https://aiplatform.{location}.rep.googleapis.com/"
+    return None
+
+
+def load_vertex_credentials():
+    """Service-account credentials, loaded once per process and shared by every
+    call, so the access token is cached across calls rather than re-minted."""
+    global _vertex_credentials
+    if _vertex_credentials is None:
+        from google.oauth2 import service_account
+        _vertex_credentials = service_account.Credentials.from_service_account_file(
+            VERTEX_CREDENTIALS_PATH,
+            scopes=["https://www.googleapis.com/auth/cloud-platform"],
+        )
+    return _vertex_credentials
+
+
+def vertex_token_needs_refresh(credentials, now=None):
+    if not credentials.token or not credentials.valid or credentials.expiry is None:
+        return True
+    # google-auth keeps expiry as a naive UTC datetime.
+    now = now or datetime.now(timezone.utc).replace(tzinfo=None)
+    return (credentials.expiry - now).total_seconds() < VERTEX_TOKEN_REFRESH_MARGIN_SECONDS
+
+
+async def ensure_vertex_token():
+    """The SDK refreshes an expired token synchronously inside live.connect(),
+    which would block the event loop (every call's audio) for an HTTP round trip
+    that GEMINI_CONNECT_TIMEOUT_SECONDS cannot cut short. Refresh here instead,
+    in a worker thread and ahead of expiry, so the SDK always finds it valid."""
+    credentials = load_vertex_credentials()
+    async with _vertex_token_lock:
+        if vertex_token_needs_refresh(credentials):
+            import google.auth.transport.requests
+            await asyncio.to_thread(
+                credentials.refresh, google.auth.transport.requests.Request()
+            )
+            logger.info("🔐 Vertex AI access token refreshed")
+
+
+def create_gemini_client():
+    if GEMINI_BACKEND == "studio":
+        return genai.Client(api_key=LIVE_API_KEY)
+    base_url = vertex_base_url(VERTEX_LOCATION)
+    return genai.Client(
+        vertexai=True,
+        project=VERTEX_PROJECT,
+        location=VERTEX_LOCATION,
+        credentials=load_vertex_credentials(),
+        http_options=types.HttpOptions(base_url=base_url) if base_url else None,
+    )
+
+
+def describe_gemini_backend():
+    if GEMINI_BACKEND == "studio":
+        return "backend=studio"
+    return f"backend=vertex project={VERTEX_PROJECT} location={VERTEX_LOCATION}"
+
+
 @contextlib.asynccontextmanager
 async def connect_live_with_timeout(client, model, config):
+    if GEMINI_BACKEND == "vertex":
+        await asyncio.wait_for(ensure_vertex_token(), timeout=GEMINI_CONNECT_TIMEOUT_SECONDS)
     live_context = client.aio.live.connect(model=model, config=config)
     session = await asyncio.wait_for(
         live_context.__aenter__(),
@@ -1630,6 +1735,10 @@ def log_call_stats(call_state):
         f"🛡️ [AEC-GUARD] enabled={AEC_OUTPUT_GUARD_ENABLED} fallback_frames={fallbacks} "
         f"checked={checked} share={share}"
     )
+    # aec1 exposes a stats dict; aec.py has none, so only the impl is logged.
+    aec_stats = getattr(call_state.get("aec"), "stats", None)
+    aec_detail = "".join(f" {k}={v}" for k, v in aec_stats.items()) if aec_stats else ""
+    logger.info(f"🎛️ [AEC] impl={AEC_IMPL}{aec_detail}")
     logger.info(f"Tokens Used - Text In: {call_state['tokens_text_in']}, Audio In: {call_state['tokens_audio_in']}, Text Out: {call_state['tokens_text_out']}, Audio Out: {call_state['tokens_audio_out']}")
     logger.info(f"Last usage_metadata.total_token_count seen: {call_state['last_usage_total_token_count']}")
     logger.info(f"usage_metadata.total_token_count updates: {call_state['usage_total_updates']}, non-monotonic transitions: {call_state['usage_total_non_monotonic_count']}")
@@ -1961,9 +2070,7 @@ async def handle_media_stream():
             play_disclaimer(plivo_ws, call_state, disclaimer_finished)
         )
 
-        client = genai.Client(
-            api_key=LIVE_API_KEY
-        )
+        client = create_gemini_client()
 
         current_time = get_indian_time()
         try:
@@ -2137,6 +2244,7 @@ async def handle_media_stream():
                         f"gemini_reconnect_count={call_state['gemini_reconnect_count']}"
                         f"/{MAX_GEMINI_RECONNECTS} | resumption_handle="
                         f"{'present' if call_state.get('session_resumption_handle') else 'none'}"
+                        f" | {describe_gemini_backend()}"
                     )
 
                     if not is_reconnect:
@@ -3584,6 +3692,11 @@ async def trigger_call():
 
 if __name__ == "__main__":
     logger.info(f'Starting the Quart Server on Port {PORT} with Hypercorn (Waiting for Dashboard trigger...)')
+    logger.info(f"🧬 [MODEL] Gemini {describe_gemini_backend()}")
+    if GEMINI_BACKEND == "vertex":
+        import google.auth.transport.requests
+        load_vertex_credentials().refresh(google.auth.transport.requests.Request())
+        logger.info("🔐 Vertex AI credentials loaded and access token obtained")
     import hypercorn.asyncio
     from hypercorn.config import Config as HypercornConfig
     

@@ -262,6 +262,7 @@ DIAGNOSTIC_LOG_TAGS = (
     "[FAR-END]",      # 5.4a far-end recorder and its alignment metadata
     "[ALIGNED-REC]",  # TEST1 follow-up: aligned nearraw/farref/aecout recorders
     "[AEC-GUARD]",    # TEST2 follow-up: AEC output louder than input, raw passed
+    "[AEC]",          # path B trial: which canceller ran (AEC_IMPL) and aec1 stats
     "[LATCH-HOLD]",   # onset held only by the echo latch
     "[LATCH-END]",    # how a latch episode ended (broken vs dropped)
     "[LATCH]",        # per-call latch summary in call stats
