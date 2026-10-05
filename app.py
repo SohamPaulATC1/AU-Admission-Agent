@@ -197,7 +197,7 @@ class GeminiSessionDisconnected(Exception):
     """Raised when the Gemini Live session drops but may be resumable."""
     pass
 
-with open("prompt.txt", "r", encoding="utf-8") as f:
+with open("prompt_au.txt", "r", encoding="utf-8") as f:
     RAW_SYSTEM_PROMPT = f.read()
 
 
