@@ -18,6 +18,7 @@ import unicodedata
 import regex
 import collections
 import bargein
+import course_catalog
 from pyrnnoise import RNNoise
 import numpy as np
 import urllib.parse
@@ -399,7 +400,10 @@ transfer_call_tool = types.FunctionDeclaration(
     }
 )
 
-LOCAL_GEMINI_TOOLS = [{"function_declarations": [end_call_tool, transfer_call_tool]}]
+# Course catalog lookups (course_catalog.py, docs/spec/course-catalog-tools-design.md).
+catalog_tools = [types.FunctionDeclaration(**spec) for spec in course_catalog.TOOL_SPECS]
+
+LOCAL_GEMINI_TOOLS = [{"function_declarations": [end_call_tool, transfer_call_tool, *catalog_tools]}]
     
 SILENCE_FOLLOWUP_PROMPT = (
     "The user has been silent for a few seconds after you spoke with them last."
@@ -1626,6 +1630,7 @@ def log_call_stats(call_state):
     aec_stats = getattr(call_state.get("aec"), "stats", None)
     aec_detail = "".join(f" {k}={v}" for k, v in aec_stats.items()) if aec_stats else ""
     logger.info(f"🎛️ [AEC] impl={AEC_IMPL}{aec_detail}")
+    logger.info(f"🔎 [CATALOG] calls={call_state.get('catalog_calls', 0)} chars={call_state.get('catalog_chars', 0)}")
     logger.info(f"Tokens Used - Text In: {call_state['tokens_text_in']}, Audio In: {call_state['tokens_audio_in']}, Text Out: {call_state['tokens_text_out']}, Audio Out: {call_state['tokens_audio_out']}")
     logger.info(f"Last usage_metadata.total_token_count seen: {call_state['last_usage_total_token_count']}")
     logger.info(f"usage_metadata.total_token_count updates: {call_state['usage_total_updates']}, non-monotonic transitions: {call_state['usage_total_non_monotonic_count']}")
@@ -1866,6 +1871,10 @@ async def handle_media_stream():
         # the AEC output was louder than its input so the raw input was used.
         "aec_guard_frames_checked": 0,
         "aec_guard_fallback_frames": 0,
+
+        # Course catalog tool calls this call, and the response characters sent.
+        "catalog_calls": 0,
+        "catalog_chars": 0,
 
         # Per-delta trace and byte counters — task 5.1. Observability only.
         "delta_trace": [],
@@ -2739,32 +2748,32 @@ async def stream_gemini_to_plivo(session, plivo_ws, call_state,plivo_client):
                                         )
                                     )
                                     
-                                # else:
-                                #     # Execute against Adamas Tech server
-                                #     mcp_result = await mcp_session.call_tool(
-                                #         call.name, args_dict
-                                #     )
-                                #     result_text = "\n".join(
-                                #         [
-                                #             c.text
-                                #             for c in mcp_result.content
-                                #             if c.type == "text"
-                                #         ]
-                                #     )
-                                #     logger.info("[✅ Tool executed successfully. Returning data to Gemini...]")
-                                #     logger.info(f"Raw Data from MCP: {result_text}")
-
-                                #     function_responses_to_send.append(
-                                #         types.FunctionResponse(
-                                #             id=call.id,
-                                #             name=call.name,
-                                #             response={
-                                #                 "result": result_text,
-                                #                 # schedule
-                                #                 # "scheduling": "WHEN_IDLE"
-                                #             },
-                                #         )
-                                #     )
+                                elif call.name in course_catalog.TOOL_NAMES:
+                                    # Local lookup, no terminal state: the call carries on after the response.
+                                    started = time.perf_counter()
+                                    result = course_catalog.handle_tool_call(call.name, args_dict)
+                                    elapsed_ms = (time.perf_counter() - started) * 1000
+                                    chars = course_catalog.response_chars(result)
+                                    call_state["catalog_calls"] += 1
+                                    call_state["catalog_chars"] += chars
+                                    logger.info(
+                                        f"🔎 [CATALOG] tool={call.name} "
+                                        f"status={course_catalog.result_status(call.name, result)} "
+                                        f"chars={chars} ms={elapsed_ms:.1f}"
+                                    )
+                                    function_responses_to_send.append(
+                                        types.FunctionResponse(id=call.id, name=call.name, response=result)
+                                    )
+                                else:
+                                    # Always answer: an unanswered function call leaves Gemini waiting.
+                                    logger.warning(f"[⚠️ Unknown tool requested by Gemini: {call.name}]")
+                                    function_responses_to_send.append(
+                                        types.FunctionResponse(
+                                            id=call.id,
+                                            name=call.name,
+                                            response={"error": f"unknown tool {call.name}"},
+                                        )
+                                    )
                             except Exception as e:
                                 logger.error(f"[❌ Error executing MCP tool {call.name}: {e}]")
                                 function_responses_to_send.append(
@@ -2781,7 +2790,17 @@ async def stream_gemini_to_plivo(session, plivo_ws, call_state,plivo_client):
                                 function_responses=function_responses_to_send
                             )
                         call_state["tool_call_in_progress"] = False
-                        
+
+                        # Gemini owes the caller an answer to a lookup; endCall and
+                        # transferCall are covered by the terminal action deadline.
+                        if function_responses_to_send and not any(
+                            fr.name in ("endCall", "transferCall") for fr in function_responses_to_send
+                        ):
+                            call_state["awaiting_model"] = True
+                            call_state["model_response_deadline"] = (
+                                time.monotonic() + MODEL_RESPONSE_TIMEOUT_SECONDS
+                            )
+
                         if call_state.get("is_speaking") and not call_state.get("user_activity_open"):
                             # Set the flag before the await to avoid a double
                             # activityStart racing the Plivo input task.

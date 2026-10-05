@@ -1,0 +1,84 @@
+{
+ "expansions": {
+  "cse": "computer science engineering",
+  "cs": "computer science",
+  "ece": "electronics communication engineering",
+  "ee": "electrical engineering",
+  "ai": "artificial intelligence",
+  "ml": "machine learning",
+  "ds": "data science",
+  "biotech": "biotechnology",
+  "mech": "mechanical",
+  "maths": "mathematics",
+  "stats": "statistics",
+  "pharmacy": "pharmaceutical",
+  "lab": "laboratory",
+  "math": "mathematics",
+  "engg": "engineering"
+ },
+ "records": {
+  "btech-computer-science-and-engineering": [
+   "cse",
+   "computer science",
+   "computer science and engineering"
+  ],
+  "btech-electronics-and-communication-engineering": [
+   "ece"
+  ],
+  "btech-electrical-engineering": [
+   "ee"
+  ],
+  "btech-cse-artificial-intelligence-and-machine-learning": [
+   "aiml",
+   "ai ml",
+   "cse aiml",
+   "cse ai ml"
+  ],
+  "btech-computer-science-and-engineering-and-business-systems": [
+   "csbs",
+   "cse business systems"
+  ],
+  "bba-e-commerce": [
+   "ecommerce"
+  ],
+  "ba-llb-hons": [
+   "ballb",
+   "law"
+  ],
+  "bba-llb-hons": [
+   "bballb",
+   "law"
+  ],
+  "llm": [
+   "master of laws",
+   "law"
+  ],
+  "bachelor-of-medical-laboratory-science-bmls": [
+   "mlt"
+  ],
+  "bba": [
+   "bachelor of business administration"
+  ],
+  "mba": [
+   "master of business administration"
+  ],
+  "bca": [
+   "bachelor of computer applications"
+  ],
+  "mca": [
+   "master of computer applications"
+  ],
+  "bcom": [
+   "bachelor of commerce"
+  ],
+  "bed": [
+   "bachelor of education"
+  ],
+  "bpharm": [
+   "bachelor of pharmacy"
+  ],
+  "dpharm": [
+   "diploma in pharmacy"
+  ]
+ }
+}

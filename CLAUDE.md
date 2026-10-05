@@ -4,28 +4,37 @@ Other standing rules: do not read .env or credential JSON. Tests are stdlib unit
 
 Numbering: HANDOFF uses "Redesign Task N"; docs/spec/tasks.md uses 1-10 / 5.x. Mapping in HANDOFF §3.
 
-## Current state (as of 2026-09-29)
+## Current state (as of 2026-10-05)
 
-- Suite: **251 tests OK** (2 skipped, 1 expected failure). `GEMINI_MODEL` pins in the 4_8 test: `[64, 1721, 2233, 2243, 2659]`. Re-pin whenever app.py's line count changes.
+- Suite: **323 tests OK** (2 skipped, 1 expected failure). `GEMINI_MODEL` pins in the 4_8 test: `[61, 1612, 2129, 2139, 2552]`. Re-pin whenever app.py's line count changes.
   - Skips: the retired Case C and the deferred reconnect test. Expected failure: `TestCaseDQuietCallerKnownLimitation`.
 - Branch `dev`, no upstream: nothing pushed to origin. EC2 is synced by copying files (see memory / HANDOFF).
 - Never commit `.env`, credential JSON, `CALL_RECORDINGS/`, `TEST_FILES/`, `debug_recordings/`, `*.db` (all gitignored; never force-add them). Commit only when asked.
 
 ### Resume here
-0. **Vertex AI backend, connect-tested from Windows, NOT yet run on EC2 or a real call (2026-09-29).** `GEMINI_BACKEND` in app.py defaults to `vertex` (`studio` = AI Studio with GOOGLE_API_KEY, the rollback). Key file `silver-shift-490819-k0-1b9ed54b2663.json` in the repo root (gitignored via `silver-shift-*.json`; copy to EC2 by hand, chmod 600). Startup refreshes the token once, so a bad key fails before any dial.
+0. **Course catalog tools, built and tested offline, NOT yet on a live call (2026-10-05). Summary: `docs/HANDOFF2.md`.** `course_catalog.py` + `catalog/` give Gemini `list_programs` and `get_program_details` over 87 programs (2027 session). Spec `docs/spec/course-catalog-tools-design.md`, plan `docs/spec/course-catalog-tools-plan.md`.
+   - Rebuild `catalog/courses.json` with `venv312/Scripts/python.exe catalog/build_catalog.py` whenever the Excel in `AU Admission Data/` changes; `test_committed_courses_json_is_fresh` fails until you do.
+   - Try tools offline: `venv312/Scripts/python.exe tests/tool_playground.py` (interactive) or `... list_programs degree=B.Tech`.
+   - `prompt_au.txt` is rewritten for the tools; the operator copies it into `prompt.txt` by hand. Until then the live prompt is still Senco content.
+   - On live calls watch `🔎 [CATALOG]` lines (tool, status, chars) and the per-call `[CATALOG] calls= chars=` totals; tune `catalog/aliases.json` from `not_found` / `ambiguous` queries.
+   - Phase 2 (`find_eligible_programs`) and a scholarship tool are designed, not built.
+   - EC2 needs: `course_catalog.py`, all of `catalog/` (the build test imports `build_catalog.py`), `app.py`, `tests/harness/appctl.py`, the new/changed tests.
+   - **Known-good baseline: HEAD `a0ec061`** (operator, 2026-10-05: the code the catalog work was built on is what works correctly on EC2). The catalog work is uncommitted on top of it. Commit it on its own so one revert restores the EC2 version, and back up EC2's `app.py`, `prompt.txt`, `tests/harness/appctl.py` before copying anything over.
+   - Test order agreed 2026-10-05: first a text-only tool test from Windows (one Gemini session with `prompt_au.txt` and the real declarations, typed questions, no Plivo; script goes in `TEST_FILES/`), then 3-5 live calls on EC2. Phase 2 waits for those results.
+1. **Vertex AI backend, committed in `edb0bf1`, working on EC2 (operator, 2026-10-05).** `GEMINI_BACKEND` in app.py defaults to `vertex` (`studio` = AI Studio with GOOGLE_API_KEY, the rollback). Key file `silver-shift-490819-k0-1b9ed54b2663.json` in the repo root (gitignored via `silver-shift-*.json`; copy to EC2 by hand, chmod 600). Startup refreshes the token once, so a bad key fails before any dial.
    - `TEST_FILES/_vertex_smoke.py` (Windows, 2026-09-29): token in 0.39 s, Live session open in 1.42 s, greeting via `send_client_content` worked, first audio at 0.70 s, turn completed, ~$0.004. Confirms GCP is set up right (API enabled, `roles/aiplatform.user`) and the `eu` base_url override works.
    - `docs/handoff1.md` written for the EC2 agent: bring-up checklist (file hashes, key file mode, Python/SDK version, suite, the same smoke test run from EC2) plus the live-call tasks below. EC2 agent reports back in `docs/handoff1_ec2_report.md`.
-   - Remaining live checks (now EC2's job): first-audio latency vs studio from Mumbai; reconnection/GoAway on a call past ~10 min; token refresh over a long uptime: not just once at startup; a rollback call with `GEMINI_BACKEND=studio`.
-   - Cost still compounds per turn on Vertex (same prices as the app's constants; confirmed by the smoke test's usage line: prompt=1450 response=246). Capping it means `trigger_tokens` / `target_tokens` on `ContextWindowCompressionConfig`; not done, operator's call.
-1. **Path B side-by-side trial (aec1.py), LIVE as of 2026-09-29.** `AEC_IMPL` in app.py now defaults to `aec1` (was parked 2026-09-28, then the operator asked for `python app.py` with no env var to run aec1 directly). `AEC_IMPL=aec` in the shell still falls back to stock. aec.py itself is still byte-identical (hash pinned).
-   - Uncommitted: `aec1.py`, `tests/test_aec1.py` (new); `app.py`, `tests/harness/appctl.py`, `tests/test_preservation_4_8_resumption_recording_stats.py`, `CLAUDE.md` (modified).
+   - `docs/handoff1_ec2_report.md` (2026-09-29) is out of date: it stopped at the smoke-test step, but the operator confirmed on 2026-10-05 that the `a0ec061` version (Vertex + aec1 defaults) runs correctly on EC2.
+   - Not reported either way, so still worth watching on the next calls: first-audio latency vs studio from Mumbai; reconnection/GoAway on a call past ~10 min; token refresh over a long uptime (not just once at startup). `GEMINI_BACKEND=studio` stays the rollback.
+   - Cost still compounds per turn on Vertex (same prices as the app's constants; confirmed by the smoke test's usage line: prompt=1450 response=246). Capping it means `trigger_tokens` / `target_tokens` on `ContextWindowCompressionConfig`; operator declined it for now (2026-10-05), don't propose it again unless live-call bills ask for it.
+2. **Path B (aec1.py), the default, committed in `edb0bf1`, part of the working EC2 version (operator, 2026-10-05).** `AEC_IMPL` in app.py defaults to `aec1`; `AEC_IMPL=aec` in the shell falls back to stock. aec.py itself is still byte-identical (hash pinned).
    - Watch live calls for: the `[AEC]` stats line (impl and aec1's counters), the `[AEC-GUARD]` share (expected about 0% with aec1 converged, higher during the ~2.4 s convergence window; 55-68% is the stock baseline) and any phantom or missed barge-ins. Include at least one speakerphone call — that's the case aec1 is for. Replay recordings offline with `TEST_FILES/_aec_compare.py`. Fall back to `AEC_IMPL=aec` if a live call regresses.
-2. **Redesign Task 8 (live-call validation), in progress.** Five live calls analysed (TEST1-5, 2026-09-24). Still to do:
+3. **Redesign Task 8 (live-call validation), in progress.** Five live calls analysed (TEST1-5, 2026-09-24). Still to do:
    - Latch/threshold tuning on more calls, especially a caller talking over the agent at normal volume. Known miss: TEST5 17:22:17, where real caller speech (raw -26 dBFS) was judged echo and the latch held 13.5 s (`ended_by=new-playback`).
    - অন্তঃ echo-trigger live check (item G).
-3. **Verify** whether the 2026-09-25 CancelledError/orphan-task fix also stops the stale "Terminating call: Gemini response timeout" (then "call not found") that fired ~27 s after the caller hung up in TEST3.
-4. aec.py itself stays byte-identical (hash pinned by test_preservation_4_7). The path B fixes live only in aec1.py.
-5. Known and unaddressed: echo at 160 ms delay truncates mid-playback (frame 12). Outside the realistic domain; predates this work.
+4. **Verify** whether the 2026-09-25 CancelledError/orphan-task fix also stops the stale "Terminating call: Gemini response timeout" (then "call not found") that fired ~27 s after the caller hung up in TEST3.
+5. aec.py itself stays byte-identical (hash pinned by test_preservation_4_7). The path B fixes live only in aec1.py.
+6. Known and unaddressed: echo at 160 ms delay truncates mid-playback (frame 12). Outside the realistic domain; predates this work.
 
 ## Session log (oldest first)
 
@@ -113,7 +122,25 @@ Numbering: HANDOFF uses "Redesign Task N"; docs/spec/tasks.md uses 1-10 / 5.x. M
 - **Tests:** `tests/test_gemini_backend.py` (16 tests, fakes only, no network, no key read). 4_8 pins re-pinned. `.gitignore` gains `silver-shift-*.json`.
 - Suite: 251 OK, 2 skipped, 1 expected failure.
 
+### 2026-10-05: EC2 commit `a0ec061` ("Data Extraction 1") and the fallout
+- Operator pulled a commit made directly on EC2 (author `Ubuntu`), despite the sync model being file-copy only and `docs/handoff1.md` telling the EC2 agent not to edit code there. Three unrelated things landed in one commit:
+  1. **app.py comment slimming.** All the historical rationale comments (measured defects, task numbers, why-not-X reasoning around AEC_IMPL, GEMINI_BACKEND, truncation clock, echo gate, commit gate, delta trace, far-end pacing, etc) were replaced with short generic one-liners. No logic changed. Operator decision (2026-10-05): keep the slim version, do not restore.
+  2. **Quiet config change.** `PRICE_TEXT_INPUT/OUTPUT`, `PRICE_AUDIO_INPUT/OUTPUT`, `GEMINI_MODEL`, `PORT` went from hardcoded to env-override-able. Not mentioned in the commit message.
+  3. **Unrelated feature bundled in.** Two xlsx files added under new `AU Admission Data/` (admission notification, course fee) — a separate data-extraction effort, no code wiring, no mention in commit message beyond its title.
+  - Also added: `tests/_vertex_smoke.py` (tracked, not the gitignored `TEST_FILES/` copy) and `docs/handoff1_ec2_report.md`, which shows the EC2 bring-up got through hashes/key-file/Python-SDK/suite but stalled at the smoke-test step — `TEST_FILES/_vertex_smoke.py` was never copied to EC2, so the server was never started there and none of the live-call validation tasks ran.
+  - **Broke the suite:** app.py's line count shifted (comment removal), so `test_model_identifier_is_recorded`'s GEMINI_MODEL line pins went stale. Re-pinned `[64, 1721, 2233, 2243, 2659]` -> `[60, 1608, 2120, 2130, 2543]`. Suite back to 251 OK, 2 skipped, 1 expected failure.
+  - Update 2026-10-05 (operator): the `a0ec061` version, Vertex + aec1 included, runs correctly on EC2; the report above is out of date.
+
 ### 2026-09-29: Vertex connect smoke test, and docs/handoff1.md for EC2
 - **Smoke test:** `TEST_FILES/_vertex_smoke.py` (gitignored, not committed). Reuses `create_gemini_client()` / `connect_live_with_timeout()` / the app's own `LiveConnectConfig` and greeting prompt, so it exercises the real code path with no audio and no Plivo. Run from Windows: token 0.39 s, session open 1.42 s, greeting sent via `send_client_content`, first audio 0.70 s, `turn_complete=True`, transcript matched the Senco persona, usage prompt=1450/response=246 (~$0.004). Saves `TEST_FILES/_vertex_smoke_greeting.wav`.
 - **docs/handoff1.md:** written for a Claude agent running on EC2, to take the Vertex backend and aec1 the rest of the way to a validated live call. Covers: EC2 is not a git repo (file-copy sync only, backup old files first); the pre-2026-09-24 backup dir holds an old `.env`/creds, treat like `.env`; Python/`audioop`/SDK-version checks; a file-hash bring-up checklist; running the smoke test from EC2; then the live-call tasks (Vertex validation, aec1 trial, Redesign Task 8 remnants, the stale-timeout check) in priority order; env-var fallback table; where to write its findings (`docs/handoff1_ec2_report.md`) and the rule not to edit code on EC2 directly.
 - `CLAUDE.md` top line now points the EC2 agent at `docs/handoff1.md` first.
+
+### 2026-10-05: Course catalog tools (uncommitted)
+- Two Gemini tools over a JSON catalog built from the two AU Excel files (joined on UID, 87 records, operator-approved special cases for UIDs 121, 133, 137, 171 and two exclusions). Structured lookup, no RAG.
+- **app.py:** `import course_catalog`; catalog declarations appended to `LOCAL_GEMINI_TOOLS`; a catalog branch in the tool-call loop (no terminal state); a new `else` answers unknown tools with an error (they used to get no response, which leaves Gemini waiting); the dead MCP comment block is gone; call_state `catalog_calls` / `catalog_chars` (mirrored); `[CATALOG]` stats line and diagnostic tag.
+- **Tests:** `test_catalog_build` (18), `test_course_catalog` (34), `test_catalog_tool_handler` (9), `test_prompt_catalog` (6). Intentional 4_4 re-baseline (unknown tool now gets a tool_response before the deferred activityStart). 4_8 pins re-pinned.
+- Final review (opus) fixes: a department-only word can no longer make a `found` ("mtech computer science" used to land on M.Tech Data Science; now a one-candidate `ambiguous`, spec §6.3 step 6 amended); prompt reuse rule lets the model fetch a field it has not fetched yet. Deferred minors listed in the session's final message ("MCP tool" wording in the except log, playground comma splitting).
+- Suite: 318 OK, 2 skipped, 1 expected failure.
+- **prompt_au.txt shortened** (operator: the prompt is re-billed every turn). 10,835 to 6,614 chars, about 1,050 fewer tokens per turn (6,782 after the `error` rule below). Duplicates merged (bot refusal, no-invention rule, not-available list, entrance-exam rule, goal section); the degree list dropped, since the `list_programs` enum carries it (test and spec §10 updated). No instruction removed.
+- **Two deferred minors fixed** (operator, same day): the response deadline is re-armed after a non-terminal tool reply (catalog or unknown tool), so a model that goes silent after a lookup still hits "Gemini response timeout"; endCall/transferCall stay on the terminal deadline, and speech during the lookup still clears it via the deferred activityStart (`TestResponseWatchdogAfterLookup`, 4 tests). Prompt gains an `error` rule: never read the error aloud, retry once with fixed arguments, then counselor follow-up (`test_error_result_rule`). Suite: 323 OK, 2 skipped, 1 expected failure; 4_8 pins unchanged.

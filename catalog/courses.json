@@ -1,0 +1,3634 @@
+{
+ "session": "2027",
+ "source": [
+  "Academic Program Notification_2026-2027_Corrigendum_FINAL_06082026 (4) (1).xlsx",
+  "National Course fee 2026.xlsx"
+ ],
+ "excluded": [
+  "M. Tech (VLSI & Embedded Systems)",
+  "Post-Graduate Diploma in Nuclear Medicine Technology"
+ ],
+ "records": [
+  {
+   "id": "msc-chemistry",
+   "uid": "101",
+   "name": "M.Sc (Chemistry)",
+   "aliases": [],
+   "degree": "M.Sc",
+   "level": "PG",
+   "school": {
+    "name": "School of Basic and Applied Sciences",
+    "code": "SoBAS"
+   },
+   "department": "Chemistry",
+   "duration_years": 2,
+   "duration_note": null,
+   "seats": 10,
+   "eligibility": "Minimum 50% aggregate in 10+2 or equivalent from any recognized board and Minimum 50% aggregate in Undergraduate degree with respective subject from any recognised University in India or abroad.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 43250,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 87050,
+    "per_year": [
+     86500,
+     81500
+    ],
+    "per_semester": [
+     43250,
+     43250,
+     40750,
+     40750
+    ],
+    "program_fee": 168000,
+    "total": 211800
+   },
+   "add_ons": []
+  },
+  {
+   "id": "msc-environmental-science-and-sustainability",
+   "uid": "102",
+   "name": "M.Sc (Environmental Science and Sustainability)",
+   "aliases": [],
+   "degree": "M.Sc",
+   "level": "PG",
+   "school": {
+    "name": "School of Basic and Applied Sciences",
+    "code": "SoBAS"
+   },
+   "department": "Chemistry",
+   "duration_years": 2,
+   "duration_note": null,
+   "seats": 10,
+   "eligibility": "Minimum 50% in UG degree in any discipline of Science/ Engineering/ Agriculture Sciences/ Forestry/ Veterinary Science/ Medical Sciences or any other allied disciplines from a recognized University.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 43250,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 87050,
+    "per_year": [
+     86500,
+     81500
+    ],
+    "per_semester": [
+     43250,
+     43250,
+     40750,
+     40750
+    ],
+    "program_fee": 168000,
+    "total": 211800
+   },
+   "add_ons": []
+  },
+  {
+   "id": "bsc-chemistry",
+   "uid": "103",
+   "name": "B.Sc (Chemistry)",
+   "aliases": [],
+   "degree": "B.Sc",
+   "level": "UG",
+   "school": {
+    "name": "School of Basic and Applied Sciences",
+    "code": "SoBAS"
+   },
+   "department": "Chemistry",
+   "duration_years": 4,
+   "duration_note": null,
+   "seats": 10,
+   "eligibility": "Minimum 50% aggregate in 10+2 or equivalent with respective subject(s) from any recognized board.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 42211,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 86011,
+    "per_year": [
+     84422,
+     79422,
+     77922,
+     46560
+    ],
+    "per_semester": [
+     42211,
+     42211,
+     39711,
+     39711,
+     38961,
+     38961,
+     23280,
+     23280
+    ],
+    "program_fee": 288326,
+    "total": 332126
+   },
+   "add_ons": []
+  },
+  {
+   "id": "bsc-environmental-science-and-sustainability",
+   "uid": "104",
+   "name": "B.Sc (Environmental Science and Sustainability)",
+   "aliases": [],
+   "degree": "B.Sc",
+   "level": "UG",
+   "school": {
+    "name": "School of Basic and Applied Sciences",
+    "code": "SoBAS"
+   },
+   "department": "Chemistry",
+   "duration_years": 4,
+   "duration_note": null,
+   "seats": 10,
+   "eligibility": "Minimum 50% in Class XII (10+2) or its equivalent with science and humanities subjects from a recognized board in India or abroad.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 42211,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 86011,
+    "per_year": [
+     84422,
+     79422,
+     77922,
+     46560
+    ],
+    "per_semester": [
+     42211,
+     42211,
+     39711,
+     39711,
+     38961,
+     38961,
+     23280,
+     23280
+    ],
+    "program_fee": 288326,
+    "total": 332126
+   },
+   "add_ons": []
+  },
+  {
+   "id": "msc-forensic-science",
+   "uid": "105",
+   "name": "M.Sc (Forensic Science)",
+   "aliases": [],
+   "degree": "M.Sc",
+   "level": "PG",
+   "school": {
+    "name": "School of Basic and Applied Sciences",
+    "code": "SoBAS"
+   },
+   "department": "Forensic Science",
+   "duration_years": 2,
+   "duration_note": null,
+   "seats": 50,
+   "eligibility": "Minimum 50% aggregate in 10+2 or equivalent and minimum 50% aggregate in Undergraduate degree in Science from any recognised University in India or abroad.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 78250,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 122050,
+    "per_year": [
+     156500,
+     151500
+    ],
+    "per_semester": [
+     78250,
+     78250,
+     75750,
+     75750
+    ],
+    "program_fee": 308000,
+    "total": 351800
+   },
+   "add_ons": []
+  },
+  {
+   "id": "bsc-forensic-science",
+   "uid": "106",
+   "name": "B.Sc (Forensic Science)",
+   "aliases": [],
+   "degree": "B.Sc",
+   "level": "UG",
+   "school": {
+    "name": "School of Basic and Applied Sciences",
+    "code": "SoBAS"
+   },
+   "department": "Forensic Science",
+   "duration_years": 4,
+   "duration_note": null,
+   "seats": 180,
+   "eligibility": "Minimum 50% aggregate in 10+2 or equivalent with PCM/PCB from any recognized board.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 72984,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 116784,
+    "per_year": [
+     145968,
+     140968,
+     139468,
+     82902
+    ],
+    "per_semester": [
+     72984,
+     72984,
+     70484,
+     70484,
+     69734,
+     69734,
+     41451,
+     41451
+    ],
+    "program_fee": 509306,
+    "total": 553106
+   },
+   "add_ons": []
+  },
+  {
+   "id": "msc-geoinformatics",
+   "uid": "107",
+   "name": "M.Sc (Geoinformatics)",
+   "aliases": [],
+   "degree": "M.Sc",
+   "level": "PG",
+   "school": {
+    "name": "School of Basic and Applied Sciences",
+    "code": "SoBAS"
+   },
+   "department": "Geography",
+   "duration_years": 2,
+   "duration_note": null,
+   "seats": 160,
+   "eligibility": "Minimum 50% aggregate in 10+2 or equivalent from any recognized board, and minimum 50% aggregate in Undergraduate degree/ Post graduate degree from any recognized University in India or abroad Or M.Sc./M.Sc. (Tech.)/ M.Tech. in any discipline. Or MA in Geography/ Environmental Studies. Or B.E./ B.Tech. in any discipline. Or B.Arch./ B.Plan. / M.Arch. / M.Plan Or B.Sc. degree in any discipline Or BA in Geography/ Environmental Studies",
+   "fees": {
+    "session": "2027",
+    "first_semester": 78250,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 122050,
+    "per_year": [
+     156500,
+     151500
+    ],
+    "per_semester": [
+     78250,
+     78250,
+     75750,
+     75750
+    ],
+    "program_fee": 308000,
+    "total": 351800
+   },
+   "add_ons": []
+  },
+  {
+   "id": "msc-geography",
+   "uid": "109",
+   "name": "M.Sc (Geography)",
+   "aliases": [],
+   "degree": "M.Sc",
+   "level": "PG",
+   "school": {
+    "name": "School of Basic and Applied Sciences",
+    "code": "SoBAS"
+   },
+   "department": "Geography",
+   "duration_years": 2,
+   "duration_note": null,
+   "seats": 25,
+   "eligibility": "Minimum 50% aggregate in 10+2 or equivalent from any recognised board and minimum 50% aggregate in UG degree in Geography or Environmental Science from any recognised University in India or abroad.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 48838,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 92638,
+    "per_year": [
+     97676,
+     92676
+    ],
+    "per_semester": [
+     48838,
+     48838,
+     46338,
+     46338
+    ],
+    "program_fee": 190352,
+    "total": 234152
+   },
+   "add_ons": []
+  },
+  {
+   "id": "bsc-geography",
+   "uid": "108",
+   "name": "B.Sc (Geography)",
+   "aliases": [],
+   "degree": "B.Sc",
+   "level": "UG",
+   "school": {
+    "name": "School of Basic and Applied Sciences",
+    "code": "SoBAS"
+   },
+   "department": "Geography",
+   "duration_years": 4,
+   "duration_note": null,
+   "seats": 25,
+   "eligibility": "Minimum 50% aggregate in 10+2 or equivalent with respective subject(s) or with PCM/PCB from any recognized board.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 46250,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 90050,
+    "per_year": [
+     92500,
+     87500,
+     86000,
+     51600
+    ],
+    "per_semester": [
+     46250,
+     46250,
+     43750,
+     43750,
+     43000,
+     43000,
+     25800,
+     25800
+    ],
+    "program_fee": 317600,
+    "total": 361400
+   },
+   "add_ons": []
+  },
+  {
+   "id": "bsc-geoinformatics",
+   "uid": "110",
+   "name": "B.Sc (Geoinformatics)",
+   "aliases": [
+    "B.Sc. Geoinformatics"
+   ],
+   "degree": "B.Sc",
+   "level": "UG",
+   "school": {
+    "name": "School of Basic and Applied Sciences",
+    "code": "SoBAS"
+   },
+   "department": "Geography",
+   "duration_years": 4,
+   "duration_note": null,
+   "seats": 25,
+   "eligibility": "50% marks in 10+2 in the Science stream with a combination of PCM or PCB from a recognized board and its equivalent. Or 50% marks in 10+2 in the Eco-Science stream with a combination of any three of the following subjects: Mathematics, Statistics, Economics, Computer Science/Application from a recognized board and its equivalent. Or 50% marks in 10+2 in the Humanities stream with Geography from a recognized board and its equivalent.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 53956,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 97756,
+    "per_year": [
+     107912,
+     97430,
+     94286,
+     56572
+    ],
+    "per_semester": [
+     53956,
+     53956,
+     48715,
+     48715,
+     47143,
+     47143,
+     28286,
+     28286
+    ],
+    "program_fee": 356200,
+    "total": 400000
+   },
+   "add_ons": []
+  },
+  {
+   "id": "msc-applied-statistics-and-data-science",
+   "uid": "111",
+   "name": "M.Sc. (Applied Statistics and Data Science)",
+   "aliases": [],
+   "degree": "M.Sc",
+   "level": "PG",
+   "school": {
+    "name": "School of Basic and Applied Sciences",
+    "code": "SoBAS"
+   },
+   "department": "Mathematical Sciences",
+   "duration_years": 2,
+   "duration_note": null,
+   "seats": 10,
+   "eligibility": "Minimum 50% aggregate in 10+2 or equivalent from any recognised board and minimum 50% aggregate in UG degree in science (such as B.Sc. in Mathematics/Statistics/Physics/ Economics/Computer Science) or BCA or B.Tech. in CSE/ECE/IT from any recognised University in India or abroad.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 53250,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 97050,
+    "per_year": [
+     106500,
+     101500
+    ],
+    "per_semester": [
+     53250,
+     53250,
+     50750,
+     50750
+    ],
+    "program_fee": 208000,
+    "total": 251800
+   },
+   "add_ons": []
+  },
+  {
+   "id": "bsc-applied-statistics-and-data-science",
+   "uid": "112",
+   "name": "B.Sc (Applied Statistics and Data Science)",
+   "aliases": [],
+   "degree": "B.Sc",
+   "level": "UG",
+   "school": {
+    "name": "School of Basic and Applied Sciences",
+    "code": "SoBAS"
+   },
+   "department": "Mathematical Sciences",
+   "duration_years": 4,
+   "duration_note": null,
+   "seats": 30,
+   "eligibility": "Minimum 50% aggregate in 10+2 or equivalent with Mathematics/Statistics from any recognized board.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 45750,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 89550,
+    "per_year": [
+     91500,
+     86500,
+     85000,
+     45000
+    ],
+    "per_semester": [
+     45750,
+     45750,
+     43250,
+     43250,
+     42500,
+     42500,
+     22500,
+     22500
+    ],
+    "program_fee": 308000,
+    "total": 351800
+   },
+   "add_ons": []
+  },
+  {
+   "id": "bsc-mathematics-and-computing",
+   "uid": "113",
+   "name": "B.Sc (Mathematics and Computing)",
+   "aliases": [],
+   "degree": "B.Sc",
+   "level": "UG",
+   "school": {
+    "name": "School of Basic and Applied Sciences",
+    "code": "SoBAS"
+   },
+   "department": "Mathematical Sciences",
+   "duration_years": 4,
+   "duration_note": null,
+   "seats": 10,
+   "eligibility": "Minimum 50% aggregate in 10+2 or equivalent with respective subject(s) from any recognized board",
+   "fees": {
+    "session": "2027",
+    "first_semester": 39125,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 82925,
+    "per_year": [
+     78250,
+     73250,
+     71750,
+     43050
+    ],
+    "per_semester": [
+     39125,
+     39125,
+     36625,
+     36625,
+     35875,
+     35875,
+     21525,
+     21525
+    ],
+    "program_fee": 266300,
+    "total": 310100
+   },
+   "add_ons": []
+  },
+  {
+   "id": "msc-physics",
+   "uid": "114",
+   "name": "M.Sc (Physics)",
+   "aliases": [],
+   "degree": "M.Sc",
+   "level": "PG",
+   "school": {
+    "name": "School of Basic and Applied Sciences",
+    "code": "SoBAS"
+   },
+   "department": "Physics",
+   "duration_years": 2,
+   "duration_note": null,
+   "seats": 10,
+   "eligibility": "Minimum 50% aggregate in 10+2 or equivalent from any recognized board and Minimum 50% aggregate in Undergraduate degree with respective subject from any recognised University in India or abroad.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 53250,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 97050,
+    "per_year": [
+     106500,
+     101500
+    ],
+    "per_semester": [
+     53250,
+     53250,
+     50750,
+     50750
+    ],
+    "program_fee": 208000,
+    "total": 251800
+   },
+   "add_ons": []
+  },
+  {
+   "id": "bsc-physics",
+   "uid": "115",
+   "name": "B.Sc (Physics)",
+   "aliases": [],
+   "degree": "B.Sc",
+   "level": "UG",
+   "school": {
+    "name": "School of Basic and Applied Sciences",
+    "code": "SoBAS"
+   },
+   "department": "Physics",
+   "duration_years": 4,
+   "duration_note": null,
+   "seats": 15,
+   "eligibility": "Minimum 50% aggregate in 10+2 or equivalent with respective subject(s) from any recognized board.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 45750,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 89550,
+    "per_year": [
+     91500,
+     86500,
+     85000,
+     45000
+    ],
+    "per_semester": [
+     45750,
+     45750,
+     43250,
+     43250,
+     42500,
+     42500,
+     22500,
+     22500
+    ],
+    "program_fee": 308000,
+    "total": 351800
+   },
+   "add_ons": []
+  },
+  {
+   "id": "post-msc-diploma-in-medical-physics",
+   "uid": "116",
+   "name": "Post-M.Sc Diploma in Medical Physics",
+   "aliases": [],
+   "degree": "Post-M.Sc Diploma",
+   "level": "Diploma",
+   "school": {
+    "name": "School of Basic and Applied Sciences",
+    "code": "SoBAS"
+   },
+   "department": "Physics",
+   "duration_years": null,
+   "duration_note": "1st Year (1st Semester at Adamas University and 2nd Semester at Netaji Subhash Chandra Bose Cancer Hospital) & 2nd Year Internship",
+   "seats": 10,
+   "eligibility": "M.Sc. (Physics) with not less than 60% marks in aggregate or a CGPA of ≥ 6.5. In addition, the candidate should possess a B.Sc. (Physics as a main subject) Degree with not less than 60% marks in aggregate or a CGPA of ≥ 6.5",
+   "fees": {
+    "session": "2027",
+    "first_semester": 64000,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 107800,
+    "per_year": [
+     128000,
+     0
+    ],
+    "per_semester": [
+     64000,
+     64000,
+     0,
+     0
+    ],
+    "program_fee": 128000,
+    "total": 171800
+   },
+   "add_ons": []
+  },
+  {
+   "id": "bcom",
+   "uid": "117",
+   "name": "B.Com",
+   "aliases": [
+    "bachelor of commerce"
+   ],
+   "degree": "B.Com",
+   "level": "UG",
+   "school": {
+    "name": "School of Business",
+    "code": "SoB"
+   },
+   "department": "Commerce",
+   "duration_years": 4,
+   "duration_note": null,
+   "seats": 150,
+   "eligibility": "Minimum 55% aggregate in 10+2 or equivalent from any recognized board.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 50604,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 94404,
+    "per_year": [
+     101208,
+     96208,
+     94708,
+     56468
+    ],
+    "per_semester": [
+     50604,
+     50604,
+     48104,
+     48104,
+     47354,
+     47354,
+     28234,
+     28234
+    ],
+    "program_fee": 348592,
+    "total": 392392
+   },
+   "add_ons": []
+  },
+  {
+   "id": "mba",
+   "uid": "118",
+   "name": "MBA",
+   "aliases": [
+    "master of business administration"
+   ],
+   "degree": "MBA",
+   "level": "PG",
+   "school": {
+    "name": "School of Business",
+    "code": "SoB"
+   },
+   "department": "Management",
+   "duration_years": 2,
+   "duration_note": null,
+   "seats": 170,
+   "eligibility": "Minimum 50% aggregate in 10+2 or equivalent from any recognized board and in 60% in UG from any recognised University in India or abroad and CAT / MAT / XAT / AUAT qualified.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 193250,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 237050,
+    "per_year": [
+     386500,
+     381500
+    ],
+    "per_semester": [
+     193250,
+     193250,
+     190750,
+     190750
+    ],
+    "program_fee": 768000,
+    "total": 811800
+   },
+   "add_ons": []
+  },
+  {
+   "id": "mba-logistics-and-supply-chain-management",
+   "uid": "119",
+   "name": "MBA (Logistics and Supply Chain Management)",
+   "aliases": [],
+   "degree": "MBA",
+   "level": "PG",
+   "school": {
+    "name": "School of Business",
+    "code": "SoB"
+   },
+   "department": "Management",
+   "duration_years": 2,
+   "duration_note": null,
+   "seats": 170,
+   "eligibility": "Minimum 50% aggregate in 10+2 or equivalent from any recognized board and in 60% in UG from any recognised University in India or abroad and CAT / MAT / XAT / AUAT qualified.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 193250,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 237050,
+    "per_year": [
+     386500,
+     381500
+    ],
+    "per_semester": [
+     193250,
+     193250,
+     190750,
+     190750
+    ],
+    "program_fee": 768000,
+    "total": 811800
+   },
+   "add_ons": []
+  },
+  {
+   "id": "mba-business-analytics",
+   "uid": "120",
+   "name": "MBA (Business Analytics)",
+   "aliases": [],
+   "degree": "MBA",
+   "level": "PG",
+   "school": {
+    "name": "School of Business",
+    "code": "SoB"
+   },
+   "department": "Management",
+   "duration_years": 2,
+   "duration_note": null,
+   "seats": 170,
+   "eligibility": "Minimum 50% aggregate in 10+2 or equivalent from any recognized board and in 60% in UG from any recognised University in India or abroad and CAT / MAT / XAT / AUAT qualified.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 193250,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 237050,
+    "per_year": [
+     386500,
+     381500
+    ],
+    "per_semester": [
+     193250,
+     193250,
+     190750,
+     190750
+    ],
+    "program_fee": 768000,
+    "total": 811800
+   },
+   "add_ons": []
+  },
+  {
+   "id": "bba",
+   "uid": "121",
+   "name": "BBA",
+   "aliases": [
+    "bachelor of business administration"
+   ],
+   "degree": "BBA",
+   "level": "UG",
+   "school": {
+    "name": "School of Business",
+    "code": "SoB"
+   },
+   "department": "Management",
+   "duration_years": 4,
+   "duration_note": null,
+   "seats": 370,
+   "eligibility": "Minimum 60% aggregate in 10+2 or equivalent from any recognized board.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 94311,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 138111,
+    "per_year": [
+     188622,
+     183622,
+     182122,
+     109032
+    ],
+    "per_semester": [
+     94311,
+     94311,
+     91811,
+     91811,
+     91061,
+     91061,
+     54516,
+     54516
+    ],
+    "program_fee": 663398,
+    "total": 707198
+   },
+   "add_ons": []
+  },
+  {
+   "id": "bba-e-commerce",
+   "uid": "121",
+   "name": "BBA (E-Commerce)",
+   "aliases": [
+    "ecommerce"
+   ],
+   "degree": "BBA",
+   "level": "UG",
+   "school": {
+    "name": "School of Business",
+    "code": "SoB"
+   },
+   "department": "Management",
+   "duration_years": 4,
+   "duration_note": null,
+   "seats": 100,
+   "eligibility": "Minimum 60% aggregate in 10+2 or equivalent from any recognized board.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 94311,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 138111,
+    "per_year": [
+     188622,
+     183622,
+     182122,
+     109032
+    ],
+    "per_semester": [
+     94311,
+     94311,
+     91811,
+     91811,
+     91061,
+     91061,
+     54516,
+     54516
+    ],
+    "program_fee": 663398,
+    "total": 707198
+   },
+   "add_ons": []
+  },
+  {
+   "id": "ma-education",
+   "uid": "122",
+   "name": "M.A (Education)",
+   "aliases": [],
+   "degree": "M.A",
+   "level": "PG",
+   "school": {
+    "name": "School of Education",
+    "code": "SoE"
+   },
+   "department": "Education",
+   "duration_years": 2,
+   "duration_note": null,
+   "seats": 10,
+   "eligibility": "Minimum 50% aggregate 10+2 or equivalent from any recognized board and Minimum 50% aggregate with Honours in Undergraduate degree in Education or UG degree from any disciplines with B.Ed. from any recognised University in India or abroad.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 35750,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 79550,
+    "per_year": [
+     71500,
+     66500
+    ],
+    "per_semester": [
+     35750,
+     35750,
+     33250,
+     33250
+    ],
+    "program_fee": 138000,
+    "total": 181800
+   },
+   "add_ons": []
+  },
+  {
+   "id": "ba-education",
+   "uid": "123",
+   "name": "B.A (Education)",
+   "aliases": [],
+   "degree": "B.A",
+   "level": "UG",
+   "school": {
+    "name": "School of Education",
+    "code": "SoE"
+   },
+   "department": "Education",
+   "duration_years": 4,
+   "duration_note": null,
+   "seats": 40,
+   "eligibility": "Minimum 50% aggregate in 10+2 or equivalent from any recognized board.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 31250,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 75050,
+    "per_year": [
+     62500,
+     57500,
+     56000,
+     33600
+    ],
+    "per_semester": [
+     31250,
+     31250,
+     28750,
+     28750,
+     28000,
+     28000,
+     16800,
+     16800
+    ],
+    "program_fee": 209600,
+    "total": 253400
+   },
+   "add_ons": []
+  },
+  {
+   "id": "bed",
+   "uid": "124",
+   "name": "B.Ed",
+   "aliases": [
+    "bachelor of education"
+   ],
+   "degree": "B.Ed",
+   "level": "UG",
+   "school": {
+    "name": "School of Education",
+    "code": "SoE"
+   },
+   "department": "Education",
+   "duration_years": 2,
+   "duration_note": null,
+   "seats": 100,
+   "eligibility": "Graduate and/or Post Graduate with 50% marks or Equivalent Grade; Bachelor's in Engineering or Technology with specialization in Science & Mathematics with 55% Marks or any other qualification equivalent.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 43250,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 87050,
+    "per_year": [
+     86500,
+     81500
+    ],
+    "per_semester": [
+     43250,
+     43250,
+     40750,
+     40750
+    ],
+    "program_fee": 168000,
+    "total": 211800
+   },
+   "add_ons": []
+  },
+  {
+   "id": "btech-civil-engineering",
+   "uid": "125",
+   "name": "B.Tech (Civil Engineering)",
+   "aliases": [],
+   "degree": "B.Tech",
+   "level": "UG",
+   "school": {
+    "name": "School of Engineering and Technology",
+    "code": "SoET"
+   },
+   "department": "Civil Engineering",
+   "duration_years": 4,
+   "duration_note": null,
+   "seats": 60,
+   "eligibility": "Minimum 55% aggregate in 10+2 or equivalent with PM + Chem/ BioTech/ Biology/Technical Vocational/Computer Science/ Computer Application (with min 45% marks)",
+   "fees": {
+    "session": "2027",
+    "first_semester": 55450,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 99250,
+    "per_year": [
+     110900,
+     105900,
+     104400,
+     104400
+    ],
+    "per_semester": [
+     55450,
+     55450,
+     52950,
+     52950,
+     52200,
+     52200,
+     52200,
+     52200
+    ],
+    "program_fee": 425600,
+    "total": 469400
+   },
+   "add_ons": []
+  },
+  {
+   "id": "mtech-structural-engineering",
+   "uid": "126",
+   "name": "M.Tech (Structural Engineering)",
+   "aliases": [],
+   "degree": "M.Tech",
+   "level": "PG",
+   "school": {
+    "name": "School of Engineering and Technology",
+    "code": "SoET"
+   },
+   "department": "Civil Engineering",
+   "duration_years": 2,
+   "duration_note": null,
+   "seats": 5,
+   "eligibility": "Minimum 50% aggregate in 10+2 or equivalent from any recognized board and 60% in B. Tech. / GATE /AUAT qualified, subject to securing a minimum of 45% marks in respective subject.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 78250,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 122050,
+    "per_year": [
+     156500,
+     151500
+    ],
+    "per_semester": [
+     78250,
+     78250,
+     75750,
+     75750
+    ],
+    "program_fee": 308000,
+    "total": 351800
+   },
+   "add_ons": []
+  },
+  {
+   "id": "mtech-data-science-and-digital-transformation",
+   "uid": "127",
+   "name": "M.Tech (Data Science and Digital Transformation)",
+   "aliases": [],
+   "degree": "M.Tech",
+   "level": "PG",
+   "school": {
+    "name": "School of Engineering and Technology",
+    "code": "SoET"
+   },
+   "department": "Computer Science and Engineering",
+   "duration_years": 2,
+   "duration_note": null,
+   "seats": 18,
+   "eligibility": "Minimum 50% aggregate in 10+2 or equivalent from any recognized board and 60% in B. Tech. / GATE /AUAT qualified, subject to securing a minimum of 45% marks in respective subject.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 78250,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 122050,
+    "per_year": [
+     156500,
+     151500
+    ],
+    "per_semester": [
+     78250,
+     78250,
+     75750,
+     75750
+    ],
+    "program_fee": 308000,
+    "total": 351800
+   },
+   "add_ons": []
+  },
+  {
+   "id": "btech-computer-science-and-engineering-and-business-systems",
+   "uid": "128",
+   "name": "B.Tech (Computer Science and Engineering & Business Systems)",
+   "aliases": [
+    "csbs",
+    "cse business systems"
+   ],
+   "degree": "B.Tech",
+   "level": "UG",
+   "school": {
+    "name": "School of Engineering and Technology",
+    "code": "SoET"
+   },
+   "department": "Computer Science and Engineering",
+   "duration_years": 4,
+   "duration_note": null,
+   "seats": 30,
+   "eligibility": "Minimum 60% aggregate in 10+2 or equivalent from any recognized board with PM + Chem/ Bio. Tech/ Biology/Technical Vocational /Computer Science/ Computer Application (with min 45% marks in respective subject),",
+   "fees": {
+    "session": "2027",
+    "first_semester": 108250,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 152050,
+    "per_year": [
+     216500,
+     211500,
+     210000,
+     210000
+    ],
+    "per_semester": [
+     108250,
+     108250,
+     105750,
+     105750,
+     105000,
+     105000,
+     105000,
+     105000
+    ],
+    "program_fee": 848000,
+    "total": 891800
+   },
+   "add_ons": []
+  },
+  {
+   "id": "btech-robotics-and-artificial-intelligence",
+   "uid": "129",
+   "name": "B.Tech (Robotics and Artificial Intelligence)",
+   "aliases": [],
+   "degree": "B.Tech",
+   "level": "UG",
+   "school": {
+    "name": "School of Engineering and Technology",
+    "code": "SoET"
+   },
+   "department": "Computer Science and Engineering",
+   "duration_years": 4,
+   "duration_note": null,
+   "seats": 30,
+   "eligibility": "Minimum 60% aggregate in 10+2 or equivalent from any recognized board with PM + Chem/ Bio. Tech/ Biology/Technical Vocational /Computer Science/ Computer Application (with min 45% marks in respective subject),",
+   "fees": {
+    "session": "2027",
+    "first_semester": 108250,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 152050,
+    "per_year": [
+     216500,
+     211500,
+     210000,
+     210000
+    ],
+    "per_semester": [
+     108250,
+     108250,
+     105750,
+     105750,
+     105000,
+     105000,
+     105000,
+     105000
+    ],
+    "program_fee": 848000,
+    "total": 891800
+   },
+   "add_ons": []
+  },
+  {
+   "id": "mca",
+   "uid": "130",
+   "name": "MCA",
+   "aliases": [
+    "master of computer applications"
+   ],
+   "degree": "MCA",
+   "level": "PG",
+   "school": {
+    "name": "School of Engineering and Technology",
+    "code": "SoET"
+   },
+   "department": "Computer Application",
+   "duration_years": 2,
+   "duration_note": null,
+   "seats": 100,
+   "eligibility": "Minimum 50% aggregate in 10+2 or equivalent from any recognized board and Minimum 50% aggregate in BCA/Bachelor Degree in Computer Science Engineering or Equivalent Degree/Passed B.Sc/B.Com/B.A with Mathematics/ Computer Science at 10+2 level or at Graduation level (with additional bridge courses as per the norms of the concerned)",
+   "fees": {
+    "session": "2027",
+    "first_semester": 71500,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 115300,
+    "per_year": [
+     143000,
+     138000
+    ],
+    "per_semester": [
+     71500,
+     71500,
+     69000,
+     69000
+    ],
+    "program_fee": 281000,
+    "total": 324800
+   },
+   "add_ons": []
+  },
+  {
+   "id": "bca",
+   "uid": "131",
+   "name": "BCA",
+   "aliases": [
+    "bachelor of computer applications"
+   ],
+   "degree": "BCA",
+   "level": "UG",
+   "school": {
+    "name": "School of Engineering and Technology",
+    "code": "SoET"
+   },
+   "department": "Computer Application",
+   "duration_years": 4,
+   "duration_note": null,
+   "seats": 250,
+   "eligibility": "Minimum 60% aggregate in 10+2 or equivalent from any recognized board.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 75058,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 118858,
+    "per_year": [
+     150116,
+     145116,
+     143616,
+     76032
+    ],
+    "per_semester": [
+     75058,
+     75058,
+     72558,
+     72558,
+     71808,
+     71808,
+     38016,
+     38016
+    ],
+    "program_fee": 514880,
+    "total": 558680
+   },
+   "add_ons": []
+  },
+  {
+   "id": "btech-computer-science-and-engineering",
+   "uid": "132",
+   "name": "B.Tech (Computer Science and Engineering)",
+   "aliases": [
+    "cse",
+    "computer science",
+    "computer science and engineering"
+   ],
+   "degree": "B.Tech",
+   "level": "UG",
+   "school": {
+    "name": "School of Engineering and Technology",
+    "code": "SoET"
+   },
+   "department": "Computer Science and Engineering",
+   "duration_years": 4,
+   "duration_note": null,
+   "seats": 300,
+   "eligibility": "Minimum 60% aggregate in 10+2 or equivalent from any recognized board with PM + Chem/ Bio. Tech/ Biology/Technical Vocational /Computer Science/ Computer Application (with min 45% marks in respective subject)",
+   "fees": {
+    "session": "2027",
+    "first_semester": 108250,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 152050,
+    "per_year": [
+     216500,
+     211500,
+     210000,
+     210000
+    ],
+    "per_semester": [
+     108250,
+     108250,
+     105750,
+     105750,
+     105000,
+     105000,
+     105000,
+     105000
+    ],
+    "program_fee": 848000,
+    "total": 891800
+   },
+   "add_ons": []
+  },
+  {
+   "id": "btech-cse-artificial-intelligence-and-machine-learning",
+   "uid": "133",
+   "name": "B.Tech CSE (Artificial Intelligence & Machine Learning)",
+   "aliases": [
+    "aiml",
+    "ai ml",
+    "cse aiml",
+    "cse ai ml"
+   ],
+   "degree": "B.Tech",
+   "level": "UG",
+   "school": {
+    "name": "School of Engineering and Technology",
+    "code": "SoET"
+   },
+   "department": "Computer Science and Engineering",
+   "duration_years": 4,
+   "duration_note": null,
+   "seats": 60,
+   "eligibility": "Minimum 60% aggregate in 10+2 or equivalent from any recognized board with PM + Chem/ Bio. Tech/ Biology/Technical Vocational /Computer Science/ Computer Application (with min 45% marks in respective subject)",
+   "fees": {
+    "session": "2027",
+    "first_semester": 108250,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 152050,
+    "per_year": [
+     216500,
+     211500,
+     210000,
+     210000
+    ],
+    "per_semester": [
+     108250,
+     108250,
+     105750,
+     105750,
+     105000,
+     105000,
+     105000,
+     105000
+    ],
+    "program_fee": 848000,
+    "total": 891800
+   },
+   "add_ons": []
+  },
+  {
+   "id": "btech-in-artificial-intelligence-and-data-science-business-application",
+   "uid": "133",
+   "name": "B.Tech in Artificial Intelligence & Data Science (Business Application)",
+   "aliases": [],
+   "degree": "B.Tech",
+   "level": "UG",
+   "school": {
+    "name": "School of Engineering and Technology",
+    "code": "SoET"
+   },
+   "department": "Computer Science and Engineering",
+   "duration_years": 4,
+   "duration_note": null,
+   "seats": 100,
+   "eligibility": "12th pass (10+2) with an aggregate of 50% and from PM + Chem/ Bio Tech/ Biology/ Technical Vocational (with 45%), subject to securing a minimum 40% marks in each individual subject.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 108250,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 152050,
+    "per_year": [
+     216500,
+     211500,
+     210000,
+     210000
+    ],
+    "per_semester": [
+     108250,
+     108250,
+     105750,
+     105750,
+     105000,
+     105000,
+     105000,
+     105000
+    ],
+    "program_fee": 848000,
+    "total": 891800
+   },
+   "add_ons": []
+  },
+  {
+   "id": "btech-in-artificial-intelligence-and-data-science-fintech",
+   "uid": "133",
+   "name": "B.Tech in Artificial Intelligence & Data Science (FinTech)",
+   "aliases": [],
+   "degree": "B.Tech",
+   "level": "UG",
+   "school": {
+    "name": "School of Engineering and Technology",
+    "code": "SoET"
+   },
+   "department": "Computer Science and Engineering",
+   "duration_years": 4,
+   "duration_note": null,
+   "seats": 100,
+   "eligibility": "12th pass (10+2) with an aggregate of 50% and from PM + Chem/ Bio Tech/ Biology/ Technical Vocational (with 45%), subject to securing a minimum 40% marks in each individual subject.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 108250,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 152050,
+    "per_year": [
+     216500,
+     211500,
+     210000,
+     210000
+    ],
+    "per_semester": [
+     108250,
+     108250,
+     105750,
+     105750,
+     105000,
+     105000,
+     105000,
+     105000
+    ],
+    "program_fee": 848000,
+    "total": 891800
+   },
+   "add_ons": []
+  },
+  {
+   "id": "btech-cse-cyber-security",
+   "uid": "134",
+   "name": "B.Tech CSE (Cyber Security)",
+   "aliases": [],
+   "degree": "B.Tech",
+   "level": "UG",
+   "school": {
+    "name": "School of Engineering and Technology",
+    "code": "SoET"
+   },
+   "department": "Computer Science and Engineering",
+   "duration_years": 4,
+   "duration_note": null,
+   "seats": 30,
+   "eligibility": "Minimum 60% aggregate in 10+2 or equivalent from any recognized board with PM + Chem/ Bio. Tech/ Biology/Technical Vocational /Computer Science/ Computer Application (with min 45% marks in respective subject)",
+   "fees": {
+    "session": "2027",
+    "first_semester": 108250,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 152050,
+    "per_year": [
+     216500,
+     211500,
+     210000,
+     210000
+    ],
+    "per_semester": [
+     108250,
+     108250,
+     105750,
+     105750,
+     105000,
+     105000,
+     105000,
+     105000
+    ],
+    "program_fee": 848000,
+    "total": 891800
+   },
+   "add_ons": []
+  },
+  {
+   "id": "btech-cse-data-science",
+   "uid": "135",
+   "name": "B.Tech CSE (Data Science)",
+   "aliases": [],
+   "degree": "B.Tech",
+   "level": "UG",
+   "school": {
+    "name": "School of Engineering and Technology",
+    "code": "SoET"
+   },
+   "department": "Computer Science and Engineering",
+   "duration_years": 4,
+   "duration_note": null,
+   "seats": 30,
+   "eligibility": "Minimum 60% aggregate in 10+2 or equivalent from any recognized board with PM + Chem/ Bio. Tech/ Biology/Technical Vocational /Computer Science/ Computer Application (with min 45% marks in respective subject)",
+   "fees": {
+    "session": "2027",
+    "first_semester": 108250,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 152050,
+    "per_year": [
+     216500,
+     211500,
+     210000,
+     210000
+    ],
+    "per_semester": [
+     108250,
+     108250,
+     105750,
+     105750,
+     105000,
+     105000,
+     105000,
+     105000
+    ],
+    "program_fee": 848000,
+    "total": 891800
+   },
+   "add_ons": []
+  },
+  {
+   "id": "btech-cse-cloud-computing",
+   "uid": "136",
+   "name": "B.Tech CSE (Cloud Computing)",
+   "aliases": [],
+   "degree": "B.Tech",
+   "level": "UG",
+   "school": {
+    "name": "School of Engineering and Technology",
+    "code": "SoET"
+   },
+   "department": "Computer Science and Engineering",
+   "duration_years": 4,
+   "duration_note": null,
+   "seats": 30,
+   "eligibility": "Minimum 60% aggregate in 10+2 or equivalent from any recognized board with PM + Chem/ Bio. Tech/ Biology/Technical Vocational /Computer Science/ Computer Application (with min 45% marks in respective subject)",
+   "fees": {
+    "session": "2027",
+    "first_semester": 108250,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 152050,
+    "per_year": [
+     216500,
+     211500,
+     210000,
+     210000
+    ],
+    "per_semester": [
+     108250,
+     108250,
+     105750,
+     105750,
+     105000,
+     105000,
+     105000,
+     105000
+    ],
+    "program_fee": 848000,
+    "total": 891800
+   },
+   "add_ons": []
+  },
+  {
+   "id": "btech-cse-with-specialization-in-sap",
+   "uid": "137",
+   "name": "B.Tech CSE with specialization in SAP",
+   "aliases": [
+    "B.Tech (Computer Science and Engineering) with specialization in SAP"
+   ],
+   "degree": "B.Tech",
+   "level": "UG",
+   "school": {
+    "name": "School of Engineering and Technology",
+    "code": "SoET"
+   },
+   "department": "Computer Science and Engineering",
+   "duration_years": 4,
+   "duration_note": null,
+   "seats": 60,
+   "eligibility": "Minimum 60% aggregate in 10+2 or equivalent from any recognized board with PM + Chem/ Bio. Tech/ Biology/Technical Vocational /Computer Science/ Computer Application (with min 45% marks in respective subject)",
+   "fees": {
+    "session": "2027",
+    "first_semester": 107000,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 150800,
+    "per_year": [
+     214000,
+     209000,
+     207500,
+     207500
+    ],
+    "per_semester": [
+     107000,
+     107000,
+     104500,
+     104500,
+     103750,
+     103750,
+     103750,
+     103750
+    ],
+    "program_fee": 838000,
+    "total": 881800
+   },
+   "add_ons": [
+    {
+     "name": "SAP add-on certification",
+     "duration_years": 1,
+     "fee": 65000
+    }
+   ]
+  },
+  {
+   "id": "btech-electrical-engineering",
+   "uid": "138",
+   "name": "B.Tech (Electrical Engineering)",
+   "aliases": [
+    "ee"
+   ],
+   "degree": "B.Tech",
+   "level": "UG",
+   "school": {
+    "name": "School of Engineering and Technology",
+    "code": "SoET"
+   },
+   "department": "Electrical & Electronics Engineering",
+   "duration_years": 4,
+   "duration_note": null,
+   "seats": 60,
+   "eligibility": "Minimum 55% aggregate in 10+2 or equivalent with PM + Chem/ BioTech/ Biology/Technical Vocational/Computer Science/ Computer Application (with min 45% marks)",
+   "fees": {
+    "session": "2027",
+    "first_semester": 65250,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 109050,
+    "per_year": [
+     130500,
+     125500,
+     124000,
+     124000
+    ],
+    "per_semester": [
+     65250,
+     65250,
+     62750,
+     62750,
+     62000,
+     62000,
+     62000,
+     62000
+    ],
+    "program_fee": 504000,
+    "total": 547800
+   },
+   "add_ons": []
+  },
+  {
+   "id": "btech-electronics-and-communication-engineering",
+   "uid": "139",
+   "name": "B.Tech (Electronics and Communication Engineering)",
+   "aliases": [
+    "ece"
+   ],
+   "degree": "B.Tech",
+   "level": "UG",
+   "school": {
+    "name": "School of Engineering and Technology",
+    "code": "SoET"
+   },
+   "department": "Electrical & Electronics Engineering",
+   "duration_years": 4,
+   "duration_note": null,
+   "seats": 60,
+   "eligibility": "Minimum 55% aggregate in 10+2 or equivalent with PM + Chem/ BioTech/ Biology/Technical Vocational/Computer Science/ Computer Application (with min 45% marks)",
+   "fees": {
+    "session": "2027",
+    "first_semester": 68375,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 112175,
+    "per_year": [
+     136750,
+     131750,
+     130250,
+     130250
+    ],
+    "per_semester": [
+     68375,
+     68375,
+     65875,
+     65875,
+     65125,
+     65125,
+     65125,
+     65125
+    ],
+    "program_fee": 529000,
+    "total": 572800
+   },
+   "add_ons": []
+  },
+  {
+   "id": "btech-biomedical-engineering",
+   "uid": "140",
+   "name": "B.Tech (Biomedical Engineering)",
+   "aliases": [],
+   "degree": "B.Tech",
+   "level": "UG",
+   "school": {
+    "name": "School of Engineering and Technology",
+    "code": "SoET"
+   },
+   "department": "Electrical & Electronics Engineering",
+   "duration_years": 4,
+   "duration_note": null,
+   "seats": 60,
+   "eligibility": "Minimum 55% aggregate in 10+2 or equivalent from any recognized board; PCB/PCM required, (with min 45% marks in respective subject)",
+   "fees": {
+    "session": "2027",
+    "first_semester": 78250,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 122050,
+    "per_year": [
+     156500,
+     151500,
+     150000,
+     150000
+    ],
+    "per_semester": [
+     78250,
+     78250,
+     75750,
+     75750,
+     75000,
+     75000,
+     75000,
+     75000
+    ],
+    "program_fee": 608000,
+    "total": 651800
+   },
+   "add_ons": []
+  },
+  {
+   "id": "btech-mechanical-engineering",
+   "uid": "141",
+   "name": "B.Tech (Mechanical Engineering)",
+   "aliases": [],
+   "degree": "B.Tech",
+   "level": "UG",
+   "school": {
+    "name": "School of Engineering and Technology",
+    "code": "SoET"
+   },
+   "department": "Mechanical Engineering",
+   "duration_years": 4,
+   "duration_note": null,
+   "seats": 60,
+   "eligibility": "Minimum 55% aggregate in 10+2 or equivalent with PM + Chem/ BioTech/ Biology/Technical Vocational/Computer Science/ Computer Application (with min 45% marks)",
+   "fees": {
+    "session": "2027",
+    "first_semester": 55444,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 99244,
+    "per_year": [
+     110888,
+     105888,
+     104388,
+     104388
+    ],
+    "per_semester": [
+     55444,
+     55444,
+     52944,
+     52944,
+     52194,
+     52194,
+     52194,
+     52194
+    ],
+    "program_fee": 425552,
+    "total": 469352
+   },
+   "add_ons": []
+  },
+  {
+   "id": "btech-electronics-engineering-and-vlsi-design",
+   "uid": "142",
+   "name": "B.Tech (Electronics Engineering and VLSI Design)",
+   "aliases": [
+    "B.Tech. Electronics Engineering (VLSI Design and Technology)"
+   ],
+   "degree": "B.Tech",
+   "level": "UG",
+   "school": {
+    "name": "School of Engineering and Technology",
+    "code": "SoET"
+   },
+   "department": "Electrical & Electronics Engineering",
+   "duration_years": 4,
+   "duration_note": null,
+   "seats": 30,
+   "eligibility": "Minimum 55% aggregate in 10+2 or equivalent with PM + Chem/ BioTech/ Biology/Technical Vocational/Computer Science/ Computer Application (with min 45% marks)",
+   "fees": {
+    "session": "2027",
+    "first_semester": 109275,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 153075,
+    "per_year": [
+     218550,
+     213550,
+     212050,
+     212050
+    ],
+    "per_semester": [
+     109275,
+     109275,
+     106775,
+     106775,
+     106025,
+     106025,
+     106025,
+     106025
+    ],
+    "program_fee": 856200,
+    "total": 900000
+   },
+   "add_ons": []
+  },
+  {
+   "id": "ba-llb-hons",
+   "uid": "143",
+   "name": "B.A. LL.B (Hons)",
+   "aliases": [
+    "BA. LLB (Hons)",
+    "ballb",
+    "law"
+   ],
+   "degree": "BA LL.B",
+   "level": "UG",
+   "school": {
+    "name": "School of Law and Justice",
+    "code": "SoLJ"
+   },
+   "department": "Law",
+   "duration_years": 5,
+   "duration_note": null,
+   "seats": 60,
+   "eligibility": "Minimum 60% aggregate in 10+2 or equivalent from any recognized board & CLAT /AUAT qualified.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 95650,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 139450,
+    "per_year": [
+     191300,
+     186300,
+     184800,
+     184800,
+     184800
+    ],
+    "per_semester": [
+     95650,
+     95650,
+     93150,
+     93150,
+     92400,
+     92400,
+     92400,
+     92400,
+     92400,
+     92400
+    ],
+    "program_fee": 932000,
+    "total": 975800
+   },
+   "add_ons": []
+  },
+  {
+   "id": "bba-llb-hons",
+   "uid": "144",
+   "name": "B.B.A. LL.B (Hons)",
+   "aliases": [
+    "BBA. LLB (Hons)",
+    "bballb",
+    "law"
+   ],
+   "degree": "BBA LL.B",
+   "level": "UG",
+   "school": {
+    "name": "School of Law and Justice",
+    "code": "SoLJ"
+   },
+   "department": "Law",
+   "duration_years": 5,
+   "duration_note": null,
+   "seats": 60,
+   "eligibility": "Minimum 60% aggregate in 10+2 or equivalent from any recognized board & CLAT /AUAT qualified.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 95650,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 139450,
+    "per_year": [
+     191300,
+     186300,
+     184800,
+     184800,
+     184800
+    ],
+    "per_semester": [
+     95650,
+     95650,
+     93150,
+     93150,
+     92400,
+     92400,
+     92400,
+     92400,
+     92400,
+     92400
+    ],
+    "program_fee": 932000,
+    "total": 975800
+   },
+   "add_ons": []
+  },
+  {
+   "id": "llm",
+   "uid": "145",
+   "name": "LL.M",
+   "aliases": [
+    "master of laws",
+    "law"
+   ],
+   "degree": "LL.M",
+   "level": "PG",
+   "school": {
+    "name": "School of Law and Justice",
+    "code": "SoLJ"
+   },
+   "department": "Law",
+   "duration_years": 2,
+   "duration_note": null,
+   "seats": 40,
+   "eligibility": "Minimum 50% aggregate in LL.B (3 / 5 yrs) and 45% for SC/St/PWD from any recognized University in India or abroad & AUAT qualified.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 59688,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 103488,
+    "per_year": [
+     119376,
+     114376
+    ],
+    "per_semester": [
+     59688,
+     59688,
+     57188,
+     57188
+    ],
+    "program_fee": 233752,
+    "total": 277552
+   },
+   "add_ons": []
+  },
+  {
+   "id": "msc-economics",
+   "uid": "147",
+   "name": "M.Sc (Economics)",
+   "aliases": [],
+   "degree": "M.Sc",
+   "level": "PG",
+   "school": {
+    "name": "School of Liberal Arts and Culture Studies",
+    "code": "SoLACS"
+   },
+   "department": "Economics & Social Sciences",
+   "duration_years": 2,
+   "duration_note": null,
+   "seats": 15,
+   "eligibility": "Minimum 50% aggregate in UG degree in Economics or Applied Economics or Allied Subjects to Economics (Honours or Major) from any recognised university in India or abroad.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 37938,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 81738,
+    "per_year": [
+     75876,
+     70876
+    ],
+    "per_semester": [
+     37938,
+     37938,
+     35438,
+     35438
+    ],
+    "program_fee": 146752,
+    "total": 190552
+   },
+   "add_ons": []
+  },
+  {
+   "id": "bsc-economics",
+   "uid": "146",
+   "name": "B.Sc (Economics)",
+   "aliases": [],
+   "degree": "B.Sc",
+   "level": "UG",
+   "school": {
+    "name": "School of Liberal Arts and Culture Studies",
+    "code": "SoLACS"
+   },
+   "department": "Economics & Social Sciences",
+   "duration_years": 4,
+   "duration_note": null,
+   "seats": 15,
+   "eligibility": "Minimum 50% aggregate in 10+2 or equivalent examination from any recognised board. Mathematics as one of the subjects in class XI and XII is preferred. Those who do not have mathematics in class XI and XII have to undergo an additional non-credit remedial course in the subject in the first semester. Candidates have to pass this remedial course in order to continue in the program.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 40055,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 83855,
+    "per_year": [
+     80110,
+     75110,
+     73610,
+     44166
+    ],
+    "per_semester": [
+     40055,
+     40055,
+     37555,
+     37555,
+     36805,
+     36805,
+     22083,
+     22083
+    ],
+    "program_fee": 272996,
+    "total": 316796
+   },
+   "add_ons": []
+  },
+  {
+   "id": "ma-bengali-language-and-literature",
+   "uid": "182",
+   "name": "M.A (Bengali Language and Literature)",
+   "aliases": [],
+   "degree": "M.A",
+   "level": "PG",
+   "school": {
+    "name": "School of Liberal Arts and Culture Studies",
+    "code": "SoLACS"
+   },
+   "department": "Language and Literature",
+   "duration_years": 2,
+   "duration_note": null,
+   "seats": 5,
+   "eligibility": "Minimum 50% aggregate in 10+2 or equivalent from any recognized board and Minimum 50% aggregate in Undergraduate degree with respective subjects from any recognized University in India or abroad.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 28250,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 72050,
+    "per_year": [
+     56500,
+     51500
+    ],
+    "per_semester": [
+     28250,
+     28250,
+     25750,
+     25750
+    ],
+    "program_fee": 108000,
+    "total": 151800
+   },
+   "add_ons": []
+  },
+  {
+   "id": "ba-bengali-language-and-literature",
+   "uid": "148",
+   "name": "B. A (Bengali Language and Literature)",
+   "aliases": [],
+   "degree": "B.A",
+   "level": "UG",
+   "school": {
+    "name": "School of Liberal Arts and Culture Studies",
+    "code": "SoLACS"
+   },
+   "department": "Language and Literature",
+   "duration_years": 4,
+   "duration_note": null,
+   "seats": 10,
+   "eligibility": "Minimum 50% aggregate in 10+2 or equivalent from any recognized board.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 23250,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 67050,
+    "per_year": [
+     46500,
+     41500,
+     40000,
+     24000
+    ],
+    "per_semester": [
+     23250,
+     23250,
+     20750,
+     20750,
+     20000,
+     20000,
+     12000,
+     12000
+    ],
+    "program_fee": 152000,
+    "total": 195800
+   },
+   "add_ons": []
+  },
+  {
+   "id": "ma-english-language-and-literature",
+   "uid": "149",
+   "name": "M.A (English Language and Literature)",
+   "aliases": [],
+   "degree": "M.A",
+   "level": "PG",
+   "school": {
+    "name": "School of Liberal Arts and Culture Studies",
+    "code": "SoLACS"
+   },
+   "department": "Language and Literature",
+   "duration_years": 2,
+   "duration_note": null,
+   "seats": 30,
+   "eligibility": "Minimum 50% aggregate in 10+2 or equivalent from any recognized board and Minimum 50% aggregate in Undergraduate degree with respective subjects from any recognized University in India or abroad.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 38325,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 82125,
+    "per_year": [
+     76650,
+     71650
+    ],
+    "per_semester": [
+     38325,
+     38325,
+     35825,
+     35825
+    ],
+    "program_fee": 148300,
+    "total": 192100
+   },
+   "add_ons": []
+  },
+  {
+   "id": "ba-english-language-and-literature",
+   "uid": "150",
+   "name": "B. A (English Language and Literature)",
+   "aliases": [],
+   "degree": "B.A",
+   "level": "UG",
+   "school": {
+    "name": "School of Liberal Arts and Culture Studies",
+    "code": "SoLACS"
+   },
+   "department": "Language and Literature",
+   "duration_years": 4,
+   "duration_note": null,
+   "seats": 60,
+   "eligibility": "Minimum 50% aggregate in 10+2 or equivalent from any recognized board.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 43849,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 87649,
+    "per_year": [
+     87698,
+     82698,
+     81198,
+     48606
+    ],
+    "per_semester": [
+     43849,
+     43849,
+     41349,
+     41349,
+     40599,
+     40599,
+     24303,
+     24303
+    ],
+    "program_fee": 300200,
+    "total": 344000
+   },
+   "add_ons": []
+  },
+  {
+   "id": "ma-political-science-and-international-relations",
+   "uid": "151",
+   "name": "M.A (Political Science & International Relations)",
+   "aliases": [],
+   "degree": "M.A",
+   "level": "PG",
+   "school": {
+    "name": "School of Liberal Arts and Culture Studies",
+    "code": "SoLACS"
+   },
+   "department": "Economics & Social Sciences",
+   "duration_years": 2,
+   "duration_note": null,
+   "seats": 20,
+   "eligibility": "Minimum 50% aggregate in 10+2 or equivalent from any recognized board and Minimum 50% aggregate in Undergraduate degree with respective subjects from any recognized University in India or abroad.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 38788,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 82588,
+    "per_year": [
+     77576,
+     72576
+    ],
+    "per_semester": [
+     38788,
+     38788,
+     36288,
+     36288
+    ],
+    "program_fee": 150152,
+    "total": 193952
+   },
+   "add_ons": []
+  },
+  {
+   "id": "ma-public-administration-and-governance",
+   "uid": "152",
+   "name": "M.A (Public Administration & Governance)",
+   "aliases": [],
+   "degree": "M.A",
+   "level": "PG",
+   "school": {
+    "name": "School of Liberal Arts and Culture Studies",
+    "code": "SoLACS"
+   },
+   "department": "Economics & Social Sciences",
+   "duration_years": 2,
+   "duration_note": null,
+   "seats": 15,
+   "eligibility": "Minimum 50% aggregate in 10+2 or equivalent from any recognized board and Minimum 50% aggregate in Undergraduate degree with respective subjects from any recognized University in India or abroad.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 46788,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 90588,
+    "per_year": [
+     93576,
+     88576
+    ],
+    "per_semester": [
+     46788,
+     46788,
+     44288,
+     44288
+    ],
+    "program_fee": 182152,
+    "total": 225952
+   },
+   "add_ons": []
+  },
+  {
+   "id": "ba-political-science-and-international-relations",
+   "uid": "153",
+   "name": "B.A (Political Science & International Relations)",
+   "aliases": [],
+   "degree": "B.A",
+   "level": "UG",
+   "school": {
+    "name": "School of Liberal Arts and Culture Studies",
+    "code": "SoLACS"
+   },
+   "department": "Economics & Social Sciences",
+   "duration_years": 4,
+   "duration_note": null,
+   "seats": 20,
+   "eligibility": "Minimum 50% aggregate in 10+2 or equivalent from any recognized board.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 39125,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 82925,
+    "per_year": [
+     78250,
+     73250,
+     71750,
+     43050
+    ],
+    "per_semester": [
+     39125,
+     39125,
+     36625,
+     36625,
+     35875,
+     35875,
+     21525,
+     21525
+    ],
+    "program_fee": 266300,
+    "total": 310100
+   },
+   "add_ons": []
+  },
+  {
+   "id": "ba-public-administration-and-governance",
+   "uid": "154",
+   "name": "B.A (Public Administration & Governance)",
+   "aliases": [],
+   "degree": "B.A",
+   "level": "UG",
+   "school": {
+    "name": "School of Liberal Arts and Culture Studies",
+    "code": "SoLACS"
+   },
+   "department": "Economics & Social Sciences",
+   "duration_years": 4,
+   "duration_note": null,
+   "seats": 10,
+   "eligibility": "Minimum 50% aggregate in 10+2 or equivalent from any recognized board.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 47262,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 91062,
+    "per_year": [
+     94524,
+     89524,
+     88024,
+     52698
+    ],
+    "per_semester": [
+     47262,
+     47262,
+     44762,
+     44762,
+     44012,
+     44012,
+     26349,
+     26349
+    ],
+    "program_fee": 324770,
+    "total": 368570
+   },
+   "add_ons": []
+  },
+  {
+   "id": "ba-history-with-specialization-in-heritage-studies",
+   "uid": "155",
+   "name": "B.A. History (with Specialization in) Heritage Studies",
+   "aliases": [
+    "B.A (History)"
+   ],
+   "degree": "B.A",
+   "level": "UG",
+   "school": {
+    "name": "School of Liberal Arts and Culture Studies",
+    "code": "SoLACS"
+   },
+   "department": "Economics & Social Sciences",
+   "duration_years": 4,
+   "duration_note": null,
+   "seats": 5,
+   "eligibility": "Minimum 50% aggregate in 10+2 or equivalent from any recognized board.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 39125,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 82925,
+    "per_year": [
+     78250,
+     73250,
+     71750,
+     43050
+    ],
+    "per_semester": [
+     39125,
+     39125,
+     36625,
+     36625,
+     35875,
+     35875,
+     21525,
+     21525
+    ],
+    "program_fee": 266300,
+    "total": 310100
+   },
+   "add_ons": []
+  },
+  {
+   "id": "ma-history",
+   "uid": "156",
+   "name": "M.A (History)",
+   "aliases": [],
+   "degree": "M.A",
+   "level": "PG",
+   "school": {
+    "name": "School of Liberal Arts and Culture Studies",
+    "code": "SoLACS"
+   },
+   "department": "Economics & Social Sciences",
+   "duration_years": 2,
+   "duration_note": null,
+   "seats": 10,
+   "eligibility": "Minimum 50% aggregate in 10+2 or equivalent from any recognized board and Minimum 50% aggregate in Undergraduate degree with respective subjects from any recognized University in India or abroad.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 38788,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 82588,
+    "per_year": [
+     77576,
+     72576
+    ],
+    "per_semester": [
+     38788,
+     38788,
+     36288,
+     36288
+    ],
+    "program_fee": 150152,
+    "total": 193952
+   },
+   "add_ons": []
+  },
+  {
+   "id": "ma-sociology-with-specialization-in-corporate-social-responsibility-and-management",
+   "uid": "157",
+   "name": "M.A. Sociology (with Specialization in) Corporate Social Responsibility and Management",
+   "aliases": [
+    "M.A (Sociology)"
+   ],
+   "degree": "M.A",
+   "level": "PG",
+   "school": {
+    "name": "School of Liberal Arts and Culture Studies",
+    "code": "SoLACS"
+   },
+   "department": "Economics & Social Sciences",
+   "duration_years": 2,
+   "duration_note": null,
+   "seats": 10,
+   "eligibility": "Minimum 50% aggregate in 10+2 or equivalent from any recognized board and Minimum 50% aggregate in Undergraduate degree with respective subjects from any recognized University in India or abroad.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 38784,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 82584,
+    "per_year": [
+     77568,
+     72568
+    ],
+    "per_semester": [
+     38784,
+     38784,
+     36284,
+     36284
+    ],
+    "program_fee": 150136,
+    "total": 193936
+   },
+   "add_ons": []
+  },
+  {
+   "id": "ba-sociology-with-specialization-in-corporate-social-responsibility-and-management",
+   "uid": "158",
+   "name": "B.A. Sociology (with Specialization in) Corporate Social Responsibility and Management",
+   "aliases": [
+    "B.A (Sociology)"
+   ],
+   "degree": "B.A",
+   "level": "UG",
+   "school": {
+    "name": "School of Liberal Arts and Culture Studies",
+    "code": "SoLACS"
+   },
+   "department": "Economics & Social Sciences",
+   "duration_years": 4,
+   "duration_note": null,
+   "seats": 20,
+   "eligibility": "Minimum 50% aggregate in 10+2 or equivalent from any recognized board.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 39125,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 82925,
+    "per_year": [
+     78250,
+     73250,
+     71750,
+     43050
+    ],
+    "per_semester": [
+     39125,
+     39125,
+     36625,
+     36625,
+     35875,
+     35875,
+     21525,
+     21525
+    ],
+    "program_fee": 266300,
+    "total": 310100
+   },
+   "add_ons": []
+  },
+  {
+   "id": "msc-biochemistry",
+   "uid": "159",
+   "name": "M.Sc (Biochemistry)",
+   "aliases": [],
+   "degree": "M.Sc",
+   "level": "PG",
+   "school": {
+    "name": "School of Life Science and Biotechnology",
+    "code": "SoLB"
+   },
+   "department": "Biological Sciences",
+   "duration_years": 2,
+   "duration_note": null,
+   "seats": 10,
+   "eligibility": "Minimum 50% aggregate 10+2 or equivalent from any recognized board and Minimum 50% aggregate in Undergraduate degree with respective subject from any recognized University in India or abroad.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 54938,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 98738,
+    "per_year": [
+     109876,
+     104876
+    ],
+    "per_semester": [
+     54938,
+     54938,
+     52438,
+     52438
+    ],
+    "program_fee": 214752,
+    "total": 258552
+   },
+   "add_ons": []
+  },
+  {
+   "id": "bsc-biochemistry",
+   "uid": "160",
+   "name": "B.Sc (Biochemistry)",
+   "aliases": [],
+   "degree": "B.Sc",
+   "level": "UG",
+   "school": {
+    "name": "School of Life Science and Biotechnology",
+    "code": "SoLB"
+   },
+   "department": "Biological Sciences",
+   "duration_years": 4,
+   "duration_note": null,
+   "seats": 30,
+   "eligibility": "Minimum 50% aggregate in 10+2 or equivalent from any recognized board with respective subjects.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 53327,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 97127,
+    "per_year": [
+     106654,
+     101654,
+     100154,
+     59696
+    ],
+    "per_semester": [
+     53327,
+     53327,
+     50827,
+     50827,
+     50077,
+     50077,
+     29848,
+     29848
+    ],
+    "program_fee": 368158,
+    "total": 411958
+   },
+   "add_ons": []
+  },
+  {
+   "id": "bsc-microbiology",
+   "uid": "161",
+   "name": "B.Sc (Microbiology)",
+   "aliases": [],
+   "degree": "B.Sc",
+   "level": "UG",
+   "school": {
+    "name": "School of Life Science and Biotechnology",
+    "code": "SoLB"
+   },
+   "department": "Biological Sciences",
+   "duration_years": 4,
+   "duration_note": null,
+   "seats": 60,
+   "eligibility": "Minimum 50% aggregate in 10+2 or equivalent from any recognized board with respective subjects.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 80362,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 124162,
+    "per_year": [
+     160724,
+     155724,
+     154224,
+     81648
+    ],
+    "per_semester": [
+     80362,
+     80362,
+     77862,
+     77862,
+     77112,
+     77112,
+     40824,
+     40824
+    ],
+    "program_fee": 552320,
+    "total": 596120
+   },
+   "add_ons": []
+  },
+  {
+   "id": "msc-microbiology",
+   "uid": "162",
+   "name": "M.Sc (Microbiology)",
+   "aliases": [],
+   "degree": "M.Sc",
+   "level": "PG",
+   "school": {
+    "name": "School of Life Science and Biotechnology",
+    "code": "SoLB"
+   },
+   "department": "Biological Sciences",
+   "duration_years": 2,
+   "duration_note": null,
+   "seats": 50,
+   "eligibility": "Minimum 50% aggregate 10+2 or equivalent from any recognized board and Minimum 50% aggregate in Undergraduate degree with respective subject from any recognized University in India or abroad.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 93250,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 137050,
+    "per_year": [
+     186500,
+     181500
+    ],
+    "per_semester": [
+     93250,
+     93250,
+     90750,
+     90750
+    ],
+    "program_fee": 368000,
+    "total": 411800
+   },
+   "add_ons": []
+  },
+  {
+   "id": "msc-biotechnology",
+   "uid": "163",
+   "name": "M.Sc (Biotechnology)",
+   "aliases": [],
+   "degree": "M.Sc",
+   "level": "PG",
+   "school": {
+    "name": "School of Life Science and Biotechnology",
+    "code": "SoLB"
+   },
+   "department": "Biotechnology",
+   "duration_years": 2,
+   "duration_note": null,
+   "seats": 50,
+   "eligibility": "Minimum 50% aggregate 10+2 or equivalent from any recognized board and Minimum 50% aggregate in Undergraduate degree with respective subject from any recognized University in India or abroad.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 83250,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 127050,
+    "per_year": [
+     166500,
+     161500
+    ],
+    "per_semester": [
+     83250,
+     83250,
+     80750,
+     80750
+    ],
+    "program_fee": 328000,
+    "total": 371800
+   },
+   "add_ons": []
+  },
+  {
+   "id": "bsc-biotechnology",
+   "uid": "164",
+   "name": "B.Sc (Biotechnology)",
+   "aliases": [],
+   "degree": "B.Sc",
+   "level": "UG",
+   "school": {
+    "name": "School of Life Science and Biotechnology",
+    "code": "SoLB"
+   },
+   "department": "Biotechnology",
+   "duration_years": 4,
+   "duration_note": null,
+   "seats": 180,
+   "eligibility": "Minimum 55% aggregate in 10+2 or equivalent from any recognized board with respective subjects.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 88250,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 132050,
+    "per_year": [
+     176500,
+     171500,
+     170000,
+     90000
+    ],
+    "per_semester": [
+     88250,
+     88250,
+     85750,
+     85750,
+     85000,
+     85000,
+     45000,
+     45000
+    ],
+    "program_fee": 608000,
+    "total": 651800
+   },
+   "add_ons": []
+  },
+  {
+   "id": "btech-biotechnology",
+   "uid": "165",
+   "name": "B.Tech (Biotechnology)",
+   "aliases": [],
+   "degree": "B.Tech",
+   "level": "UG",
+   "school": {
+    "name": "School of Life Science and Biotechnology",
+    "code": "SoLB"
+   },
+   "department": "Biotechnology",
+   "duration_years": 4,
+   "duration_note": null,
+   "seats": 240,
+   "eligibility": "Minimum 60% aggregate in 10+2 or equivalent from any recognized board with PC + Mathematics/BioTech. / Biology / Technical Vocational with 45% in respective subject.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 98899,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 142699,
+    "per_year": [
+     197798,
+     192798,
+     191298,
+     190702
+    ],
+    "per_semester": [
+     98899,
+     98899,
+     96399,
+     96399,
+     95649,
+     95649,
+     95351,
+     95351
+    ],
+    "program_fee": 772596,
+    "total": 816396
+   },
+   "add_ons": []
+  },
+  {
+   "id": "btech-food-technology",
+   "uid": "166",
+   "name": "B.Tech (Food Technology)",
+   "aliases": [
+    "B.Tech. Food Technology"
+   ],
+   "degree": "B.Tech",
+   "level": "UG",
+   "school": {
+    "name": "School of Life Science and Biotechnology",
+    "code": "SoLB"
+   },
+   "department": "Biotechnology",
+   "duration_years": 4,
+   "duration_note": null,
+   "seats": 30,
+   "eligibility": "Minimum 60% aggregate in 10+2 or equivalent from any recognized board with PC + Mathematics/BioTech. / Biology / Technical Vocational with 45% in respective subject.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 78025,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 121825,
+    "per_year": [
+     156050,
+     151050,
+     149550,
+     149550
+    ],
+    "per_semester": [
+     78025,
+     78025,
+     75525,
+     75525,
+     74775,
+     74775,
+     74775,
+     74775
+    ],
+    "program_fee": 606200,
+    "total": 650000
+   },
+   "add_ons": []
+  },
+  {
+   "id": "ma-journalism-and-mass-communication",
+   "uid": "167",
+   "name": "M. A. Journalism and Mass Communication",
+   "aliases": [
+    "M.A (Journalism & Mass Communication)"
+   ],
+   "degree": "M.A",
+   "level": "PG",
+   "school": {
+    "name": "School of Media and Communication",
+    "code": "SoMC"
+   },
+   "department": "Media Studies",
+   "duration_years": 2,
+   "duration_note": null,
+   "seats": 25,
+   "eligibility": "Minimum 50% aggregate 10+2 or equivalent from any recognized board and Minimum 50% aggregate in Undergraduate degree with respective subject from any recognised University in India or abroad.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 55788,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 99588,
+    "per_year": [
+     111576,
+     106576
+    ],
+    "per_semester": [
+     55788,
+     55788,
+     53288,
+     53288
+    ],
+    "program_fee": 218152,
+    "total": 261952
+   },
+   "add_ons": []
+  },
+  {
+   "id": "ba-journalism-and-mass-communication",
+   "uid": "168",
+   "name": "B. A. Journalism and Mass Communication",
+   "aliases": [
+    "B.A (Journalism & Mass Communication)"
+   ],
+   "degree": "B.A",
+   "level": "UG",
+   "school": {
+    "name": "School of Media and Communication",
+    "code": "SoMC"
+   },
+   "department": "Media Studies",
+   "duration_years": 4,
+   "duration_note": null,
+   "seats": 60,
+   "eligibility": "Minimum 50% aggregate in 10+2 or equivalent from any recognized board.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 53575,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 97375,
+    "per_year": [
+     107150,
+     102150,
+     100650,
+     60390
+    ],
+    "per_semester": [
+     53575,
+     53575,
+     51075,
+     51075,
+     50325,
+     50325,
+     30195,
+     30195
+    ],
+    "program_fee": 370340,
+    "total": 414140
+   },
+   "add_ons": []
+  },
+  {
+   "id": "bsc-graphics-animation-and-media-technology",
+   "uid": "169",
+   "name": "B.Sc. Graphics, Animation and Media Technology",
+   "aliases": [
+    "B.Sc (Graphics, Animation & Media Technology)"
+   ],
+   "degree": "B.Sc",
+   "level": "UG",
+   "school": {
+    "name": "School of Media and Communication",
+    "code": "SoMC"
+   },
+   "department": "Media Studies",
+   "duration_years": 4,
+   "duration_note": null,
+   "seats": 160,
+   "eligibility": "Minimum 50% aggregate in 10+2 or equivalent from any recognized board.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 53250,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 97050,
+    "per_year": [
+     106500,
+     101500,
+     100000,
+     60000
+    ],
+    "per_semester": [
+     53250,
+     53250,
+     50750,
+     50750,
+     50000,
+     50000,
+     30000,
+     30000
+    ],
+    "program_fee": 368000,
+    "total": 411800
+   },
+   "add_ons": []
+  },
+  {
+   "id": "msc-graphics-and-animation",
+   "uid": "170",
+   "name": "M. Sc. Graphics and Animation",
+   "aliases": [
+    "M.Sc (Graphics & Animation)"
+   ],
+   "degree": "M.Sc",
+   "level": "PG",
+   "school": {
+    "name": "School of Media and Communication",
+    "code": "SoMC"
+   },
+   "department": "Media Studies",
+   "duration_years": 2,
+   "duration_note": null,
+   "seats": 15,
+   "eligibility": "Minimum 50% aggregate 10+2 or equivalent from any recognized board and Minimum 50% aggregate in Undergraduate degree with respective subject from any recognised University in India or abroad.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 58852,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 102652,
+    "per_year": [
+     117704,
+     112704
+    ],
+    "per_semester": [
+     58852,
+     58852,
+     56352,
+     56352
+    ],
+    "program_fee": 230408,
+    "total": 274208
+   },
+   "add_ons": []
+  },
+  {
+   "id": "mpharm-pharmaceutics",
+   "uid": "171",
+   "name": "M.Pharm (Pharmaceutics)",
+   "aliases": [],
+   "degree": "M.Pharm",
+   "level": "PG",
+   "school": {
+    "name": "School of Health and Medical Sciences",
+    "code": "SoHMS"
+   },
+   "department": "Pharmaceutical Technology",
+   "duration_years": 2,
+   "duration_note": null,
+   "seats": 30,
+   "eligibility": "B.Pharm degree examination of an Indian University established by law in India from an institution approved by Pharmacy Council of India and has scored not less than 55% of the maximum marks (aggregate of four years of B.Pharm)",
+   "fees": {
+    "session": "2027",
+    "first_semester": 100747,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 144547,
+    "per_year": [
+     201494,
+     196494
+    ],
+    "per_semester": [
+     100747,
+     100747,
+     98247,
+     98247
+    ],
+    "program_fee": 397988,
+    "total": 441788
+   },
+   "add_ons": [],
+   "seats_note": "intake shared with M.Pharm (Pharmacology)"
+  },
+  {
+   "id": "mpharm-pharmacology",
+   "uid": "171",
+   "name": "M.Pharm (Pharmacology)",
+   "aliases": [],
+   "degree": "M.Pharm",
+   "level": "PG",
+   "school": {
+    "name": "School of Health and Medical Sciences",
+    "code": "SoHMS"
+   },
+   "department": "Pharmaceutical Technology",
+   "duration_years": 2,
+   "duration_note": null,
+   "seats": 30,
+   "eligibility": "B.Pharm degree examination of an Indian University established by law in India from an institution approved by Pharmacy Council of India and has scored not less than 55% of the maximum marks (aggregate of four years of B.Pharm)",
+   "fees": {
+    "session": "2027",
+    "first_semester": 100747,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 144547,
+    "per_year": [
+     201494,
+     196494
+    ],
+    "per_semester": [
+     100747,
+     100747,
+     98247,
+     98247
+    ],
+    "program_fee": 397988,
+    "total": 441788
+   },
+   "add_ons": [],
+   "seats_note": "intake shared with M.Pharm (Pharmaceutics)"
+  },
+  {
+   "id": "bpharm",
+   "uid": "183",
+   "name": "B.Pharm",
+   "aliases": [
+    "bachelor of pharmacy"
+   ],
+   "degree": "B.Pharm",
+   "level": "UG",
+   "school": {
+    "name": "School of Health and Medical Sciences",
+    "code": "SoHMS"
+   },
+   "department": "Pharmaceutical Technology",
+   "duration_years": 4,
+   "duration_note": null,
+   "seats": 100,
+   "eligibility": "Minimum 60% aggregate in 10+2 or equivalent from any recognized board conducted by the respective state/central government authorities recognized as equivalent to 10+2 examination by the Association of Indian Universities (AIU) with English as one of the subjects and Physics, Chemistry, Mathematics/Biology as optional subjects individually. Students have to secure a minimum of 60% marks in the qualifying examination. \"However, the students possessing 10+2 qualification from non-formal and non-class rooms based schooling such as National Institute of Open Schooling, open school systems of States etc. shall not be eligible for admission to B. Pharm Course.\" Any other qualification approved by the Pharmacy Council of India as equivalent to any of the above examinations.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 123309,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 167109,
+    "per_year": [
+     246618,
+     241618,
+     240118,
+     143952
+    ],
+    "per_semester": [
+     123309,
+     123309,
+     120809,
+     120809,
+     120059,
+     120059,
+     71976,
+     71976
+    ],
+    "program_fee": 872306,
+    "total": 916106
+   },
+   "add_ons": []
+  },
+  {
+   "id": "dpharm",
+   "uid": "172",
+   "name": "D.Pharm",
+   "aliases": [
+    "diploma in pharmacy"
+   ],
+   "degree": "D.Pharm",
+   "level": "Diploma",
+   "school": {
+    "name": "School of Health and Medical Sciences",
+    "code": "SoHMS"
+   },
+   "department": "Pharmaceutical Technology",
+   "duration_years": 2,
+   "duration_note": null,
+   "seats": 60,
+   "eligibility": "A pass in any of the following examinations with Physics, Chemistry and Biology or Mathematics. 1. Intermediate examination in Science; 2. The first year of the three- year degree course in Science, 3. 10+2 examination (academic stream) in Science; 4. Pre-degree examination; 5. Any other qualification approved by the Pharmacy Council of India as equivalent to any of the above examination.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 74650,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 118450,
+    "per_year": [
+     149300,
+     144300
+    ],
+    "per_semester": [
+     74650,
+     74650,
+     72150,
+     72150
+    ],
+    "program_fee": 293600,
+    "total": 337400
+   },
+   "add_ons": []
+  },
+  {
+   "id": "msc-clinical-embryology",
+   "uid": "181",
+   "name": "M.Sc (Clinical Embryology)",
+   "aliases": [
+    "M.Sc. Clinical Embryology"
+   ],
+   "degree": "M.Sc",
+   "level": "PG",
+   "school": {
+    "name": "School of Health and Medical Sciences",
+    "code": "SoHMS"
+   },
+   "department": "Allied Health",
+   "duration_years": 2,
+   "duration_note": null,
+   "seats": 20,
+   "eligibility": "Minimum 50% aggregate in Bachelor of Science (B.Sc.) / Technology (B.Tech.)/ Master of Science (M.Sc.)/ Technology (M.Tech.) degree in any area of Biological Sciences from any UGC recognized Universities/ MBBS/M.D. or any other equivalent degree from international Universities",
+   "fees": {
+    "session": "2027",
+    "first_semester": 203250,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 247050,
+    "per_year": [
+     406500,
+     401500
+    ],
+    "per_semester": [
+     203250,
+     203250,
+     200750,
+     200750
+    ],
+    "program_fee": 808000,
+    "total": 851800
+   },
+   "add_ons": []
+  },
+  {
+   "id": "bachelor-of-medical-laboratory-science-bmls",
+   "uid": "173",
+   "name": "Bachelor Of Medical Laboratory Science (BMLS)",
+   "aliases": [
+    "B.Sc Medical Laboratory Technology",
+    "mlt"
+   ],
+   "degree": "BMLS",
+   "level": "UG",
+   "school": {
+    "name": "School of Health and Medical Sciences",
+    "code": "SoHMS"
+   },
+   "department": "Allied Health",
+   "duration_years": 4,
+   "duration_note": null,
+   "seats": 80,
+   "eligibility": "Minimum 50% aggregate in 10+2 or equivalent from any recognized board system of education or equivalent examination in science group with Chemistry, Physics & Biology, as main subjects conducted by a recognized Board/Council/ University.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 58929,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 102729,
+    "per_year": [
+     117858,
+     112858,
+     111358,
+     66484
+    ],
+    "per_semester": [
+     58929,
+     58929,
+     56429,
+     56429,
+     55679,
+     55679,
+     33242,
+     33242
+    ],
+    "program_fee": 408558,
+    "total": 452358
+   },
+   "add_ons": []
+  },
+  {
+   "id": "bachelor-of-optometry",
+   "uid": "174",
+   "name": "Bachelor of Optometry",
+   "aliases": [],
+   "degree": "B.Optom",
+   "level": "UG",
+   "school": {
+    "name": "School of Health and Medical Sciences",
+    "code": "SoHMS"
+   },
+   "department": "Allied Health",
+   "duration_years": 4,
+   "duration_note": null,
+   "seats": 80,
+   "eligibility": "Minimum 50% aggregate in 10+2 or equivalent from any recognized board with Physics, Chemistry and Biology/Mathematics as the main subjects.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 59022,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 102822,
+    "per_year": [
+     118044,
+     113044,
+     111544,
+     66344
+    ],
+    "per_semester": [
+     59022,
+     59022,
+     56522,
+     56522,
+     55772,
+     55772,
+     33172,
+     33172
+    ],
+    "program_fee": 408976,
+    "total": 452776
+   },
+   "add_ons": []
+  },
+  {
+   "id": "bachelor-of-food-nutrition-and-dietetics",
+   "uid": "175",
+   "name": "Bachelor Of Food Nutrition and Dietetics",
+   "aliases": [
+    "B.Sc Food, Nutrition and Dietetics"
+   ],
+   "degree": "BFND",
+   "level": "UG",
+   "school": {
+    "name": "School of Health and Medical Sciences",
+    "code": "SoHMS"
+   },
+   "department": "Allied Health",
+   "duration_years": 4,
+   "duration_note": null,
+   "seats": 40,
+   "eligibility": "Minimum 50% aggregate in 10+2 or equivalent from any recognized board system of education or equivalent examination in science group with Chemistry, Biology, Nutrition, Human development, Home science, etc as main subjects conducted by a recognized Board/Council/ University.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 45750,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 89550,
+    "per_year": [
+     91500,
+     86500,
+     85000,
+     45000
+    ],
+    "per_semester": [
+     45750,
+     45750,
+     43250,
+     43250,
+     42500,
+     42500,
+     22500,
+     22500
+    ],
+    "program_fee": 308000,
+    "total": 351800
+   },
+   "add_ons": []
+  },
+  {
+   "id": "ma-psychology",
+   "uid": "176",
+   "name": "M.A (Psychology)",
+   "aliases": [],
+   "degree": "M.A",
+   "level": "PG",
+   "school": {
+    "name": "School of Health and Medical Sciences",
+    "code": "SoHMS"
+   },
+   "department": "Psychology",
+   "duration_years": 2,
+   "duration_note": null,
+   "seats": 10,
+   "eligibility": "Minimum 50% aggregate in 10+2 or equivalent from any recognized board and Minimum 50% aggregate in Social Science (Sociology, Social Work, Education, Human Development & Developmental Studies) or Behavioral Science (Psychology) in undergraduate degree from any recognized University in India or abroad.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 55788,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 99588,
+    "per_year": [
+     111576,
+     106576
+    ],
+    "per_semester": [
+     55788,
+     55788,
+     53288,
+     53288
+    ],
+    "program_fee": 218152,
+    "total": 261952
+   },
+   "add_ons": []
+  },
+  {
+   "id": "ba-psychology",
+   "uid": "177",
+   "name": "B.A (Psychology)",
+   "aliases": [],
+   "degree": "B.A",
+   "level": "UG",
+   "school": {
+    "name": "School of Health and Medical Sciences",
+    "code": "SoHMS"
+   },
+   "department": "Psychology",
+   "duration_years": 4,
+   "duration_note": null,
+   "seats": 15,
+   "eligibility": "Minimum 50% aggregate in 10+2 or equivalent from any recognized board.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 58898,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 102698,
+    "per_year": [
+     117796,
+     112796,
+     111296,
+     66526
+    ],
+    "per_semester": [
+     58898,
+     58898,
+     56398,
+     56398,
+     55648,
+     55648,
+     33263,
+     33263
+    ],
+    "program_fee": 408414,
+    "total": 452214
+   },
+   "add_ons": []
+  },
+  {
+   "id": "msc-psychology",
+   "uid": "178",
+   "name": "M.Sc (Psychology)",
+   "aliases": [],
+   "degree": "M.Sc",
+   "level": "PG",
+   "school": {
+    "name": "School of Health and Medical Sciences",
+    "code": "SoHMS"
+   },
+   "department": "Psychology",
+   "duration_years": 2,
+   "duration_note": null,
+   "seats": 30,
+   "eligibility": "Minimum 50% aggregate in 10+2 or equivalent from any recognized board and Minimum 50% aggregate in any Science stream in undergraduate degree with Psychology as a subject from any recognized University in India or abroad.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 55788,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 99588,
+    "per_year": [
+     111576,
+     106576
+    ],
+    "per_semester": [
+     55788,
+     55788,
+     53288,
+     53288
+    ],
+    "program_fee": 218152,
+    "total": 261952
+   },
+   "add_ons": []
+  },
+  {
+   "id": "bsc-psychology",
+   "uid": "179",
+   "name": "B.Sc (Psychology)",
+   "aliases": [],
+   "degree": "B.Sc",
+   "level": "UG",
+   "school": {
+    "name": "School of Health and Medical Sciences",
+    "code": "SoHMS"
+   },
+   "department": "Psychology",
+   "duration_years": 4,
+   "duration_note": null,
+   "seats": 60,
+   "eligibility": "Minimum 50% aggregate in 10+2 or equivalent from any recognized board with Science background or Psychology as one of the subject in 10+2.",
+   "fees": {
+    "session": "2027",
+    "first_semester": 58950,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 102750,
+    "per_year": [
+     117900,
+     112900,
+     111400,
+     66450
+    ],
+    "per_semester": [
+     58950,
+     58950,
+     56450,
+     56450,
+     55700,
+     55700,
+     33225,
+     33225
+    ],
+    "program_fee": 408650,
+    "total": 452450
+   },
+   "add_ons": []
+  },
+  {
+   "id": "bsc-hons-agriculture",
+   "uid": "180",
+   "name": "B. Sc. (Hons.) Agriculture",
+   "aliases": [
+    "B. Sc (Hons) Agriculture"
+   ],
+   "degree": "B.Sc",
+   "level": "UG",
+   "school": {
+    "name": "School of Smart Agriculture",
+    "code": "SoSA"
+   },
+   "department": "Smart Agriculture",
+   "duration_years": 4,
+   "duration_note": null,
+   "seats": 150,
+   "eligibility": "Minimum 50% aggregate in 10+2 or equivalent from any recognized board with three subjects out of Physics (P), Chemistry (C), Mathematics (M), Biology (B) and Agriculture (A), as core course, combinations can be PCB/PCM/PCA/CMB/CMA/CBA /PMB/PMA/PBA /MBA",
+   "fees": {
+    "session": "2027",
+    "first_semester": 58842,
+    "admission_fee": 43800,
+    "admission_fee_note": "one-time, paid with the first semester fee; includes T-shirt and blazer",
+    "due_at_admission": 102642,
+    "per_year": [
+     117684,
+     112684,
+     111184,
+     66612
+    ],
+    "per_semester": [
+     58842,
+     58842,
+     56342,
+     56342,
+     55592,
+     55592,
+     33306,
+     33306
+    ],
+    "program_fee": 408164,
+    "total": 451964
+   },
+   "add_ons": []
+  }
+ ]
+}

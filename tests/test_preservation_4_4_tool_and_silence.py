@@ -22,8 +22,10 @@ Both the ``endCall`` and ``transferCall`` branches set ``is_speaking = False``
 and ``user_activity_open = False`` before the ``finally`` block runs (app.py
 1509-1510 and 1546-1547), and the ``finally`` gate is
 ``if call_state.get("is_speaking") and not call_state.get("user_activity_open")``.
-The only ways in are (a) a tool name matching neither branch -- the commented-out
-MCP ``else`` at app.py 1560-1585 -- or (b) the inbound task setting
+The only ways in are (a) a tool name matching neither branch -- now the
+unknown-tool ``else``, which answers with an error tool_response first, and also
+any course catalog tool, which leaves ``is_speaking`` alone -- or (b) the inbound
+task setting
 ``is_speaking`` True during the ``await session.send_tool_response(...)`` inside
 the ``finally``, which is a race and not deterministically reproducible offline.
 This test exercises route (a) and records why: a golden record of dead code is
@@ -112,7 +114,11 @@ class TestPrerollPrependOnToolCompletion(unittest.TestCase):
         self.call_state, self.ws, self.session, self.log = asyncio.run(scenario())
 
     def test_ordering_is_activity_start_then_one_prepended_blob(self):
-        self.assertEqual(self.session.sent_kinds, ["activityStart", "audio"])
+        # INTENTIONAL BASELINE UPDATE — course catalog tools: an unknown tool
+        # name now gets an error tool_response (it used to get none, leaving
+        # Gemini waiting). The deferred activityStart and the one prepended
+        # blob still follow, in the same order.
+        self.assertEqual(self.session.sent_kinds, ["tool_response", "activityStart", "audio"])
         self.assertEqual(self.session.audio_bytes_sent, PREROLL_MARKER + INPUT_BUFFER_MARKER)
 
     def test_both_buffers_are_cleared(self):

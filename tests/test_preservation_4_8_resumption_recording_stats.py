@@ -312,8 +312,13 @@ class TestCallStats(unittest.TestCase):
         # (aec / aec1) that now sits after load_dotenv(), above the definition,
         # and again when its comment grew a line for the default flip to aec1,
         # and again for the GEMINI_BACKEND switch (studio / vertex) and its
-        # credential helpers.
-        self.assertEqual(references, [64, 1721, 2233, 2243, 2659])
+        # credential helpers. Shifted -4 by the 2026-10-05 EC2 commit, which
+        # slimmed app.py's historical rationale comments to one-liners
+        # (no logic change) and made PRICE_*/GEMINI_MODEL/PORT env-overridable.
+        # And again for the course catalog tools (import course_catalog, the
+        # catalog declarations, the [CATALOG] stats line, the call_state
+        # counters and the catalog / unknown-tool branches).
+        self.assertEqual(references, [61, 1612, 2129, 2139, 2552])
 
 
 if __name__ == "__main__":
