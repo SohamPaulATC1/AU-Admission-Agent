@@ -28,12 +28,8 @@ from google.genai import types
 
 load_dotenv()
 
-# AEC implementation (path B trial, 2026-09-28; default flipped to aec1 for the
-# live trial, 2026-09-29). "aec" = stock aec.py (byte-identical); "aec1" =
-# aec1.py, the same canceller with gated adaptation, a step-size ceiling,
-# leakage and a two-path divergence reset. Same public API, so the two can be
-# run side by side. An unknown value fails at startup rather than silently
-# running the wrong canceller. Set AEC_IMPL=aec in the shell to fall back.
+# Choose the Acoustic Echo Canceller (AEC) implementation.
+# Defaults to "aec1" (trial version). Set AEC_IMPL=aec in the environment to use the stock version.
 AEC_IMPL = os.getenv("AEC_IMPL", "aec1").strip().lower()
 if AEC_IMPL == "aec":
     from aec import AcousticEchoCanceller
@@ -55,29 +51,23 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
-PRICE_TEXT_INPUT = 0.75
-PRICE_TEXT_OUTPUT = 4.50
-PRICE_AUDIO_INPUT = 3.00 
-PRICE_AUDIO_OUTPUT = 12.00
+PRICE_TEXT_INPUT = float(os.getenv("PRICE_TEXT_INPUT", "0.75"))
+PRICE_TEXT_OUTPUT = float(os.getenv("PRICE_TEXT_OUTPUT", "4.50"))
+PRICE_AUDIO_INPUT = float(os.getenv("PRICE_AUDIO_INPUT", "3.00"))
+PRICE_AUDIO_OUTPUT = float(os.getenv("PRICE_AUDIO_OUTPUT", "12.00"))
 
 LIVE_API_KEY = os.getenv('GOOGLE_API_KEY')
-GEMINI_MODEL = "gemini-3.8-live"
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-live")
 PUBLIC_BASE_URL = os.getenv('PUBLIC_BASE_URL')
 HUMAN_TRANSFER_NUMBER = os.getenv('HUMAN_TRANSFER_NUMBER')
 PLIVO_PHONE_NUMBER = os.getenv('FROM_NUMBER')
 
-# Gemini backend (2026-09-29). "vertex" = Vertex AI (Gemini Enterprise Agent
-# Platform) authenticated with the service-account key, the production path;
-# "studio" = Google AI Studio with GOOGLE_API_KEY, the development path and the
-# rollback. Same model ID, same Live API, same config on both. An unknown value
-# fails at startup. Set GEMINI_BACKEND=studio in the shell to fall back.
+# Select the Gemini backend: "vertex" (production) or "studio" (development fallback).
 GEMINI_BACKEND = os.getenv("GEMINI_BACKEND", "vertex").strip().lower()
 if GEMINI_BACKEND not in ("vertex", "studio"):
     raise ValueError(f"GEMINI_BACKEND must be 'vertex' or 'studio', got {GEMINI_BACKEND!r}")
 VERTEX_PROJECT = os.getenv("VERTEX_PROJECT", "silver-shift-490819-k0")
-# gemini-3.8-live is served only from the us and eu multi-regions and
-# us-central1 (no global, no India region). EC2 is in ap-south-1 (Mumbai), and
-# eu is the nearest of the three. VERTEX_LOCATION=us-central1 is the fallback.
+# Vertex location fallback. EU is nearest to the Mumbai server. us-central1 is fallback.
 VERTEX_LOCATION = os.getenv("VERTEX_LOCATION", "eu").strip().lower()
 VERTEX_CREDENTIALS_PATH = os.getenv(
     "VERTEX_CREDENTIALS_PATH",
@@ -87,7 +77,7 @@ VERTEX_CREDENTIALS_PATH = os.getenv(
 # Refresh the access token (1 h lifetime) when less than this much is left.
 VERTEX_TOKEN_REFRESH_MARGIN_SECONDS = 300
 
-PORT = 8000
+PORT = int(os.getenv("PORT", "8000"))
 
 PLIVO_START_TIMEOUT_SECONDS = float(os.getenv("PLIVO_START_TIMEOUT_SECONDS", "10"))
 GEMINI_CONNECT_TIMEOUT_SECONDS = float(os.getenv("GEMINI_CONNECT_TIMEOUT_SECONDS", "20"))
@@ -127,78 +117,34 @@ AGC_MAX_GAIN_DB = 30.0               # Tuned down to prevent telephony artifact 
 AGC_NOISE_GATE_DB = -50.0
 AGC_SMOOTHING_ALPHA = 0.08         # Slow alpha to prevent volume pumping
 
-# --- Anomalous-truncation classification and the leading-fragment commit gate ---
-# Tasks 5.3 and 5.10. Both values are INITIAL ESTIMATES; tuning is task 5.11 and
-# needs a live call captured with the concern (d) instrumentation below.
-#   ANOMALOUS_TRUNCATION_MS -- a barge-in that cuts playback after less than this
-#       much delivered audio is classified anomalous. 350 ms covers requirement
-#       1.1's 100-350 ms band and the 32-193 ms short mode measured in task 1.
-#   GRAPHEME_COMMIT_MS      -- how much audio the commit gate withholds while
-#       armed, so a leading Bengali CV+visarga cluster is emitted whole or not at
-#       all rather than as a repeated partial fragment.
-# Of the other three constants the design names, ECHO_CORR_THRESHOLD and
-# FAR_END_ACTIVE_FLOOR_DB live with the redesigned echo gate below. The two-tier
-# gate's ECHO_AMBIGUOUS_ONSET_FRAMES was dropped by the redesign (task 5.7).
+# --- Truncation and Commit Gate Settings ---
+# ANOMALOUS_TRUNCATION_MS: Short barge-ins below this threshold are classified as anomalous.
+# GRAPHEME_COMMIT_MS: Amount of audio withheld to prevent fragmented stutters during a barge-in.
 ANOMALOUS_TRUNCATION_MS = 350
 GRAPHEME_COMMIT_MS = 240
 
-# --- Which clock decides "how much did the caller actually hear?" ------------
-# MEASURED DEFECT, call b51312c8 (2026-09-22 16:32). The first version of the
-# classifier used current_utterance_bytes / 8000, i.e. bytes handed to Plivo.
-# That is NOT what the caller heard, because send_plivo_audio has no pacing: it
-# drains the queue and sends every 160-byte frame back to back, while Plivo
-# buffers and plays out at real time. Measured consequence on that call: all ten
-# truncations reported delivered_ms of 580-1020 and were classified "normal",
-# while the caller had actually heard only 103-152 ms. ANOMALOUS_TRUNCATION_MS
-# was therefore never crossed, [ANOMALY] never fired, and the commit gate never
-# armed during a call that reproduced the defect ten times over.
-#
-# Wall clock since ai_playback_start_time is what the caller experiences, so it
-# is what the classification now uses. Bytes are still logged, because the gap
-# between the two is itself the measurement: it quantifies how far the AEC's
-# far-end reference runs ahead of playout (720 ms of reference against 111 ms
-# heard on that call, against a canceller that models only 480 ms).
+# --- Playback Measurement Setting ---
+# Determines how we measure what the caller actually heard to properly classify anomalies.
+# "wallclock" uses actual time passed, avoiding discrepancies from buffered audio.
 TRUNCATION_CLOCK = os.getenv("TRUNCATION_CLOCK", "wallclock")   # "wallclock" | "bytes"
 
-# Arming the commit gate changes what the caller hears: while armed, a
-# regenerated turn's leading audio is withheld until GRAPHEME_COMMIT_MS
-# accumulates. In a sustained loop that converts an audible stutter into a
-# silent gap, which is not obviously better for the caller. Default OFF so the
-# corrected classification above is purely diagnostic and this pass stays
-# attribution-neutral: the next live call must differ from the last only in what
-# is recorded, never in what is heard. Set COMMIT_GATE_ENABLED=1 to turn the
-# mitigation on once the trade-off is an explicit decision.
+# Enable to delay regenerated audio to avoid stutter gaps. Default OFF.
 COMMIT_GATE_ENABLED = os.getenv("COMMIT_GATE_ENABLED", "0").strip().lower() in ("1", "true", "yes")
 
 # Bound on zero-padding written to the far-end recording to keep it wall-clock
 # continuous (see the recorder in send_plivo_audio). 60 s at 8 kHz.
 FAREND_MAX_PAD_SAMPLES = 60 * PLIVO_SAMPLE_RATE
 
-# Aligned inbound-loop recordings, file suffix -> what is written (8 kHz each):
-# nearraw = caller audio from Plivo before AEC, farref = the playout-paced far
-# reference fed to the AEC and far_shadow, aecout = AEC output before the output
-# guard below and RNNoise (what passed downstream is recomputable per frame).
+# Types of aligned loop recordings used for diagnostics (raw near, far reference, and AEC output).
 ALIGNED_RECORDING_KINDS = ("nearraw", "farref", "aecout")
 
-# AEC output guard (TEST2 follow-up). An echo canceller may only remove energy.
-# TEST2's aligned recordings showed the handset already cancels echo (raw near
-# -72 dBFS during playback) while aec.py's filter, adapting on near-silent
-# reference frames, drifted and subtracted a filtered copy of the assistant's
-# voice from a silent line: AEC output -48..-27 dBFS, i.e. echo it created, which
-# opened phantom barge-ins. Per frame, if the AEC output is louder than its input
-# the raw input is passed on instead. aec.py and its adaptation are untouched.
-# Kill-switch: AEC_OUTPUT_GUARD_ENABLED=0.
+# AEC output guard: Prevents the echo canceller from injecting echo by passing 
+# raw input instead if the AEC output is louder than the input. Default ON.
 AEC_OUTPUT_GUARD_ENABLED = os.getenv("AEC_OUTPUT_GUARD_ENABLED", "1").strip().lower() in ("1", "true", "yes")
 
-# --- Audio-pipeline redesign: corroborated barge-in gate (concerns a + b) -----
-# See docs/spec/redesign-audio-pipeline.md.
-# The barge-in gate corroborates a while-speaking VAD onset against the far-end
-# (what the assistant is playing) before truncating: if the near-end energy
-# envelope correlates with the aligned far-end above ECHO_CORR_THRESHOLD, the
-# "speech" is the assistant's own echo and playback is NOT truncated. All values
-# are grounded in the two reproduction calls (2026-09-22): real residual echo
-# correlated 0.955-0.986 at ~50-60 ms lag, so 0.88 separates echo from genuine
-# double-talk with margin. Final value is a live-tune (Phase 5); env-overridable.
+# --- Audio-pipeline redesign: Corroborated barge-in gate ---
+# Checks if detected speech is just the assistant's own echo by comparing it to the playback.
+# If it correlates highly, playback is not truncated.
 ECHO_CORR_THRESHOLD = float(os.getenv("ECHO_CORR_THRESHOLD", "0.88"))
 ECHO_CORR_WINDOW_MS = 180        # near/far window correlated at a barge-in onset
 ECHO_LAG_SEARCH_MS = 80          # +/- search around lag 0 (measured best-lag 50-60 ms)
@@ -208,24 +154,12 @@ FAR_END_ACTIVE_FLOOR_DB = -60.0  # below this the far-end is "silent" => never e
 FAR_SHADOW_FRAMES = 40
 # Near-end correlation window in bytes of 16 kHz PCM16 (the preroll's rate).
 ECHO_NEAR_BYTES_16K = int(round(ECHO_CORR_WINDOW_MS / 1000.0 * GEMINI_INPUT_RATE)) * 2
-# Far-end correlation window: the near window plus ECHO_LAG_SEARCH_MS of LEAD,
-# ending at the same instant as the near window. bargein.echo_correlation aligns
-# the two envelopes at their starts and slides +/- ECHO_LAG_SEARCH_MS from there,
-# so the far window's extra length decides which echo delays get searched: an
-# echo can only lag the playout, so lag_bins=0 sits at an 80 ms delay and the
-# search spans 0-160 ms, with full window overlap from 0 to 80 ms (the measured
-# 50-60 ms is inside that). The old window+2*lag (340 ms) put lag 0 at 160 ms and
-# missed 0-60 ms delays about half the time; see tests/test_bargein_unit.py.
-# ECHO_FAR_FRAMES is the whole 20 ms frames covering it; the join is trimmed to
-# ECHO_FAR_BYTES_8K from the end.
+# Determines the time window used to search for acoustic echo delays.
 ECHO_FAR_MS = ECHO_CORR_WINDOW_MS + ECHO_LAG_SEARCH_MS
 ECHO_FAR_BYTES_8K = int(round(ECHO_FAR_MS / 1000.0 * PLIVO_SAMPLE_RATE)) * 2
 ECHO_FAR_FRAMES = -(-ECHO_FAR_MS // 20)  # ceil
-# How long the gate keeps running after the last real far frame is consumed.
-# assistant_speaking drops on the send-side wall clock, but the echo of the
-# last frames arrives up to 2 * ECHO_LAG_SEARCH_MS later. Measured 2026-09-23
-# (EchoTailScenario, 12-30 dB x 0-120 ms): 160 ms leaves 0/36 phantom caller
-# turns, 140 ms leaves 2/36, no gate leaves 41/42.
+# Duration the gate continues to check for echo after playback stops, 
+# accounting for delayed acoustic echo.
 ECHO_TAIL_FRAMES = -(-(2 * ECHO_LAG_SEARCH_MS) // 20)  # ceil
 # One 20 ms far-end frame of silence: ulaw_to_pcm of a 160-byte frame yields 160
 # PCM16 samples = 320 bytes. Fed to the AEC when nothing is queued for playout.
@@ -235,30 +169,16 @@ _FAR_SILENCE_FRAME = b"\x00" * (PLIVO_ULAW_CHUNK_SIZE * 2)
 # (ECHO_GATE_ENABLED=0) if tuning ever misbehaves.
 ECHO_GATE_ENABLED = os.getenv("ECHO_GATE_ENABLED", "1").strip().lower() in ("1", "true", "yes")
 # Echo latch. After an echo verdict, VAD re-fires every few frames for the rest of
-# the assistant's playback, and a single 180 ms window only correlates reliably at
-# the turn onset (measured on the 17:05 call: 0.90-1.00 at onset, 0.1-0.89 after).
-# So an echo verdict is latched for the playback period: later onsets are held as
-# echo unless the echo return (pre-AGC near level minus far level) rises more than
-# this many dB above the latched one -- a caller talking over playback raises the
-# near level independently of the far-end; the assistant's own echo does not.
+# Echo threshold and latch configurations:
+# ECHO_LATCH_BREAK_DB: Minimum dB difference required to break an echo verdict (e.g. caller talking over playback).
 ECHO_LATCH_BREAK_DB = float(os.getenv("ECHO_LATCH_BREAK_DB", "10"))
-# Echo return ceiling. Residual echo after the canceller is well below the far-end:
-# the 17:05 reproduction call's false triggers measured -12.8 to -30.3 dB (and no
-# worse than -10.3 dB even assuming zero AGC gain). A near-end within 6 dB of the
-# far-end, or louder, cannot be that residual, so it is never classed as echo --
-# however well its envelope correlates. This is what lets a caller who starts
-# talking with the assistant's turn through: at turn onset the energy step makes
-# almost any speech correlate with the far-end (~0.97).
+# ECHO_MAX_RETURN_DB: Near-end audio within this dB of far-end is never classed as echo.
 ECHO_MAX_RETURN_DB = float(os.getenv("ECHO_MAX_RETURN_DB", "-6"))
-# 8 kHz mu-law is one byte per sample, so ms -> bytes is a straight x8.
+# Commit gate limits: Avoids stalling indefinitely if playback fails.
 GRAPHEME_COMMIT_BYTES = GRAPHEME_COMMIT_MS * PLIVO_SAMPLE_RATE // 1000   # 1920
-# Safety valve: if the model's turn ends (or stalls) with fewer than
-# GRAPHEME_COMMIT_BYTES withheld, release anyway after this many consecutive idle
-# sender polls rather than holding the caller's audio forever.
 COMMIT_GATE_IDLE_RELEASE_POLLS = 3
-# Bounded per-turn delta trace (task 5.1). A 15 minute call at ~50 audio parts
-# per second would be unbounded otherwise; the trace is reset per turn and the
-# number of entries dropped is recorded so the dump is never silently partial.
+
+# Max delta traces per turn to prevent unbounded growth on long calls.
 DELTA_TRACE_MAX_ENTRIES = 240
 
 VAD_SPEECH_ONSET_FRAMES = 3
@@ -531,17 +451,8 @@ def calculate_rms_db(pcm_data):
 # =============================================================================
 # Grapheme-cluster helpers  (tasks 5.1 and 5.10)
 # =============================================================================
-# PRE-REDESIGN HOME. Tasks 5.1 and 5.10 needed these pure helpers before
-# ``bargein.py`` existed (task 5.5 was parked with concern (a) at the time), so
-# they were written here as pure module-level functions with no I/O and no
-# global state. The redesign created ``bargein.py`` but did not migrate them.
-# Decided 2026-09-23: they stay here, as named in the amended bargein.py
-# constraint in docs/spec/tasks.md (HANDOFF section 8, #7 item A).
-#
-# ``regex``'s ``\X`` is UAX #29 extended grapheme clusters. The four Bengali
-# expectations in the spec were verified against the installed ``regex``
-# 2026.2.28 by the existing test suite, so no ``unicodedata`` fallback walker is
-# carried here -- adding one would be untested code on a path that cannot fail.
+# Grapheme-cluster helpers to correctly split text characters.
+# These remain as independent helper functions.
 
 _GRAPHEME_CLUSTER_RE = regex.compile(r"\X")
 _BENGALI_VIRAMA = "\u09CD"
@@ -606,18 +517,8 @@ def shared_leading_cluster_count(previous_text, new_text):
 # =============================================================================
 # Per-delta trace  (task 5.1 -- concern (d), observability only)
 # =============================================================================
-# Records what the model actually delivered, per part, so the three mutually
-# exclusive explanations for a repeated leading fragment can be told apart from
-# the log alone (design gap 1):
-#
-#   upstream duplication  -- the model sent the same audio twice inside one turn
-#   downstream re-delivery -- we sent the same audio twice
-#   neither               -- distinct audio both directions, the fragment repeats
-#                            as separate short-``delivered_ms`` turns, which is
-#                            the false-barge-in signature this design predicts
-#
-# Nothing here changes what is sent, what the canceller receives or what the VAD
-# sees. It is attribution-neutral by construction: append to a list, log, return.
+# Logs the exact audio delivered by the model to diagnose repeated audio issues.
+# This does not modify the data, it only records it for debugging.
 
 def _short_hash(payload):
     if isinstance(payload, str):
@@ -999,18 +900,9 @@ def dump_delta_trace(call_state, reason):
     return summary
 
 
-# =============================================================================
-# Leading-fragment commit gate  (task 5.10 -- concern (c))
-# =============================================================================
-# The one part of this pass that is NOT purely observational: while armed it
-# withholds up to GRAPHEME_COMMIT_MS of outbound audio, so the caller hears a
-# leading Bengali cluster whole or not at all instead of the same partial sound
-# again. It is armed only by an anomalous truncation that has already happened,
-# and every arm / withhold / release / discard / disarm transition is logged so
-# the next live call's behaviour can be attributed to the gate rather than
-# confused with what the instrumentation merely revealed.
-#
-# Healthy calls never arm, and the not-armed path is byte-for-byte pass-through.
+# Commit gate logic: Delays playback of words slightly after an abnormal interruption, 
+# ensuring syllables play completely instead of stuttering.
+# This remains inactive unless an anomaly is detected.
 
 def arm_commit_gate(call_state, truncated_text, delivered_ms):
     clusters = leading_clusters(truncated_text)
@@ -1079,12 +971,7 @@ def commit_gate_discard(call_state, reason):
     )
 
 
-# Placeholder for the trigger-evidence fields when no gate decision was taken
-# for a trigger (gate disabled, or the onset fell outside playback and its tail).
-# The string predates the redesign and is kept verbatim because it is a logged
-# value that log queries may match; "concern-a-parked" in it is historical. It
-# names the evidence as not-measured rather than omitting or faking it, so a
-# reader can tell "measured and unremarkable" from "never measured".
+# Fallback log value used when trigger evidence wasn't recorded (e.g. gate disabled).
 FAR_END_EVIDENCE_NOT_MEASURED = "not-measured[concern-a-parked]"
 
 
@@ -2615,11 +2502,8 @@ async def stream_plivo_to_gemini(plivo_ws, session, call_state):
                             heard_ms = max(0.0, min(heard_ms, queued_ms))
                         else:
                             heard_ms = 0.0
-                        # Positive value = how far the far-end reference runs ahead
-                        # of playout. Compare against the canceller's modeled path
-                        # (_PFDKF N*M = 3840 samples = 480 ms at 8 kHz): a lead
-                        # larger than that puts the reference outside the filter's
-                        # window entirely, which is contributing mechanism 3.
+                        # Ensure the far-end reference doesn't outpace playout too much.
+                        # If the lead is too long, the echo canceller won't work correctly.
                         buffer_lead_ms = queued_ms - heard_ms
 
                         delivered_ms = heard_ms if TRUNCATION_CLOCK == "wallclock" else queued_ms
@@ -2660,10 +2544,8 @@ async def stream_plivo_to_gemini(plivo_ws, session, call_state):
                                 f"gemini_reconnect_count={call_state['gemini_reconnect_count']}"
                             )
                             dump_delta_trace(call_state, "anomalous-truncation")
-                            # Diagnostics above are unconditional. The mitigation
-                            # below changes what the caller hears (stutter becomes
-                            # a silent gap), so it stays off unless explicitly
-                            # enabled -- see COMMIT_GATE_ENABLED.
+                            # The commit gate delays audio output to fix stuttering,
+                            # but is disabled by default to maintain natural sound.
                             if COMMIT_GATE_ENABLED:
                                 arm_commit_gate(call_state, ai_text_at_truncation, delivered_ms)
                             else:
@@ -2688,24 +2570,13 @@ async def stream_plivo_to_gemini(plivo_ws, session, call_state):
                                 "stream_id": call_state["stream_id"]
                             }))
                             logger.info("🛑 Cleared Plivo playback buffer")
-                            # Task 5.8. clearAudio discards audio already handed to
-                            # Plivo, but add_far_end (line ~2497) already pushed
-                            # that same audio into the AEC's far-end reference.
-                            # Without this reset the canceller keeps filtering
-                            # against sound the caller never heard, and measured
-                            # buffer_lead_ms climbed 208ms -> 558ms across repeat
-                            # triggers on the reproduction call (2026-09-22 17:05),
-                            # exceeding the canceller's own 480ms modeled window.
-                            # reset_far_end() only clears the FIFO/backlog; the
-                            # learned filter weights are untouched, matching how
-                            # it is already used on Gemini reconnect (~line 1554).
+                            # Clear the echo canceller's buffer to prevent it from
+                            # filtering out audio that the caller never actually heard.
                             reset_far_reference(call_state)
 
                     if not call_state["user_activity_open"]:
                         if not call_state["tool_call_in_progress"]:
-                            # Set the flag BEFORE the await so the concurrent gemini
-                            # task cannot also open activity in the same window
-                            # (avoids a double activityStart with no activityEnd).
+                            # Mark activity open before await to prevent duplicate events.
                             call_state["user_activity_open"] = True
                             call_state["awaiting_model"] = False
                             call_state["model_response_deadline"] = None
@@ -3032,10 +2903,8 @@ async def stream_gemini_to_plivo(session, plivo_ws, call_state,plivo_client):
                             
                         for part in model_turn.parts:
                             if getattr(part, 'inline_data', None) and part.inline_data.data:
-                                # Task 5.1 — record every part the model delivered,
-                                # including the ones dropped locally on the next
-                                # line. The difference between what arrived and what
-                                # was queued is the upstream/downstream evidence.
+                                # Record every chunk the model delivered, even if dropped,
+                                # to help diagnose upstream issues.
                                 dropped_locally = (
                                     call_state["interrupting"] or call_state["user_activity_open"]
                                 )
@@ -3275,14 +3144,9 @@ async def send_plivo_audio(plivo_ws, call_state,session,plivo_client):
         not 20.0 ms (task 4.5). Adding pacing would be a behavioural change to
         requirement 3.9. The redesign paces the AEC reference instead, below.
         """
-        # Redesign Part 1: DO NOT feed the AEC here. Feeding at send time loaded
-        # the canceller's reference in a burst far ahead of playout (measured
-        # buffer_lead grew 208 -> 558 ms, past the 480 ms modelled window), which
-        # degraded cancellation and let residual echo cross the VAD gate. Instead
-        # enqueue the sent frame; the inbound loop consumes one per processed
-        # block, pacing the reference to realtime (playout) and keeping far_shadow
-        # aligned frame-for-frame with the near-end. The WAV recorder below still
-        # captures the sent far-end (send-side diagnostic, wall-clock continuous).
+        # Avoid sending audio to the echo canceller immediately. 
+        # Instead, queue it up so it matches the exact time the caller hears it,
+        # otherwise the canceller's timing breaks down.
         far_pcm8 = ulaw_to_pcm(chunk)
         call_state["farend_ref_queue"].append(far_pcm8)
 
@@ -3295,19 +3159,8 @@ async def send_plivo_audio(plivo_ws, call_state,session,plivo_client):
         farend_writer = call_state.get("debug_farend_wav_writer")
         if farend_writer:
             try:
-                # WALL-CLOCK CONTINUOUS, and the reason matters. The first version
-                # of this recorder wrote only the chunks actually sent, so the file
-                # was *compacted*: 14.1 s of audio spanning a 75.5 s call, with
-                # playback gaps simply absent. Recovering a timebase then needed
-                # piecewise interpolation across those gaps from ~1 Hz anchors,
-                # which produced lag estimates scattered over +/-298 ms -- useless
-                # for deciding whether the leak arrives at lag 0 (concern (a)'s
-                # central question). Padding the silent gaps with zeros makes
-                # sample index a direct function of wall time:
-                #
-                #     sample_index = (t_mono - farend_t0_mono) * PLIVO_SAMPLE_RATE
-                #
-                # so a future analysis needs no anchors and no interpolation at all.
+                # We pad silent moments with zeros so the recording exactly matches real time.
+                # This makes it easy to analyze without complex timestamps.
                 now_mono = time.monotonic()
                 # setdefault rather than indexing: this whole block sits inside a
                 # broad ``except Exception: pass``, so a missing key would silently
@@ -3492,15 +3345,8 @@ async def send_plivo_audio(plivo_ws, call_state,session,plivo_client):
                         await emit_chunk(frame)
 
             except asyncio.TimeoutError:
-                # Task 5.10 safety valve. A turn shorter than the commit window
-                # never reaches GRAPHEME_COMMIT_BYTES, so without this a short
-                # complete turn would be withheld and lost. The condition is the
-                # model's own ``turn_complete``, not mere idleness: if the turn is
-                # still open the fragment may yet be completed, and releasing on
-                # idleness alone would re-emit exactly the partial cluster this
-                # gate exists to suppress. A turn that stalls open holds at most
-                # GRAPHEME_COMMIT_MS - 20 ms of audio, and that hold is discarded
-                # on barge-in and on the terminal-action path.
+                # Safety valve: Ensures very short turns (less than the commit window delay)
+                # are still sent to the caller if the AI has finished its thought.
                 if (
                     call_state["commit_gate_hold"]
                     and call_state["plivo_output_queue"].empty()
