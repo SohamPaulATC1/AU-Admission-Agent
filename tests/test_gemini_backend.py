@@ -73,7 +73,7 @@ class TestVertexEndpoint(unittest.TestCase):
 
     def test_defaults(self):
         self.assertEqual(app.VERTEX_PROJECT, "silver-shift-490819-k0")
-        self.assertEqual(app.VERTEX_LOCATION, "eu")
+        self.assertEqual(app.VERTEX_LOCATION, "us-central1")  # TEST6: eu stalled mid-turn
         self.assertEqual(os.path.dirname(app.VERTEX_CREDENTIALS_PATH), REPO_ROOT)
 
 

@@ -68,8 +68,8 @@ GEMINI_BACKEND = os.getenv("GEMINI_BACKEND", "vertex").strip().lower()
 if GEMINI_BACKEND not in ("vertex", "studio"):
     raise ValueError(f"GEMINI_BACKEND must be 'vertex' or 'studio', got {GEMINI_BACKEND!r}")
 VERTEX_PROJECT = os.getenv("VERTEX_PROJECT", "silver-shift-490819-k0")
-# Vertex location fallback. EU is nearest to the Mumbai server. us-central1 is fallback.
-VERTEX_LOCATION = os.getenv("VERTEX_LOCATION", "eu").strip().lower()
+# Vertex location. us-central1: eu stalled mid-turn on live calls (TEST6, 2026-10-05); eu stays available via env.
+VERTEX_LOCATION = os.getenv("VERTEX_LOCATION", "us-central1").strip().lower()
 VERTEX_CREDENTIALS_PATH = os.getenv(
     "VERTEX_CREDENTIALS_PATH",
     os.path.join(os.path.dirname(os.path.abspath(__file__)),

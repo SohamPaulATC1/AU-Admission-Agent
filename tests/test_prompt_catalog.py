@@ -47,6 +47,18 @@ class TestPromptCatalog(unittest.TestCase):
         self.assertIn("`error`", self.text)
         self.assertIn("never read the error aloud", self.text)
 
+    def test_language_mix_is_critical_with_examples(self):
+        # TEST6: the model answered in pure, formal Bengali ("সর্বোচ্চ শিক্ষাগত
+        # যোগ্যতা") after the rule was shortened to "Benglish (the same mix)".
+        self.assertIn("Language mix (CRITICAL)", self.text)
+        self.assertIn("আপনার highest qualification", self.text)
+        self.assertIn("आपकी highest qualification", self.text)
+
+    def test_reply_language_counts_as_the_choice(self):
+        # TEST6: the caller kept answering in Bengali without naming a language,
+        # and the agent carried on in English.
+        self.assertIn("answers in Bengali or Hindi", self.text)
+
     def test_open_eligibility_rule(self):
         self.assertIn('Do NOT say "you are eligible"', self.text)
 
