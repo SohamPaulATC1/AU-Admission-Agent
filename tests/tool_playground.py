@@ -7,6 +7,8 @@ exactly what Gemini receives. Not named test_*, so unittest discovery skips it.
     venv312/Scripts/python.exe tests/tool_playground.py list_programs degree=B.Tech
     venv312/Scripts/python.exe tests/tool_playground.py get_program_details programs=cse,ece fields=fees
     venv312/Scripts/python.exe tests/tool_playground.py get_program_details "{\"programs\": [\"ai ml\"]}"
+    venv312/Scripts/python.exe tests/tool_playground.py find_eligible_programs aggregate_pct=58 subjects=Physics,Chemistry,Biology
+    venv312/Scripts/python.exe tests/tool_playground.py find_scholarships program=MBA cat_pct=85 situations=sibling_enrolled
     venv312/Scripts/python.exe tests/tool_playground.py --declarations
 """
 import json
@@ -34,10 +36,12 @@ def parse_args(tool, items):
         if kind == "ARRAY":
             args[name] = [v.strip() for v in value.split(",") if v.strip()]
         elif kind in ("INTEGER", "NUMBER"):
-            try:
-                args[name] = int(value)
-            except ValueError:
-                args[name] = value
+            for convert in (int, float):
+                try:
+                    args[name] = convert(value)
+                    break
+                except ValueError:
+                    args[name] = value
         else:
             args[name] = value
     return args

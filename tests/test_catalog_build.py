@@ -3,6 +3,7 @@
 Skipped when the Excel files are absent (EC2 carries only the JSON).
 """
 import collections
+import copy
 import json
 import os
 import unittest
@@ -110,6 +111,27 @@ class TestBuildFromExcel(unittest.TestCase):
         self.assertIn("B.Sc Medical Laboratory Technology", bmls["aliases"])
         self.assertIn("BA. LLB (Hons)", self.by_name["B.A. LL.B (Hons)"]["aliases"])
 
+    def test_every_ug_record_has_an_eligibility_rule(self):
+        for r in self.records:
+            with self.subTest(r["name"]):
+                if r["level"] == "UG":
+                    self.assertEqual(list(r["eligibility_rule"]),
+                                     ["min_aggregate", "subject_options", "conditions", "verified"])
+                else:
+                    self.assertNotIn("eligibility_rule", r)
+        self.assertEqual(self.catalog["subjects"], [
+            "Physics", "Chemistry", "Mathematics", "Biology", "Biotechnology", "Computer Science",
+            "Computer Application", "Technical Vocational", "Statistics", "Economics", "Geography",
+            "Psychology", "Agriculture", "Nutrition", "Home Science", "Human Development"])
+        self.assertEqual(list(self.catalog), ["session", "source", "excluded", "subjects", "records"])
+
+    def test_shared_respective_subject_text_requires_both_subjects(self):
+        for name in ("B.Sc (Physics)", "B.Sc (Chemistry)"):
+            self.assertEqual(self.by_name[name]["eligibility_rule"]["subject_options"], [["Physics", "Chemistry"]])
+
+    def test_bed_needs_a_degree_so_is_never_matched(self):
+        self.assertIsNone(self.by_name["B.Ed"]["eligibility_rule"]["min_aggregate"])
+
     def test_committed_courses_json_is_fresh(self):
         with open(build_catalog.COURSES_JSON, encoding="utf-8") as f:
             committed = f.read()
@@ -161,6 +183,90 @@ class TestBuildHelpers(unittest.TestCase):
                           {"5th - 6th Sem Fees 2026": "10"}):
             with self.subTest(overrides), self.assertRaises(build_catalog.BuildError):
                 build_catalog.fee_block(self._fee_row(**overrides), "t")
+
+
+class TestAttachEligibilityRules(unittest.TestCase):
+    RECORDS = [
+        {"name": "A", "level": "UG", "eligibility": "t1"},
+        {"name": "B", "level": "UG", "eligibility": "t1"},
+        {"name": "C", "level": "UG", "eligibility": "t2"},
+        {"name": "D", "level": "PG", "eligibility": "t3"},
+    ]
+
+    def rule(self, text, programs, **overrides):
+        rule = {"text": text, "programs": programs, "min_aggregate": 50, "subject_options": None,
+                "conditions": [], "verified": False}
+        rule.update(overrides)
+        return rule
+
+    def attach(self, rules, subjects=("Physics", "Chemistry")):
+        records = copy.deepcopy(self.RECORDS)
+        returned = build_catalog.attach_eligibility_rules(records, {"subjects": list(subjects), "rules": rules})
+        return records, returned
+
+    def good_rules(self):
+        return [self.rule("t1", ["A", "B"], subject_options=[["Physics", "Chemistry"]], verified=True,
+                          note="reviewer only"),
+                self.rule("t2", ["C"], min_aggregate=None, conditions=["needs a degree"])]
+
+    def test_rules_attach_to_ug_records_only(self):
+        records, subjects = self.attach(self.good_rules())
+        self.assertEqual(subjects, ["Physics", "Chemistry"])
+        self.assertEqual(records[0]["eligibility_rule"], {
+            "min_aggregate": 50, "subject_options": [["Physics", "Chemistry"]], "conditions": [], "verified": True})
+        self.assertEqual(records[1]["eligibility_rule"], records[0]["eligibility_rule"])
+        self.assertIsNone(records[2]["eligibility_rule"]["min_aggregate"])
+        self.assertNotIn("eligibility_rule", records[3])
+        self.assertNotIn("note", records[0]["eligibility_rule"])
+
+    def assertBuildError(self, rules, fragment):
+        with self.assertRaises(build_catalog.BuildError) as caught:
+            self.attach(rules)
+        self.assertIn(fragment, str(caught.exception))
+
+    def test_ug_text_without_a_rule(self):
+        self.assertBuildError(self.good_rules()[:1], "no eligibility rule")
+
+    def test_rule_matching_no_ug_record(self):
+        self.assertBuildError(self.good_rules() + [self.rule("t3", ["D"])], "matches no UG record")
+
+    def test_programs_must_match_the_records_sharing_the_text(self):
+        rules = self.good_rules()
+        rules[0]["programs"] = ["A"]
+        self.assertBuildError(rules, "lists ['A']")
+
+    def test_duplicate_text(self):
+        self.assertBuildError(self.good_rules() + [self.rule("t1", ["A", "B"])], "two rules share")
+
+    def test_unknown_subject(self):
+        rules = self.good_rules()
+        rules[0]["subject_options"] = [["Physics", "Accountancy"]]
+        self.assertBuildError(rules, "unknown subject 'Accountancy'")
+
+    def test_verified_must_be_a_boolean(self):
+        rules = self.good_rules()
+        rules[0]["verified"] = "true"
+        self.assertBuildError(rules, "verified must be true or false")
+
+    def test_unknown_or_missing_keys(self):
+        rules = self.good_rules()
+        rules[0]["min_agregate"] = 50
+        self.assertBuildError(rules, "unexpected keys ['min_agregate']")
+        rules = self.good_rules()
+        del rules[1]["conditions"]
+        self.assertBuildError(rules, "missing keys ['conditions']")
+
+    def test_field_types(self):
+        for field, value, fragment in (("min_aggregate", 150, "min_aggregate"),
+                                       ("min_aggregate", True, "min_aggregate"),
+                                       ("subject_options", [], "subject_options"),
+                                       ("subject_options", [[]], "subject_options"),
+                                       ("conditions", "CLAT", "conditions"),
+                                       ("conditions", [""], "conditions")):
+            rules = self.good_rules()
+            rules[0][field] = value
+            with self.subTest((field, value)):
+                self.assertBuildError(rules, fragment)
 
 
 if __name__ == "__main__":

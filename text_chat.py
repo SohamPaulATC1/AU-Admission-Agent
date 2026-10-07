@@ -1,7 +1,7 @@
 """Text-based chat with Gemini using the AU course catalog tools.
 
 This is the "text-only Gemini test" from HANDOFF2 §8 item 4.  It uses the
-same prompt_au.txt and the same course_catalog.handle_tool_call as app.py,
+same prompt (PROMPT_FILE, default prompt_au_v2.txt) and the same course_catalog.handle_tool_call as app.py,
 so tool responses are identical to what the Live API would receive.
 
 Uses GOOGLE_API_KEY from .env (Google AI Studio backend, not Vertex).
@@ -32,7 +32,7 @@ MODEL = os.getenv("TEXT_CHAT_MODEL", "gemini-3.6-flash")
 PRICE_TEXT_INPUT = float(os.getenv("PRICE_TEXT_INPUT", "0.75"))
 PRICE_TEXT_OUTPUT = float(os.getenv("PRICE_TEXT_OUTPUT", "4.50"))
 
-PROMPT_FILE = os.path.join(ROOT, "prompt_au.txt")
+PROMPT_FILE = os.path.join(ROOT, os.getenv("PROMPT_FILE", "PROMPT_FILES/prompt_au_v2.txt"))
 USER_NAME = "Paul Abhishek"
 PHONE_NUMBER = "+91-0000000000"
 
@@ -73,7 +73,7 @@ def print_banner():
 {BOLD}{'═' * 70}
   AU Admission Agent — Text Chat (catalog tools connected)
   Model : {MODEL}
-  Prompt: prompt_au.txt ({len(system_prompt)} chars)
+  Prompt: {os.path.relpath(PROMPT_FILE, ROOT)} ({len(system_prompt)} chars)
   Tools : {', '.join(spec['name'] for spec in course_catalog.TOOL_SPECS)}
 {'═' * 70}{RESET}
   Type your message and press Enter.  Empty line or Ctrl+C to quit.

@@ -37,7 +37,7 @@ is also the reference for Redesign Task 8).
 
 - Do not read `.env` or any credential JSON, including the new Vertex key (the
   code loads it; you never need to open it). Don't `cat` it, `grep` it or log it.
-- `requirements.txt` and `.env` are frozen. `prompt.txt` is still Senco content
+- `requirements.txt` and `.env` are frozen. `PROMPT_FILES/prompt.txt` (moved there 2026-10-07; app.py now loads `PROMPT_FILE`, default `PROMPT_FILES/prompt_au_v2.txt`) is still Senco content
   (the greeting says "Sia from Senco Gold and Diamonds"). This is known and is
   not a bug, so leave it alone.
 - `aec.py` must stay byte-identical (sha256 `495a82ca...`, pinned by

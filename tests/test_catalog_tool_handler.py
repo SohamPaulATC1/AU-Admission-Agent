@@ -45,7 +45,8 @@ def responses(session):
 class TestCatalogDeclarations(unittest.TestCase):
     def test_catalog_tools_are_declared_after_the_call_control_tools(self):
         names = [d.name for d in app.LOCAL_GEMINI_TOOLS[0]["function_declarations"]]
-        self.assertEqual(names, ["endCall", "transferCall", "list_programs", "get_program_details"])
+        self.assertEqual(names, ["endCall", "transferCall", "list_programs", "get_program_details",
+                                 "find_eligible_programs", "find_scholarships"])
 
 
 class TestCatalogToolCall(unittest.TestCase):

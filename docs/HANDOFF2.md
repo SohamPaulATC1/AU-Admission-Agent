@@ -127,10 +127,11 @@ Name resolution (`course_catalog.resolve`), in order:
 5. Otherwise candidates within 0.2 of the best (and at least 0.6) are
    returned as `ambiguous`; nothing left is `not_found`.
 
-## 5. Prompt (`prompt_au.txt`)
+## 5. Prompt (`PROMPT_FILES/prompt_au.txt`)
 
-`prompt.txt` is still the old Senco content and is not edited by this work.
-The operator copies `prompt_au.txt` into `prompt.txt` by hand when ready.
+Correction 2026-10-07: app.py loads `PROMPT_FILES/prompt_au.txt` directly (since
+`feb4b29`), so it is the live prompt. `PROMPT_FILES/prompt.txt` is the old Senco
+content, unused and not edited by this work. Nothing is copied by hand.
 
 - Rewritten for the tools: every hard-coded fee and eligibility line and the
   SoET-only scope are gone; the opening pitch is now "2027 admissions at
@@ -201,10 +202,12 @@ reuse rule, error rule, eligibility rule).
 
 Not yet done, in this order:
 1. Commit this work on its own (operator decides when).
-2. Operator copies `prompt_au.txt` into `prompt.txt`.
+2. (Retired: no copy step. app.py reads `PROMPT_FILE`, default `PROMPT_FILES/prompt_au_v2.txt` since
+   2026-10-07; `PROMPT_FILES/prompt_au.txt` is the rollback.)
 3. Back up EC2's current files (section 1), then copy over: `course_catalog.py`,
    all of `catalog/` (the build test imports `build_catalog.py`), `app.py`,
-   `prompt.txt`, `tests/harness/appctl.py`, and the new and changed tests.
+   the `PROMPT_FILES/` folder (delete the old root-level `prompt.txt` and
+   `prompt_au.txt` on EC2), `tests/harness/appctl.py`, and the new and changed tests.
    Run the suite on EC2.
 4. Optional first step from Windows: a text-only Gemini session with
    `prompt_au.txt` and the real declarations, typed questions, no Plivo, to

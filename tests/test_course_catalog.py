@@ -125,7 +125,7 @@ class TestResolution(unittest.TestCase):
     def test_constants_are_pinned(self):
         self.assertEqual((cc.FOUND_SCORE, cc.CANDIDATE_SCORE, cc.SCORE_MARGIN, cc.DEPARTMENT_WEIGHT),
                          (0.75, 0.6, 0.2, 0.5))
-        self.assertEqual((cc.MAX_PROGRAMS, cc.LIST_NAMES_MAX, cc.MAX_CANDIDATES), (3, 20, 4))
+        self.assertEqual((cc.MAX_PROGRAMS, cc.LIST_NAMES_MAX, cc.MAX_CANDIDATES, cc.ELIGIBLE_NAMES_MAX), (3, 20, 4, 10))
 
 
 class TestListPrograms(unittest.TestCase):
@@ -266,13 +266,16 @@ class TestSizeBudgets(unittest.TestCase):
         self.assertLessEqual(cc.response_chars(details("cse", "ece", "civil", fields=["fees"])), 1000)
 
     def test_declarations(self):
-        self.assertLessEqual(cc.response_chars(cc.TOOL_SPECS), 1800)
+        # Spec 13.4: measured 4161 with find_scholarships.
+        self.assertLessEqual(cc.response_chars(cc.TOOL_SPECS), 4200)
 
 
 class TestToolSpecs(unittest.TestCase):
     def test_names_and_enums_come_from_the_data(self):
-        self.assertEqual(cc.TOOL_NAMES, {"list_programs", "get_program_details"})
-        self.assertEqual([s["name"] for s in cc.TOOL_SPECS], ["list_programs", "get_program_details"])
+        self.assertEqual(cc.TOOL_NAMES, {"list_programs", "get_program_details", "find_eligible_programs",
+                                         "find_scholarships"})
+        self.assertEqual([s["name"] for s in cc.TOOL_SPECS],
+                         ["list_programs", "get_program_details", "find_eligible_programs", "find_scholarships"])
         props = cc.TOOL_SPECS[0]["parameters"]["properties"]
         self.assertEqual(props["degree"]["enum"], cc.DEGREES)
         self.assertEqual(len(props["degree"]["enum"]), 22)

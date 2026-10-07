@@ -1,0 +1,378 @@
+{
+  "source": "AU Scholarship Policy AY 2026-27 Updated V2",
+  "general_conditions": [
+    {
+      "text": "Only one scholarship applies per student, the highest one they qualify for.",
+      "source_text": "Candidate can avail a maximum of one scholarship at a time. Student can avail only one scholarship whichever is the highest. If any student is eligible / entitled for more than one scholarship / concession, he/ she has to make a choice for any one only.",
+      "verified": true
+    },
+    {
+      "text": "Half of the scholarship is applied in the first semester and the other half in the third semester.",
+      "source_text": "Whichever percentage of scholarship a student secures, 50% of the scholarship shall be applied in the 1st semester and the remaining 50% in the 3rd semester.",
+      "verified": true
+    },
+    {
+      "text": "AUAT and Early Bird scholarships need the fee to be paid within the payment deadline.",
+      "source_text": "AUAT scholarship will be given to the students if the student pays the fee within the deadline of fee payment date. Early Bird scholarship will be given to the students if the student pays the fee within the deadline of fee payment date.",
+      "verified": true
+    },
+    {
+      "text": "To keep a scholarship the student needs the required attendance, no disciplinary charges and no backlog in any paper.",
+      "source_text": "Students not fulfilling required percentage of attendance in the classes will not be eligible for award of any Scholarship. Students having proven disciplinary charges will not be eligible for award of any. Students having backlog in any paper in any Semester will not be eligible for award of any Scholarship.",
+      "verified": true
+    }
+  ],
+  "pitch_lines": [
+    {
+      "text": "After admission, the top students of each program can win merit awards of up to Rs 25,000 every semester from the second semester, with SGPA 8.5 or above; amounts are decided by the university.",
+      "source_text": "Scholarship will be awarded programme wise to meritorious students on the basis of their performance in each Semester. Award of scholarship will start from Second Semester till last Semester on the basis of performance in the previous Semester. There may be maximum of three Scholarships of amount Rs.25000/-, Rs.10000/- and Rs.10000/- for the top three toppers in a batch of 41 students and above, top two toppers in a batch of 21 -40 students of Rs.25000/-and Rs.10000/-. If the number of students in a batch is 1-20, then the Scholarship will be restricted to the amount of Rs.25000/- for the topper. However, the amount of scholarship may vary from time to time at the discretion of the management. The students securing SGPA 8.5 and above only will be eligible for award of Scholarship.",
+      "verified": true
+    },
+    {
+      "text": "A seat can be booked with an advance of Rs 60,000, and the balance is paid within 30 days of booking.",
+      "source_text": "A student may take admission by paying an advance amount of Rs. 60,000 (Rs. 42,000 of which will be Admission Fees and Rs. 18,000 will be considered as part payment of 1st Semester Fees) and the balance amount should be paid by the student within 30 days from the date of booking. This scheme will be continued till 31st March 2026.",
+      "verified": true,
+      "note": "Open question: may Neha say this as a closer? Rs 42,000 admission fee here differs from the catalog admission_fee (e.g. Rs 43,800 for M.Sc Chemistry)."
+    }
+  ],
+  "schemes": [
+    {
+      "id": "early-bird",
+      "section": 1,
+      "name": "Early Bird Scholarship",
+      "source_text": "Early Bird Scholarship for candidate taking admission during the period from December 2025 to 31st March 2026 with maximum cap of 250 Admissions. Semester / Early Bird Scholarship/ Discount / Total: 1st Semester Rs 7,500, 3rd Semester Rs 7,500, Total Rs 15000.",
+      "programs": {"levels": ["UG", "PG", "Diploma"], "exclude_degrees": ["B.Pharm", "D.Pharm", "M.Pharm"]},
+      "input": "everyone",
+      "tiers": [
+        {"award": {"kind": "fixed_inr", "amount": 15000}}
+      ],
+      "conditions": ["limited to the first 250 admissions", "fee paid within the payment deadline"],
+      "committee_decides": false,
+      "verified": true,
+      "note": "Dates ignored (operator). Not for Consultant / Teacher Consultant / College Dekho admissions (note 7, internal, not spoken). M.Pharm excluded on 'M.PHARM No Scholarships'; confirmed."
+    },
+    {
+      "id": "early-bird-pharmacy",
+      "section": 1,
+      "name": "Early Bird Scholarship",
+      "source_text": "For B. Pharma & D. Pharma: 1st Semester Rs 5,000, 3rd Semester Rs 5,000, Total Rs 10,000.",
+      "programs": {"degrees": ["B.Pharm", "D.Pharm"]},
+      "input": "everyone",
+      "tiers": [
+        {"award": {"kind": "fixed_inr", "amount": 10000}}
+      ],
+      "conditions": ["limited to the first 250 admissions", "fee paid within the payment deadline"],
+      "committee_decides": false,
+      "verified": true
+    },
+    {
+      "id": "auat",
+      "section": 2,
+      "name": "AUAT Scholarship",
+      "source_text": "Scholarship for candidate taking Admission during the period from January 2026 to 31st March 2026. AUAT 2026 score / Scholarship: 80%-84.99% Total 25% 12.5% (1st Semester) & 12.5% (3Rd Semester); 85%- Above Total 50% 25% (1st Semester) & 25% (3Rd Semester).",
+      "programs": {"levels": ["UG", "PG", "Diploma"], "exclude_degrees": ["MBA", "M.Pharm"]},
+      "input": "auat_pct",
+      "tiers": [
+        {"min": 85, "award": {"kind": "pct_split", "pct": 50}},
+        {"min": 80, "award": {"kind": "pct_split", "pct": 25}}
+      ],
+      "conditions": ["fee paid within the payment deadline"],
+      "committee_decides": false,
+      "verified": true,
+      "note": "MBA has its own AUAT table (auat-mba). pct_split = half the pct off the 1st semester fee and half off the 3rd, per the '12.5% (1st Semester) & 12.5% (3Rd Semester)' wording."
+    },
+    {
+      "id": "auat-mba",
+      "section": 2,
+      "name": "AUAT Scholarship for MBA",
+      "source_text": "MBA AUAT Scholarships. Marks / Percentage / Student Type / Scholarship Amount / 1st Semester / 3rd Semester: 85% and above, External Students Rs 30,000 Rs 15,000 Rs 15,000; Internal Students Rs 40,000 Rs 20,000 Rs 20,000. 80% to 84.99% Internal Students Only Rs 25,000 Rs 12,500 Rs 12,500. Note: Scholarship amounts are split equally between 1st & 3rd Semesters.",
+      "programs": {"degrees": ["MBA"]},
+      "input": "auat_pct",
+      "tiers": [
+        {"min": 85, "award": {"kind": "fixed_inr", "amount": {"external": 30000, "internal": 40000}}},
+        {"min": 80, "award": {"kind": "fixed_inr", "amount": {"internal": 25000}}}
+      ],
+      "conditions": ["fee paid within the payment deadline"],
+      "committee_decides": false,
+      "verified": true,
+      "note": "Assumed internal = Adamas University graduate; confirmed."
+    },
+    {
+      "id": "aujet",
+      "section": 3,
+      "name": "AUJET Scholarship",
+      "source_text": "Top 20 with 100% 1ST Semester Fees; Next 30 with 90% 1ST Semester Fees; Next 50 with 80% T1ST Semester Fees; Next 100 with 70% 1ST Semester Fees; Next 200 with 60% 1ST Semester Fees; Next 300 with 50% 1ST Semester Fees; Next 400 with 40% 1ST Semester Fees; Next 400 with 30% 1ST Semester Fees; Rest with 20% 1ST Semester Fees (Score >=40%). 1st Semester 50% of achieved scholarships achieved in 1st Semester, 3rd Semester Rest 50% In 3rd Semester.",
+      "programs": {"levels": ["UG", "PG", "Diploma"], "exclude_degrees": ["M.Pharm"]},
+      "input": "aujet_rank",
+      "tiers": [
+        {"max": 20, "award": {"kind": "pct_first_sem", "pct": 100}},
+        {"max": 50, "award": {"kind": "pct_first_sem", "pct": 90}},
+        {"max": 100, "award": {"kind": "pct_first_sem", "pct": 80}},
+        {"max": 200, "award": {"kind": "pct_first_sem", "pct": 70}},
+        {"max": 400, "award": {"kind": "pct_first_sem", "pct": 60}},
+        {"max": 700, "award": {"kind": "pct_first_sem", "pct": 50}},
+        {"max": 1100, "award": {"kind": "pct_first_sem", "pct": 40}},
+        {"max": 1500, "award": {"kind": "pct_first_sem", "pct": 30}},
+        {"award": {"kind": "pct_first_sem", "pct": 20}}
+      ],
+      "conditions": ["AUJET score of at least 40 percent for ranks after 1500"],
+      "committee_decides": false,
+      "verified": true,
+      "note": "'Next N' converted to cumulative ranks (20, 50, 100, 200, 400, 700, 1100, 1500). Last tier has no bound = any rank."
+    },
+    {
+      "id": "ug-merit",
+      "section": 4,
+      "name": "Merit Scholarship",
+      "source_text": "UG level programs. Marks (Equivalent CGPA) in Qualifying Examination / Scholarship: 95% and above 50%; 90.% to 94.99.% 25%; 85% to 89.99% 20%; 75% to 84.99% 10%. Note: Whatever percentage of scholarship a student gets will be split equally between the 1st and 3rd semesters.",
+      "programs": {"levels": ["UG"]},
+      "input": "qualifying_pct",
+      "tiers": [
+        {"min": 95, "award": {"kind": "pct_split", "pct": 50}},
+        {"min": 90, "award": {"kind": "pct_split", "pct": 25}},
+        {"min": 85, "award": {"kind": "pct_split", "pct": 20}},
+        {"min": 75, "award": {"kind": "pct_split", "pct": 10}}
+      ],
+      "conditions": [],
+      "committee_decides": false,
+      "verified": true,
+      "note": "qualifying_pct = 10+2 marks for UG. Diploma level (D.Pharm, Post-M.Sc Diploma) left out of both merit tables; confirmed."
+    },
+    {
+      "id": "pg-merit",
+      "section": 4,
+      "name": "Merit Scholarship",
+      "source_text": "PG level Programs. Marks / CGPA in Qualifying Examination / Scholarship: 80% and above 50%; 70% to 79.99% 25%. Note: Whatever percentage of scholarship a student gets will be split equally between the 1st and 3rd semesters.",
+      "programs": {"levels": ["PG"], "exclude_degrees": ["MBA", "LL.M", "M.Pharm"]},
+      "input": "qualifying_pct",
+      "tiers": [
+        {"min": 80, "award": {"kind": "pct_split", "pct": 50}},
+        {"min": 70, "award": {"kind": "pct_split", "pct": 25}}
+      ],
+      "conditions": [],
+      "committee_decides": false,
+      "verified": true,
+      "note": "qualifying_pct = graduation marks for PG. MBA and LL.M have their own tables; M.Pharm has none."
+    },
+    {
+      "id": "mba-merit",
+      "section": 4,
+      "name": "Merit Scholarship for MBA",
+      "source_text": "MBA Merit Scholarship Structure. Marks / Percentage / Student Type / Scholarship Amount / 1st Semester / 3rd Semester: 80% and above, External Students Rs 30,000 Rs 15,000 Rs 15,000; Internal Students Rs 40,000 Rs 20,000 Rs 20,000. 70% to 79.99% Internal Students Only Rs 25,000 Rs 12,500 Rs 12,500. Note: Scholarship amounts are split equally between 1st & 3rd Semesters.",
+      "programs": {"degrees": ["MBA"]},
+      "input": "qualifying_pct",
+      "tiers": [
+        {"min": 80, "award": {"kind": "fixed_inr", "amount": {"external": 30000, "internal": 40000}}},
+        {"min": 70, "award": {"kind": "fixed_inr", "amount": {"internal": 25000}}}
+      ],
+      "conditions": [],
+      "committee_decides": false,
+      "verified": true,
+      "note": "Assumed internal = Adamas University graduate; confirm."
+    },
+    {
+      "id": "llm-merit",
+      "section": 4,
+      "name": "Merit Scholarship for LL.M",
+      "source_text": "LLM MERIT Scholarships. Marks / Percentage / Student Type / Scholarship Amount / 1st Semester / 3rd Semester: 80% and above, External Students Rs 30,000 Rs 15,000 Rs 15,000; Internal Students Rs 40,000 Rs 20,000 Rs 20,000. 70% to 79.99% Internal Students Only Rs 25,000 Rs 12,500 Rs 12,500. Note: Scholarship amounts are split equally between 1st & 3rd Semesters.",
+      "programs": {"degrees": ["LL.M"]},
+      "input": "qualifying_pct",
+      "tiers": [
+        {"min": 80, "award": {"kind": "fixed_inr", "amount": {"external": 30000, "internal": 40000}}},
+        {"min": 70, "award": {"kind": "fixed_inr", "amount": {"internal": 25000}}}
+      ],
+      "conditions": [],
+      "committee_decides": false,
+      "verified": true,
+      "note": "Assumed internal = Adamas University graduate; confirm."
+    },
+    {
+      "id": "jee-main",
+      "section": 5,
+      "name": "JEE Main Scholarship",
+      "source_text": "Scholarship to students seeking admission to B.Tech. (Engineering) programs on the basis of their JEE- Main 2026 All India Rank as per following criteria. JEE-2026 Overall All India Rank / Scholarship: Upto 50000 100%; 50001 - 100000 50%; 100001-150000 25%.",
+      "programs": {"degrees": ["B.Tech"]},
+      "input": "jee_main_rank",
+      "tiers": [
+        {"max": 50000, "award": {"kind": "pct_split", "pct": 100}},
+        {"max": 100000, "award": {"kind": "pct_split", "pct": 50}},
+        {"max": 150000, "award": {"kind": "pct_split", "pct": 25}}
+      ],
+      "conditions": ["JEE Main 2026 All India Rank"],
+      "committee_decides": false,
+      "verified": true
+    },
+    {
+      "id": "wbjee",
+      "section": 6,
+      "name": "WBJEE Scholarship",
+      "source_text": "Scholarship to students seeking admission for B.Tech (Engineering) programs on the basis of their WBJEE-2026 Ranks as per following criteria. WBJEE-2026 Rank / Scholarship: Upto 900 80%; 899 - 2000 50%; 1999 - 5000 25%.",
+      "programs": {"degrees": ["B.Tech"]},
+      "input": "wbjee_rank",
+      "tiers": [
+        {"max": 900, "award": {"kind": "pct_split", "pct": 80}},
+        {"max": 2000, "award": {"kind": "pct_split", "pct": 50}},
+        {"max": 5000, "award": {"kind": "pct_split", "pct": 25}}
+      ],
+      "conditions": ["WBJEE 2026 rank"],
+      "committee_decides": false,
+      "verified": true,
+      "note": "Source bands overlap (899-2000, 1999-5000). Read as up to 900 / 901-2000 / 2001-5000; confirmed."
+    },
+    {
+      "id": "cat",
+      "section": 7,
+      "name": "CAT Scholarship for MBA",
+      "source_text": "Scholarship to students seeking admission to MBA programs on the basis of CAT Score as per following criteria. CAT- Score / Scholarship: 80% & above 100% of the 1st Semester Fee; 70% to 79.99 50% of the 1st Semester Fee; 60% to 69.99 25% of the 1st Semester Fee. Valid CAT/MAT/CMAT/ATMA scores.",
+      "programs": {"degrees": ["MBA"]},
+      "input": "cat_pct",
+      "tiers": [
+        {"min": 80, "award": {"kind": "pct_first_sem", "pct": 100}},
+        {"min": 70, "award": {"kind": "pct_first_sem", "pct": 50}},
+        {"min": 60, "award": {"kind": "pct_first_sem", "pct": 25}}
+      ],
+      "conditions": ["valid CAT score"],
+      "committee_decides": false,
+      "verified": true,
+      "note": "'CAT score 80%' assumed to mean percentile; confirmed."
+    },
+    {
+      "id": "mat-cmat-atma",
+      "section": 7,
+      "name": "MAT, CMAT or ATMA Scholarship for MBA",
+      "source_text": "On the basis of MAT/CMAT/ATMA. MAT/CMAT/ATMA- Score / Marks / Scholarship: 95% & above 100%; 90% & 94.99% 50%; 80% & 89.99% 25%. Valid CAT/MAT/CMAT/ATMA scores.",
+      "programs": {"degrees": ["MBA"]},
+      "input": "mat_pct",
+      "tiers": [
+        {"min": 95, "award": {"kind": "pct_first_sem", "pct": 100}},
+        {"min": 90, "award": {"kind": "pct_first_sem", "pct": 50}},
+        {"min": 80, "award": {"kind": "pct_first_sem", "pct": 25}}
+      ],
+      "conditions": ["valid MAT, CMAT or ATMA score"],
+      "committee_decides": false,
+      "verified": true,
+      "note": "Unlike CAT, the source does not say 'of the 1st Semester Fee' here, but operator confirmed it matches CAT: pct_first_sem."
+    },
+    {
+      "id": "employee-ward",
+      "section": 8,
+      "name": "Scholarship for Wards of Adamas University or RICE Employees",
+      "source_text": "Scholarship of up to 20% (limiting to maximum of Rs. 25,000) will be provided to the First Child only. However, if the first child is already getting scholarship on the basis of Merit, the benefit shall be passed on to the second child, if applicable. In this case, the employee should have served at least 5 years.",
+      "programs": {"levels": ["UG", "PG", "Diploma"], "exclude_degrees": ["M.Pharm"]},
+      "input": "employee_ward",
+      "tiers": [
+        {"award": {"kind": "pct_capped_total", "pct": 20, "cap_total": 25000}}
+      ],
+      "conditions": ["first child of the employee only, or the second child if the first already has a merit scholarship", "the employee has served at least 5 years"],
+      "committee_decides": false,
+      "verified": true,
+      "note": "'In this case' read as applying to the employee in general; could mean only the second-child case. It means that the employee has to be with the adamas group for atleast 5 years to avail ward scholarships."
+    },
+    {
+      "id": "sibling",
+      "section": 9,
+      "name": "Sibling Scholarship",
+      "source_text": "Scholarship of up to 10% of Semester Fee (limiting to maximum of Rs. 5000/semester for entire program duration) will be provided to the Sibling (brother/sister) of a student already enrolled in any of the programs (Except B. Pharm.) at Adamas University. Only one sibling will be eligible for the scholarship.",
+      "programs": {"levels": ["UG", "PG", "Diploma"], "exclude_degrees": ["M.Pharm"]},
+      "input": "sibling_enrolled",
+      "tiers": [
+        {"award": {"kind": "pct_every_sem_capped", "pct": 10, "cap_per_sem": 5000}}
+      ],
+      "conditions": ["the brother or sister must be currently enrolled at Adamas University in a program other than B.Pharm", "only one sibling can get it"],
+      "committee_decides": false,
+      "verified": true,
+      "note": "'(Except B. Pharm.)' read as the enrolled sibling's program."
+    },
+    {
+      "id": "alumni",
+      "section": 10,
+      "name": "Alumni Scholarship",
+      "source_text": "A Student who is an Alumnus of any of the Adamas Educational Institutions (Schools or University), shall be eligible for 50% Scholarship ,25% in 1st Semester Fee & 25% in 3rd Semester Fee, as scholarship during admission to the programs offered at Adamas University.",
+      "programs": {"levels": ["UG", "PG", "Diploma"], "exclude_degrees": ["M.Pharm"]},
+      "input": "alumnus",
+      "tiers": [
+        {"award": {"kind": "pct_split", "pct": 50}}
+      ],
+      "conditions": ["studied at an Adamas school or Adamas University"],
+      "committee_decides": false,
+      "verified": true,
+      "note": "Not for Consultant / Teacher Consultant / College Dekho admissions (note 7, internal, not spoken)."
+    },
+    {
+      "id": "clat",
+      "section": 11,
+      "name": "CLAT Scholarship",
+      "source_text": "Scholarship to students seeking admission for LLB programs on the basis of their CLAT- 2025 Marks/Score as per following criteria. CLAT-2026 Marks/Score / Scholarship: 90 & above 100%; 70 To 89 50%; 50 to 69 25%; 35 to 49 10%.",
+      "programs": {"degrees": ["BA LL.B", "BBA LL.B"]},
+      "input": "clat_score",
+      "tiers": [
+        {"min": 90, "award": {"kind": "pct_split", "pct": 100}},
+        {"min": 70, "award": {"kind": "pct_split", "pct": 50}},
+        {"min": 50, "award": {"kind": "pct_split", "pct": 25}},
+        {"min": 35, "award": {"kind": "pct_split", "pct": 10}}
+      ],
+      "conditions": ["CLAT 2026 score"],
+      "committee_decides": false,
+      "verified": true,
+      "note": "Heading says CLAT-2026, text says CLAT-2025 Marks. Spoken as CLAT 2026; confirm. Band edges are whole marks (89 then 90); a score like 89.5 counts in the lower band."
+    },
+    {
+      "id": "defence-ward",
+      "section": 12,
+      "name": "Scholarship for Wards of Defence Personnel",
+      "source_text": "Scholarship of up to 10% of Semester Fee (limiting to maximum of Rs. 5000/semester for entire program duration) shall be available to the candidate who is a ward of a Personnel (In-Service/ Retired)/Paramilitary Forces (In-Service/Retired) in all the UG & PG Programs.",
+      "programs": {"levels": ["UG", "PG"], "exclude_degrees": ["M.Pharm"]},
+      "input": "defence_ward",
+      "tiers": [
+        {"award": {"kind": "pct_every_sem_capped", "pct": 10, "cap_per_sem": 5000}}
+      ],
+      "conditions": ["parent in the armed forces or paramilitary forces, serving or retired"],
+      "committee_decides": false,
+      "verified": true,
+      "note": "Source says 'all the UG & PG Programs', so Diploma is left out."
+    },
+    {
+      "id": "sports-achiever",
+      "section": 13,
+      "name": "Sports Achiever Scholarship",
+      "source_text": "Scholarship of 100% Semester Fee including Admission Fee will be available to outstanding achievers in sports field. The candidate seeking admission shall be required to produce relevant documents of proof of his/her participation and performance. Sports Committee under Director-Sports will take the final decision regarding Scholarship. The scholarship under this category shall be given for the first semester and its continuation shall be decided by a committee constituted by the Competent Authority of the University.",
+      "programs": {"levels": ["UG", "PG", "Diploma"], "exclude_degrees": ["M.Pharm"]},
+      "input": "sports_achiever",
+      "tiers": [
+        {"award": {"kind": "full_fee"}}
+      ],
+      "conditions": ["proof of participation and performance in sports", "the Sports Committee takes the final decision", "given for the first semester; continuation decided by a committee"],
+      "committee_decides": true,
+      "verified": true
+    },
+    {
+      "id": "sports-ward",
+      "section": 14,
+      "name": "Scholarship for Wards of Sports Achievers",
+      "source_text": "Scholarship of 100% Semester Fee including Admission Fee will be available to ward of outstanding achievers in sports field. The candidate seeking admission shall be required to produce relevant documents of his/her parent's proof of participation and performance in high level sports competitions. Sports Committee under Director-Sports will take the final decision regarding Scholarship. The scholarship under this category shall be given in the first semester and its continuation shall be decided by a committee constituted by the Competent Authority of the University.",
+      "programs": {"levels": ["UG", "PG", "Diploma"], "exclude_degrees": ["M.Pharm"]},
+      "input": "sports_ward",
+      "tiers": [
+        {"award": {"kind": "full_fee"}}
+      ],
+      "conditions": ["proof of the parent's participation and performance in high level sports competitions", "the Sports Committee takes the final decision", "given for the first semester; continuation decided by a committee"],
+      "committee_decides": true,
+      "verified": true
+    },
+    {
+      "id": "merit-cum-means",
+      "section": 15,
+      "name": "Merit cum Means Free Studentship",
+      "source_text": "A student scoring marks 60% or above or CGPA 6.5 and above with total income of the family not exceeding Rs.3.0 Lakh per semester may apply for free studentship for grant of concession in tuition fee. The number of full free and half free studentship for a course will be restricted to 5% for full free studentship and 10% for half free studentship. The final selection will be on the basis of merit i.e. marks/CGPA scored in the entry level examinations for the first semester students and in the Adamas University examinations for second semester students till last semester.",
+      "programs": {"levels": ["UG", "PG", "Diploma"], "exclude_degrees": ["M.Pharm"]},
+      "input": "qualifying_pct",
+      "tiers": [
+        {"min": 60, "award": {"kind": "described", "text": "full or half tuition fee concession"}}
+      ],
+      "conditions": ["family income not above Rs 3 lakh", "limited seats: 5 percent full free and 10 percent half free per course", "selection on merit"],
+      "committee_decides": true,
+      "verified": true,
+      "note": "No income parameter on purpose; Neha mentions it as 'you may also apply' when marks are 60% or above. Source says 'Rs.3.0 Lakh per semester', likely a typo for per year; spoken without the period. Confirmed."
+    }
+  ]
+}

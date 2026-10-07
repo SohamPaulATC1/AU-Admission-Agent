@@ -317,8 +317,9 @@ class TestCallStats(unittest.TestCase):
         # (no logic change) and made PRICE_*/GEMINI_MODEL/PORT env-overridable.
         # And again for the course catalog tools (import course_catalog, the
         # catalog declarations, the [CATALOG] stats line, the call_state
-        # counters and the catalog / unknown-tool branches).
-        self.assertEqual(references, [61, 1612, 2129, 2139, 2552])
+        # counters and the catalog / unknown-tool branches). And +1 for the
+        # PROMPT_FILE switch (prompt_au_v2.txt default) above these sites.
+        self.assertEqual(references, [61, 1613, 2130, 2140, 2553])
 
 
 if __name__ == "__main__":

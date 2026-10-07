@@ -8,6 +8,24 @@
   "M. Tech (VLSI & Embedded Systems)",
   "Post-Graduate Diploma in Nuclear Medicine Technology"
  ],
+ "subjects": [
+  "Physics",
+  "Chemistry",
+  "Mathematics",
+  "Biology",
+  "Biotechnology",
+  "Computer Science",
+  "Computer Application",
+  "Technical Vocational",
+  "Statistics",
+  "Economics",
+  "Geography",
+  "Psychology",
+  "Agriculture",
+  "Nutrition",
+  "Home Science",
+  "Human Development"
+ ],
  "records": [
   {
    "id": "msc-chemistry",
@@ -124,7 +142,18 @@
     "program_fee": 288326,
     "total": 332126
    },
-   "add_ons": []
+   "add_ons": [],
+   "eligibility_rule": {
+    "min_aggregate": 50,
+    "subject_options": [
+     [
+      "Physics",
+      "Chemistry"
+     ]
+    ],
+    "conditions": [],
+    "verified": true
+   }
   },
   {
    "id": "bsc-environmental-science-and-sustainability",
@@ -167,7 +196,15 @@
     "program_fee": 288326,
     "total": 332126
    },
-   "add_ons": []
+   "add_ons": [],
+   "eligibility_rule": {
+    "min_aggregate": 50,
+    "subject_options": null,
+    "conditions": [
+     "10+2 with science and humanities subjects"
+    ],
+    "verified": true
+   }
   },
   {
    "id": "msc-forensic-science",
@@ -247,7 +284,24 @@
     "program_fee": 509306,
     "total": 553106
    },
-   "add_ons": []
+   "add_ons": [],
+   "eligibility_rule": {
+    "min_aggregate": 50,
+    "subject_options": [
+     [
+      "Physics",
+      "Chemistry",
+      "Mathematics"
+     ],
+     [
+      "Physics",
+      "Chemistry",
+      "Biology"
+     ]
+    ],
+    "conditions": [],
+    "verified": true
+   }
   },
   {
    "id": "msc-geoinformatics",
@@ -364,7 +418,27 @@
     "program_fee": 317600,
     "total": 361400
    },
-   "add_ons": []
+   "add_ons": [],
+   "eligibility_rule": {
+    "min_aggregate": 50,
+    "subject_options": [
+     [
+      "Geography"
+     ],
+     [
+      "Physics",
+      "Chemistry",
+      "Mathematics"
+     ],
+     [
+      "Physics",
+      "Chemistry",
+      "Biology"
+     ]
+    ],
+    "conditions": [],
+    "verified": true
+   }
   },
   {
    "id": "bsc-geoinformatics",
@@ -409,7 +483,62 @@
     "program_fee": 356200,
     "total": 400000
    },
-   "add_ons": []
+   "add_ons": [],
+   "eligibility_rule": {
+    "min_aggregate": 50,
+    "subject_options": [
+     [
+      "Physics",
+      "Chemistry",
+      "Mathematics"
+     ],
+     [
+      "Physics",
+      "Chemistry",
+      "Biology"
+     ],
+     [
+      "Mathematics",
+      "Statistics",
+      "Economics"
+     ],
+     [
+      "Mathematics",
+      "Statistics",
+      "Computer Science"
+     ],
+     [
+      "Mathematics",
+      "Economics",
+      "Computer Science"
+     ],
+     [
+      "Statistics",
+      "Economics",
+      "Computer Science"
+     ],
+     [
+      "Mathematics",
+      "Statistics",
+      "Computer Application"
+     ],
+     [
+      "Mathematics",
+      "Economics",
+      "Computer Application"
+     ],
+     [
+      "Statistics",
+      "Economics",
+      "Computer Application"
+     ],
+     [
+      "Geography"
+     ]
+    ],
+    "conditions": [],
+    "verified": true
+   }
   },
   {
    "id": "msc-applied-statistics-and-data-science",
@@ -489,7 +618,20 @@
     "program_fee": 308000,
     "total": 351800
    },
-   "add_ons": []
+   "add_ons": [],
+   "eligibility_rule": {
+    "min_aggregate": 50,
+    "subject_options": [
+     [
+      "Mathematics"
+     ],
+     [
+      "Statistics"
+     ]
+    ],
+    "conditions": [],
+    "verified": true
+   }
   },
   {
    "id": "bsc-mathematics-and-computing",
@@ -532,7 +674,17 @@
     "program_fee": 266300,
     "total": 310100
    },
-   "add_ons": []
+   "add_ons": [],
+   "eligibility_rule": {
+    "min_aggregate": 50,
+    "subject_options": [
+     [
+      "Mathematics"
+     ]
+    ],
+    "conditions": [],
+    "verified": true
+   }
   },
   {
    "id": "msc-physics",
@@ -612,7 +764,18 @@
     "program_fee": 308000,
     "total": 351800
    },
-   "add_ons": []
+   "add_ons": [],
+   "eligibility_rule": {
+    "min_aggregate": 50,
+    "subject_options": [
+     [
+      "Physics",
+      "Chemistry"
+     ]
+    ],
+    "conditions": [],
+    "verified": true
+   }
   },
   {
    "id": "post-msc-diploma-in-medical-physics",
@@ -694,7 +857,13 @@
     "program_fee": 348592,
     "total": 392392
    },
-   "add_ons": []
+   "add_ons": [],
+   "eligibility_rule": {
+    "min_aggregate": 55,
+    "subject_options": null,
+    "conditions": [],
+    "verified": true
+   }
   },
   {
    "id": "mba",
@@ -852,7 +1021,13 @@
     "program_fee": 663398,
     "total": 707198
    },
-   "add_ons": []
+   "add_ons": [],
+   "eligibility_rule": {
+    "min_aggregate": 60,
+    "subject_options": null,
+    "conditions": [],
+    "verified": true
+   }
   },
   {
    "id": "bba-e-commerce",
@@ -897,7 +1072,13 @@
     "program_fee": 663398,
     "total": 707198
    },
-   "add_ons": []
+   "add_ons": [],
+   "eligibility_rule": {
+    "min_aggregate": 60,
+    "subject_options": null,
+    "conditions": [],
+    "verified": true
+   }
   },
   {
    "id": "ma-education",
@@ -977,7 +1158,13 @@
     "program_fee": 209600,
     "total": 253400
    },
-   "add_ons": []
+   "add_ons": [],
+   "eligibility_rule": {
+    "min_aggregate": 50,
+    "subject_options": null,
+    "conditions": [],
+    "verified": true
+   }
   },
   {
    "id": "bed",
@@ -1016,7 +1203,15 @@
     "program_fee": 168000,
     "total": 211800
    },
-   "add_ons": []
+   "add_ons": [],
+   "eligibility_rule": {
+    "min_aggregate": null,
+    "subject_options": null,
+    "conditions": [
+     "a graduate or postgraduate degree with at least 50%"
+    ],
+    "verified": true
+   }
   },
   {
    "id": "btech-civil-engineering",
@@ -1059,7 +1254,46 @@
     "program_fee": 425600,
     "total": 469400
    },
-   "add_ons": []
+   "add_ons": [],
+   "eligibility_rule": {
+    "min_aggregate": 55,
+    "subject_options": [
+     [
+      "Physics",
+      "Mathematics",
+      "Chemistry"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Biotechnology"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Biology"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Technical Vocational"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Computer Science"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Computer Application"
+     ]
+    ],
+    "conditions": [
+     "at least 45% in Physics, Mathematics and the third subject"
+    ],
+    "verified": true
+   }
   },
   {
    "id": "mtech-structural-engineering",
@@ -1179,7 +1413,46 @@
     "program_fee": 848000,
     "total": 891800
    },
-   "add_ons": []
+   "add_ons": [],
+   "eligibility_rule": {
+    "min_aggregate": 60,
+    "subject_options": [
+     [
+      "Physics",
+      "Mathematics",
+      "Chemistry"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Biotechnology"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Biology"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Technical Vocational"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Computer Science"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Computer Application"
+     ]
+    ],
+    "conditions": [
+     "at least 45% in Physics, Mathematics and the third subject"
+    ],
+    "verified": true
+   }
   },
   {
    "id": "btech-robotics-and-artificial-intelligence",
@@ -1222,7 +1495,46 @@
     "program_fee": 848000,
     "total": 891800
    },
-   "add_ons": []
+   "add_ons": [],
+   "eligibility_rule": {
+    "min_aggregate": 60,
+    "subject_options": [
+     [
+      "Physics",
+      "Mathematics",
+      "Chemistry"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Biotechnology"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Biology"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Technical Vocational"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Computer Science"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Computer Application"
+     ]
+    ],
+    "conditions": [
+     "at least 45% in Physics, Mathematics and the third subject"
+    ],
+    "verified": true
+   }
   },
   {
    "id": "mca",
@@ -1306,7 +1618,13 @@
     "program_fee": 514880,
     "total": 558680
    },
-   "add_ons": []
+   "add_ons": [],
+   "eligibility_rule": {
+    "min_aggregate": 60,
+    "subject_options": null,
+    "conditions": [],
+    "verified": true
+   }
   },
   {
    "id": "btech-computer-science-and-engineering",
@@ -1353,7 +1671,46 @@
     "program_fee": 848000,
     "total": 891800
    },
-   "add_ons": []
+   "add_ons": [],
+   "eligibility_rule": {
+    "min_aggregate": 60,
+    "subject_options": [
+     [
+      "Physics",
+      "Mathematics",
+      "Chemistry"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Biotechnology"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Biology"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Technical Vocational"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Computer Science"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Computer Application"
+     ]
+    ],
+    "conditions": [
+     "at least 45% in Physics, Mathematics and the third subject"
+    ],
+    "verified": true
+   }
   },
   {
    "id": "btech-cse-artificial-intelligence-and-machine-learning",
@@ -1401,7 +1758,46 @@
     "program_fee": 848000,
     "total": 891800
    },
-   "add_ons": []
+   "add_ons": [],
+   "eligibility_rule": {
+    "min_aggregate": 60,
+    "subject_options": [
+     [
+      "Physics",
+      "Mathematics",
+      "Chemistry"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Biotechnology"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Biology"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Technical Vocational"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Computer Science"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Computer Application"
+     ]
+    ],
+    "conditions": [
+     "at least 45% in Physics, Mathematics and the third subject"
+    ],
+    "verified": true
+   }
   },
   {
    "id": "btech-in-artificial-intelligence-and-data-science-business-application",
@@ -1444,7 +1840,37 @@
     "program_fee": 848000,
     "total": 891800
    },
-   "add_ons": []
+   "add_ons": [],
+   "eligibility_rule": {
+    "min_aggregate": 50,
+    "subject_options": [
+     [
+      "Physics",
+      "Mathematics",
+      "Chemistry"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Biotechnology"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Biology"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Technical Vocational"
+     ]
+    ],
+    "conditions": [
+     "at least 45% in Physics, Mathematics and the third subject",
+     "at least 40% in each individual subject"
+    ],
+    "verified": true
+   }
   },
   {
    "id": "btech-in-artificial-intelligence-and-data-science-fintech",
@@ -1487,7 +1913,37 @@
     "program_fee": 848000,
     "total": 891800
    },
-   "add_ons": []
+   "add_ons": [],
+   "eligibility_rule": {
+    "min_aggregate": 50,
+    "subject_options": [
+     [
+      "Physics",
+      "Mathematics",
+      "Chemistry"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Biotechnology"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Biology"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Technical Vocational"
+     ]
+    ],
+    "conditions": [
+     "at least 45% in Physics, Mathematics and the third subject",
+     "at least 40% in each individual subject"
+    ],
+    "verified": true
+   }
   },
   {
    "id": "btech-cse-cyber-security",
@@ -1530,7 +1986,46 @@
     "program_fee": 848000,
     "total": 891800
    },
-   "add_ons": []
+   "add_ons": [],
+   "eligibility_rule": {
+    "min_aggregate": 60,
+    "subject_options": [
+     [
+      "Physics",
+      "Mathematics",
+      "Chemistry"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Biotechnology"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Biology"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Technical Vocational"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Computer Science"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Computer Application"
+     ]
+    ],
+    "conditions": [
+     "at least 45% in Physics, Mathematics and the third subject"
+    ],
+    "verified": true
+   }
   },
   {
    "id": "btech-cse-data-science",
@@ -1573,7 +2068,46 @@
     "program_fee": 848000,
     "total": 891800
    },
-   "add_ons": []
+   "add_ons": [],
+   "eligibility_rule": {
+    "min_aggregate": 60,
+    "subject_options": [
+     [
+      "Physics",
+      "Mathematics",
+      "Chemistry"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Biotechnology"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Biology"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Technical Vocational"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Computer Science"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Computer Application"
+     ]
+    ],
+    "conditions": [
+     "at least 45% in Physics, Mathematics and the third subject"
+    ],
+    "verified": true
+   }
   },
   {
    "id": "btech-cse-cloud-computing",
@@ -1616,7 +2150,46 @@
     "program_fee": 848000,
     "total": 891800
    },
-   "add_ons": []
+   "add_ons": [],
+   "eligibility_rule": {
+    "min_aggregate": 60,
+    "subject_options": [
+     [
+      "Physics",
+      "Mathematics",
+      "Chemistry"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Biotechnology"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Biology"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Technical Vocational"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Computer Science"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Computer Application"
+     ]
+    ],
+    "conditions": [
+     "at least 45% in Physics, Mathematics and the third subject"
+    ],
+    "verified": true
+   }
   },
   {
    "id": "btech-cse-with-specialization-in-sap",
@@ -1667,7 +2240,46 @@
      "duration_years": 1,
      "fee": 65000
     }
-   ]
+   ],
+   "eligibility_rule": {
+    "min_aggregate": 60,
+    "subject_options": [
+     [
+      "Physics",
+      "Mathematics",
+      "Chemistry"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Biotechnology"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Biology"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Technical Vocational"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Computer Science"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Computer Application"
+     ]
+    ],
+    "conditions": [
+     "at least 45% in Physics, Mathematics and the third subject"
+    ],
+    "verified": true
+   }
   },
   {
    "id": "btech-electrical-engineering",
@@ -1712,7 +2324,46 @@
     "program_fee": 504000,
     "total": 547800
    },
-   "add_ons": []
+   "add_ons": [],
+   "eligibility_rule": {
+    "min_aggregate": 55,
+    "subject_options": [
+     [
+      "Physics",
+      "Mathematics",
+      "Chemistry"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Biotechnology"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Biology"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Technical Vocational"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Computer Science"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Computer Application"
+     ]
+    ],
+    "conditions": [
+     "at least 45% in Physics, Mathematics and the third subject"
+    ],
+    "verified": true
+   }
   },
   {
    "id": "btech-electronics-and-communication-engineering",
@@ -1757,7 +2408,46 @@
     "program_fee": 529000,
     "total": 572800
    },
-   "add_ons": []
+   "add_ons": [],
+   "eligibility_rule": {
+    "min_aggregate": 55,
+    "subject_options": [
+     [
+      "Physics",
+      "Mathematics",
+      "Chemistry"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Biotechnology"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Biology"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Technical Vocational"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Computer Science"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Computer Application"
+     ]
+    ],
+    "conditions": [
+     "at least 45% in Physics, Mathematics and the third subject"
+    ],
+    "verified": true
+   }
   },
   {
    "id": "btech-biomedical-engineering",
@@ -1800,7 +2490,26 @@
     "program_fee": 608000,
     "total": 651800
    },
-   "add_ons": []
+   "add_ons": [],
+   "eligibility_rule": {
+    "min_aggregate": 55,
+    "subject_options": [
+     [
+      "Physics",
+      "Chemistry",
+      "Biology"
+     ],
+     [
+      "Physics",
+      "Chemistry",
+      "Mathematics"
+     ]
+    ],
+    "conditions": [
+     "at least 45% in each of those subjects"
+    ],
+    "verified": true
+   }
   },
   {
    "id": "btech-mechanical-engineering",
@@ -1843,7 +2552,46 @@
     "program_fee": 425552,
     "total": 469352
    },
-   "add_ons": []
+   "add_ons": [],
+   "eligibility_rule": {
+    "min_aggregate": 55,
+    "subject_options": [
+     [
+      "Physics",
+      "Mathematics",
+      "Chemistry"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Biotechnology"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Biology"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Technical Vocational"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Computer Science"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Computer Application"
+     ]
+    ],
+    "conditions": [
+     "at least 45% in Physics, Mathematics and the third subject"
+    ],
+    "verified": true
+   }
   },
   {
    "id": "btech-electronics-engineering-and-vlsi-design",
@@ -1888,7 +2636,46 @@
     "program_fee": 856200,
     "total": 900000
    },
-   "add_ons": []
+   "add_ons": [],
+   "eligibility_rule": {
+    "min_aggregate": 55,
+    "subject_options": [
+     [
+      "Physics",
+      "Mathematics",
+      "Chemistry"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Biotechnology"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Biology"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Technical Vocational"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Computer Science"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Computer Application"
+     ]
+    ],
+    "conditions": [
+     "at least 45% in Physics, Mathematics and the third subject"
+    ],
+    "verified": true
+   }
   },
   {
    "id": "ba-llb-hons",
@@ -1938,7 +2725,15 @@
     "program_fee": 932000,
     "total": 975800
    },
-   "add_ons": []
+   "add_ons": [],
+   "eligibility_rule": {
+    "min_aggregate": 60,
+    "subject_options": null,
+    "conditions": [
+     "CLAT or AUAT qualified"
+    ],
+    "verified": true
+   }
   },
   {
    "id": "bba-llb-hons",
@@ -1988,7 +2783,15 @@
     "program_fee": 932000,
     "total": 975800
    },
-   "add_ons": []
+   "add_ons": [],
+   "eligibility_rule": {
+    "min_aggregate": 60,
+    "subject_options": null,
+    "conditions": [
+     "CLAT or AUAT qualified"
+    ],
+    "verified": true
+   }
   },
   {
    "id": "llm",
@@ -2108,7 +2911,15 @@
     "program_fee": 272996,
     "total": 316796
    },
-   "add_ons": []
+   "add_ons": [],
+   "eligibility_rule": {
+    "min_aggregate": 50,
+    "subject_options": null,
+    "conditions": [
+     "without Mathematics in class 11 and 12, a non-credit remedial Mathematics course in the first semester must be passed"
+    ],
+    "verified": true
+   }
   },
   {
    "id": "ma-bengali-language-and-literature",
@@ -2188,7 +2999,13 @@
     "program_fee": 152000,
     "total": 195800
    },
-   "add_ons": []
+   "add_ons": [],
+   "eligibility_rule": {
+    "min_aggregate": 50,
+    "subject_options": null,
+    "conditions": [],
+    "verified": true
+   }
   },
   {
    "id": "ma-english-language-and-literature",
@@ -2268,7 +3085,13 @@
     "program_fee": 300200,
     "total": 344000
    },
-   "add_ons": []
+   "add_ons": [],
+   "eligibility_rule": {
+    "min_aggregate": 50,
+    "subject_options": null,
+    "conditions": [],
+    "verified": true
+   }
   },
   {
    "id": "ma-political-science-and-international-relations",
@@ -2385,7 +3208,13 @@
     "program_fee": 266300,
     "total": 310100
    },
-   "add_ons": []
+   "add_ons": [],
+   "eligibility_rule": {
+    "min_aggregate": 50,
+    "subject_options": null,
+    "conditions": [],
+    "verified": true
+   }
   },
   {
    "id": "ba-public-administration-and-governance",
@@ -2428,7 +3257,13 @@
     "program_fee": 324770,
     "total": 368570
    },
-   "add_ons": []
+   "add_ons": [],
+   "eligibility_rule": {
+    "min_aggregate": 50,
+    "subject_options": null,
+    "conditions": [],
+    "verified": true
+   }
   },
   {
    "id": "ba-history-with-specialization-in-heritage-studies",
@@ -2473,7 +3308,13 @@
     "program_fee": 266300,
     "total": 310100
    },
-   "add_ons": []
+   "add_ons": [],
+   "eligibility_rule": {
+    "min_aggregate": 50,
+    "subject_options": null,
+    "conditions": [],
+    "verified": true
+   }
   },
   {
    "id": "ma-history",
@@ -2594,7 +3435,13 @@
     "program_fee": 266300,
     "total": 310100
    },
-   "add_ons": []
+   "add_ons": [],
+   "eligibility_rule": {
+    "min_aggregate": 50,
+    "subject_options": null,
+    "conditions": [],
+    "verified": true
+   }
   },
   {
    "id": "msc-biochemistry",
@@ -2674,7 +3521,18 @@
     "program_fee": 368158,
     "total": 411958
    },
-   "add_ons": []
+   "add_ons": [],
+   "eligibility_rule": {
+    "min_aggregate": 50,
+    "subject_options": [
+     [
+      "Chemistry",
+      "Biology"
+     ]
+    ],
+    "conditions": [],
+    "verified": true
+   }
   },
   {
    "id": "bsc-microbiology",
@@ -2717,7 +3575,18 @@
     "program_fee": 552320,
     "total": 596120
    },
-   "add_ons": []
+   "add_ons": [],
+   "eligibility_rule": {
+    "min_aggregate": 50,
+    "subject_options": [
+     [
+      "Chemistry",
+      "Biology"
+     ]
+    ],
+    "conditions": [],
+    "verified": true
+   }
   },
   {
    "id": "msc-microbiology",
@@ -2834,7 +3703,22 @@
     "program_fee": 608000,
     "total": 651800
    },
-   "add_ons": []
+   "add_ons": [],
+   "eligibility_rule": {
+    "min_aggregate": 55,
+    "subject_options": [
+     [
+      "Chemistry",
+      "Biology"
+     ],
+     [
+      "Chemistry",
+      "Biotechnology"
+     ]
+    ],
+    "conditions": [],
+    "verified": true
+   }
   },
   {
    "id": "btech-biotechnology",
@@ -2877,7 +3761,36 @@
     "program_fee": 772596,
     "total": 816396
    },
-   "add_ons": []
+   "add_ons": [],
+   "eligibility_rule": {
+    "min_aggregate": 60,
+    "subject_options": [
+     [
+      "Physics",
+      "Chemistry",
+      "Mathematics"
+     ],
+     [
+      "Physics",
+      "Chemistry",
+      "Biotechnology"
+     ],
+     [
+      "Physics",
+      "Chemistry",
+      "Biology"
+     ],
+     [
+      "Physics",
+      "Chemistry",
+      "Technical Vocational"
+     ]
+    ],
+    "conditions": [
+     "at least 45% in each of those subjects"
+    ],
+    "verified": true
+   }
   },
   {
    "id": "btech-food-technology",
@@ -2922,7 +3835,36 @@
     "program_fee": 606200,
     "total": 650000
    },
-   "add_ons": []
+   "add_ons": [],
+   "eligibility_rule": {
+    "min_aggregate": 60,
+    "subject_options": [
+     [
+      "Physics",
+      "Chemistry",
+      "Mathematics"
+     ],
+     [
+      "Physics",
+      "Chemistry",
+      "Biotechnology"
+     ],
+     [
+      "Physics",
+      "Chemistry",
+      "Biology"
+     ],
+     [
+      "Physics",
+      "Chemistry",
+      "Technical Vocational"
+     ]
+    ],
+    "conditions": [
+     "at least 45% in each of those subjects"
+    ],
+    "verified": true
+   }
   },
   {
    "id": "ma-journalism-and-mass-communication",
@@ -3006,7 +3948,13 @@
     "program_fee": 370340,
     "total": 414140
    },
-   "add_ons": []
+   "add_ons": [],
+   "eligibility_rule": {
+    "min_aggregate": 50,
+    "subject_options": null,
+    "conditions": [],
+    "verified": true
+   }
   },
   {
    "id": "bsc-graphics-animation-and-media-technology",
@@ -3051,7 +3999,13 @@
     "program_fee": 368000,
     "total": 411800
    },
-   "add_ons": []
+   "add_ons": [],
+   "eligibility_rule": {
+    "min_aggregate": 50,
+    "subject_options": null,
+    "conditions": [],
+    "verified": true
+   }
   },
   {
    "id": "msc-graphics-and-animation",
@@ -3211,7 +4165,27 @@
     "program_fee": 872306,
     "total": 916106
    },
-   "add_ons": []
+   "add_ons": [],
+   "eligibility_rule": {
+    "min_aggregate": 60,
+    "subject_options": [
+     [
+      "Physics",
+      "Chemistry",
+      "Mathematics"
+     ],
+     [
+      "Physics",
+      "Chemistry",
+      "Biology"
+     ]
+    ],
+    "conditions": [
+     "English as a subject in 10+2",
+     "10+2 from open schooling such as NIOS is not accepted"
+    ],
+    "verified": true
+   }
   },
   {
    "id": "dpharm",
@@ -3335,7 +4309,19 @@
     "program_fee": 408558,
     "total": 452358
    },
-   "add_ons": []
+   "add_ons": [],
+   "eligibility_rule": {
+    "min_aggregate": 50,
+    "subject_options": [
+     [
+      "Physics",
+      "Chemistry",
+      "Biology"
+     ]
+    ],
+    "conditions": [],
+    "verified": true
+   }
   },
   {
    "id": "bachelor-of-optometry",
@@ -3378,7 +4364,24 @@
     "program_fee": 408976,
     "total": 452776
    },
-   "add_ons": []
+   "add_ons": [],
+   "eligibility_rule": {
+    "min_aggregate": 50,
+    "subject_options": [
+     [
+      "Physics",
+      "Chemistry",
+      "Biology"
+     ],
+     [
+      "Physics",
+      "Chemistry",
+      "Mathematics"
+     ]
+    ],
+    "conditions": [],
+    "verified": true
+   }
   },
   {
    "id": "bachelor-of-food-nutrition-and-dietetics",
@@ -3423,7 +4426,27 @@
     "program_fee": 308000,
     "total": 351800
    },
-   "add_ons": []
+   "add_ons": [],
+   "eligibility_rule": {
+    "min_aggregate": 50,
+    "subject_options": [
+     [
+      "Chemistry",
+      "Biology"
+     ],
+     [
+      "Nutrition"
+     ],
+     [
+      "Home Science"
+     ],
+     [
+      "Human Development"
+     ]
+    ],
+    "conditions": [],
+    "verified": true
+   }
   },
   {
    "id": "ma-psychology",
@@ -3503,7 +4526,13 @@
     "program_fee": 408414,
     "total": 452214
    },
-   "add_ons": []
+   "add_ons": [],
+   "eligibility_rule": {
+    "min_aggregate": 50,
+    "subject_options": null,
+    "conditions": [],
+    "verified": true
+   }
   },
   {
    "id": "msc-psychology",
@@ -3583,7 +4612,27 @@
     "program_fee": 408650,
     "total": 452450
    },
-   "add_ons": []
+   "add_ons": [],
+   "eligibility_rule": {
+    "min_aggregate": 50,
+    "subject_options": [
+     [
+      "Physics",
+      "Chemistry",
+      "Mathematics"
+     ],
+     [
+      "Physics",
+      "Chemistry",
+      "Biology"
+     ],
+     [
+      "Psychology"
+     ]
+    ],
+    "conditions": [],
+    "verified": true
+   }
   },
   {
    "id": "bsc-hons-agriculture",
@@ -3628,7 +4677,64 @@
     "program_fee": 408164,
     "total": 451964
    },
-   "add_ons": []
+   "add_ons": [],
+   "eligibility_rule": {
+    "min_aggregate": 50,
+    "subject_options": [
+     [
+      "Physics",
+      "Chemistry",
+      "Biology"
+     ],
+     [
+      "Physics",
+      "Chemistry",
+      "Mathematics"
+     ],
+     [
+      "Physics",
+      "Chemistry",
+      "Agriculture"
+     ],
+     [
+      "Chemistry",
+      "Mathematics",
+      "Biology"
+     ],
+     [
+      "Chemistry",
+      "Mathematics",
+      "Agriculture"
+     ],
+     [
+      "Chemistry",
+      "Biology",
+      "Agriculture"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Biology"
+     ],
+     [
+      "Physics",
+      "Mathematics",
+      "Agriculture"
+     ],
+     [
+      "Physics",
+      "Biology",
+      "Agriculture"
+     ],
+     [
+      "Mathematics",
+      "Biology",
+      "Agriculture"
+     ]
+    ],
+    "conditions": [],
+    "verified": true
+   }
   }
  ]
 }

@@ -1,0 +1,712 @@
+{
+    "subjects": [
+        "Physics",
+        "Chemistry",
+        "Mathematics",
+        "Biology",
+        "Biotechnology",
+        "Computer Science",
+        "Computer Application",
+        "Technical Vocational",
+        "Statistics",
+        "Economics",
+        "Geography",
+        "Psychology",
+        "Agriculture",
+        "Nutrition",
+        "Home Science",
+        "Human Development"
+    ],
+    "rules": [
+        {
+            "text": "Minimum 50% aggregate in 10+2 or equivalent with respective subject(s) from any recognized board.",
+            "programs": [
+                "B.Sc (Chemistry)",
+                "B.Sc (Physics)"
+            ],
+            "min_aggregate": 50,
+            "subject_options": [
+                [
+                    "Physics",
+                    "Chemistry"
+                ]
+            ],
+            "conditions": [],
+            "verified": true,
+            "note": "Shared by B.Sc Chemistry and B.Sc Physics; 'respective subject(s)' differs per program, so both Physics and Chemistry are required (stricter is the safe side)."
+        },
+        {
+            "text": "Minimum 50% in Class XII (10+2) or its equivalent with science and humanities subjects from a recognized board in India or abroad.",
+            "programs": [
+                "B.Sc (Environmental Science and Sustainability)"
+            ],
+            "min_aggregate": 50,
+            "subject_options": null,
+            "conditions": [
+                "10+2 with science and humanities subjects"
+            ],
+            "verified": true,
+            "note": "Subjects are vague; any stream matches and the requirement is read out as a condition."
+        },
+        {
+            "text": "Minimum 50% aggregate in 10+2 or equivalent with PCM/PCB from any recognized board.",
+            "programs": [
+                "B.Sc (Forensic Science)"
+            ],
+            "min_aggregate": 50,
+            "subject_options": [
+                [
+                    "Physics",
+                    "Chemistry",
+                    "Mathematics"
+                ],
+                [
+                    "Physics",
+                    "Chemistry",
+                    "Biology"
+                ]
+            ],
+            "conditions": [],
+            "verified": true
+        },
+        {
+            "text": "Minimum 50% aggregate in 10+2 or equivalent with respective subject(s) or with PCM/PCB from any recognized board.",
+            "programs": [
+                "B.Sc (Geography)"
+            ],
+            "min_aggregate": 50,
+            "subject_options": [
+                [
+                    "Geography"
+                ],
+                [
+                    "Physics",
+                    "Chemistry",
+                    "Mathematics"
+                ],
+                [
+                    "Physics",
+                    "Chemistry",
+                    "Biology"
+                ]
+            ],
+            "conditions": [],
+            "verified": true,
+            "note": "'Respective subject(s)' read as Geography."
+        },
+        {
+            "text": "50% marks in 10+2 in the Science stream with a combination of PCM or PCB from a recognized board and its equivalent. Or 50% marks in 10+2 in the Eco-Science stream with a combination of any three of the following subjects: Mathematics, Statistics, Economics, Computer Science/Application from a recognized board and its equivalent. Or 50% marks in 10+2 in the Humanities stream with Geography from a recognized board and its equivalent.",
+            "programs": [
+                "B.Sc (Geoinformatics)"
+            ],
+            "min_aggregate": 50,
+            "subject_options": [
+                [
+                    "Physics",
+                    "Chemistry",
+                    "Mathematics"
+                ],
+                [
+                    "Physics",
+                    "Chemistry",
+                    "Biology"
+                ],
+                [
+                    "Mathematics",
+                    "Statistics",
+                    "Economics"
+                ],
+                [
+                    "Mathematics",
+                    "Statistics",
+                    "Computer Science"
+                ],
+                [
+                    "Mathematics",
+                    "Economics",
+                    "Computer Science"
+                ],
+                [
+                    "Statistics",
+                    "Economics",
+                    "Computer Science"
+                ],
+                [
+                    "Mathematics",
+                    "Statistics",
+                    "Computer Application"
+                ],
+                [
+                    "Mathematics",
+                    "Economics",
+                    "Computer Application"
+                ],
+                [
+                    "Statistics",
+                    "Economics",
+                    "Computer Application"
+                ],
+                [
+                    "Geography"
+                ]
+            ],
+            "conditions": [],
+            "verified": true,
+            "note": "Science: PCM or PCB. Eco-Science: any three of Mathematics, Statistics, Economics, Computer Science/Application. Humanities: Geography."
+        },
+        {
+            "text": "Minimum 50% aggregate in 10+2 or equivalent with Mathematics/Statistics from any recognized board.",
+            "programs": [
+                "B.Sc (Applied Statistics and Data Science)"
+            ],
+            "min_aggregate": 50,
+            "subject_options": [
+                [
+                    "Mathematics"
+                ],
+                [
+                    "Statistics"
+                ]
+            ],
+            "conditions": [],
+            "verified": true
+        },
+        {
+            "text": "Minimum 50% aggregate in 10+2 or equivalent with respective subject(s) from any recognized board",
+            "programs": [
+                "B.Sc (Mathematics and Computing)"
+            ],
+            "min_aggregate": 50,
+            "subject_options": [
+                [
+                    "Mathematics"
+                ]
+            ],
+            "conditions": [],
+            "verified": true,
+            "note": "'Respective subject(s)' read as Mathematics."
+        },
+        {
+            "text": "Minimum 55% aggregate in 10+2 or equivalent from any recognized board.",
+            "programs": [
+                "B.Com"
+            ],
+            "min_aggregate": 55,
+            "subject_options": null,
+            "conditions": [],
+            "verified": true
+        },
+        {
+            "text": "Minimum 60% aggregate in 10+2 or equivalent from any recognized board.",
+            "programs": [
+                "BBA",
+                "BBA (E-Commerce)",
+                "BCA"
+            ],
+            "min_aggregate": 60,
+            "subject_options": null,
+            "conditions": [],
+            "verified": true
+        },
+        {
+            "text": "Minimum 50% aggregate in 10+2 or equivalent from any recognized board.",
+            "programs": [
+                "B.A (Education)",
+                "B. A (Bengali Language and Literature)",
+                "B. A (English Language and Literature)",
+                "B.A (Political Science & International Relations)",
+                "B.A (Public Administration & Governance)",
+                "B.A. History (with Specialization in) Heritage Studies",
+                "B.A. Sociology (with Specialization in) Corporate Social Responsibility and Management",
+                "B. A. Journalism and Mass Communication",
+                "B.Sc. Graphics, Animation and Media Technology",
+                "B.A (Psychology)"
+            ],
+            "min_aggregate": 50,
+            "subject_options": null,
+            "conditions": [],
+            "verified": true
+        },
+        {
+            "text": "Graduate and/or Post Graduate with 50% marks or Equivalent Grade; Bachelor's in Engineering or Technology with specialization in Science & Mathematics with 55% Marks or any other qualification equivalent.",
+            "programs": [
+                "B.Ed"
+            ],
+            "min_aggregate": null,
+            "subject_options": null,
+            "conditions": [
+                "a graduate or postgraduate degree with at least 50%"
+            ],
+            "verified": true,
+            "note": "Needs a degree, not 10+2 marks: never matched, counted as not_covered."
+        },
+        {
+            "text": "Minimum 55% aggregate in 10+2 or equivalent with PM + Chem/ BioTech/ Biology/Technical Vocational/Computer Science/ Computer Application (with min 45% marks)",
+            "programs": [
+                "B.Tech (Civil Engineering)",
+                "B.Tech (Electrical Engineering)",
+                "B.Tech (Electronics and Communication Engineering)",
+                "B.Tech (Mechanical Engineering)",
+                "B.Tech (Electronics Engineering and VLSI Design)"
+            ],
+            "min_aggregate": 55,
+            "subject_options": [
+                [
+                    "Physics",
+                    "Mathematics",
+                    "Chemistry"
+                ],
+                [
+                    "Physics",
+                    "Mathematics",
+                    "Biotechnology"
+                ],
+                [
+                    "Physics",
+                    "Mathematics",
+                    "Biology"
+                ],
+                [
+                    "Physics",
+                    "Mathematics",
+                    "Technical Vocational"
+                ],
+                [
+                    "Physics",
+                    "Mathematics",
+                    "Computer Science"
+                ],
+                [
+                    "Physics",
+                    "Mathematics",
+                    "Computer Application"
+                ]
+            ],
+            "conditions": [
+                "at least 45% in Physics, Mathematics and the third subject"
+            ],
+            "verified": true,
+            "note": "'with min 45% marks' read as 45% in Physics, Mathematics and the third subject."
+        },
+        {
+            "text": "Minimum 60% aggregate in 10+2 or equivalent from any recognized board with PM + Chem/ Bio. Tech/ Biology/Technical Vocational /Computer Science/ Computer Application (with min 45% marks in respective subject),",
+            "programs": [
+                "B.Tech (Computer Science and Engineering & Business Systems)",
+                "B.Tech (Robotics and Artificial Intelligence)"
+            ],
+            "min_aggregate": 60,
+            "subject_options": [
+                [
+                    "Physics",
+                    "Mathematics",
+                    "Chemistry"
+                ],
+                [
+                    "Physics",
+                    "Mathematics",
+                    "Biotechnology"
+                ],
+                [
+                    "Physics",
+                    "Mathematics",
+                    "Biology"
+                ],
+                [
+                    "Physics",
+                    "Mathematics",
+                    "Technical Vocational"
+                ],
+                [
+                    "Physics",
+                    "Mathematics",
+                    "Computer Science"
+                ],
+                [
+                    "Physics",
+                    "Mathematics",
+                    "Computer Application"
+                ]
+            ],
+            "conditions": [
+                "at least 45% in Physics, Mathematics and the third subject"
+            ],
+            "verified": true,
+            "note": "Same as the B.Tech CSE text except for a trailing comma."
+        },
+        {
+            "text": "Minimum 60% aggregate in 10+2 or equivalent from any recognized board with PM + Chem/ Bio. Tech/ Biology/Technical Vocational /Computer Science/ Computer Application (with min 45% marks in respective subject)",
+            "programs": [
+                "B.Tech (Computer Science and Engineering)",
+                "B.Tech CSE (Artificial Intelligence & Machine Learning)",
+                "B.Tech CSE (Cyber Security)",
+                "B.Tech CSE (Data Science)",
+                "B.Tech CSE (Cloud Computing)",
+                "B.Tech CSE with specialization in SAP"
+            ],
+            "min_aggregate": 60,
+            "subject_options": [
+                [
+                    "Physics",
+                    "Mathematics",
+                    "Chemistry"
+                ],
+                [
+                    "Physics",
+                    "Mathematics",
+                    "Biotechnology"
+                ],
+                [
+                    "Physics",
+                    "Mathematics",
+                    "Biology"
+                ],
+                [
+                    "Physics",
+                    "Mathematics",
+                    "Technical Vocational"
+                ],
+                [
+                    "Physics",
+                    "Mathematics",
+                    "Computer Science"
+                ],
+                [
+                    "Physics",
+                    "Mathematics",
+                    "Computer Application"
+                ]
+            ],
+            "conditions": [
+                "at least 45% in Physics, Mathematics and the third subject"
+            ],
+            "verified": true
+        },
+        {
+            "text": "12th pass (10+2) with an aggregate of 50% and from PM + Chem/ Bio Tech/ Biology/ Technical Vocational (with 45%), subject to securing a minimum 40% marks in each individual subject.",
+            "programs": [
+                "B.Tech in Artificial Intelligence & Data Science (Business Application)",
+                "B.Tech in Artificial Intelligence & Data Science (FinTech)"
+            ],
+            "min_aggregate": 50,
+            "subject_options": [
+                [
+                    "Physics",
+                    "Mathematics",
+                    "Chemistry"
+                ],
+                [
+                    "Physics",
+                    "Mathematics",
+                    "Biotechnology"
+                ],
+                [
+                    "Physics",
+                    "Mathematics",
+                    "Biology"
+                ],
+                [
+                    "Physics",
+                    "Mathematics",
+                    "Technical Vocational"
+                ]
+            ],
+            "conditions": [
+                "at least 45% in Physics, Mathematics and the third subject",
+                "at least 40% in each individual subject"
+            ],
+            "verified": true
+        },
+        {
+            "text": "Minimum 55% aggregate in 10+2 or equivalent from any recognized board; PCB/PCM required, (with min 45% marks in respective subject)",
+            "programs": [
+                "B.Tech (Biomedical Engineering)"
+            ],
+            "min_aggregate": 55,
+            "subject_options": [
+                [
+                    "Physics",
+                    "Chemistry",
+                    "Biology"
+                ],
+                [
+                    "Physics",
+                    "Chemistry",
+                    "Mathematics"
+                ]
+            ],
+            "conditions": [
+                "at least 45% in each of those subjects"
+            ],
+            "verified": true
+        },
+        {
+            "text": "Minimum 60% aggregate in 10+2 or equivalent from any recognized board & CLAT /AUAT qualified.",
+            "programs": [
+                "B.A. LL.B (Hons)",
+                "B.B.A. LL.B (Hons)"
+            ],
+            "min_aggregate": 60,
+            "subject_options": null,
+            "conditions": [
+                "CLAT or AUAT qualified"
+            ],
+            "verified": true
+        },
+        {
+            "text": "Minimum 50% aggregate in 10+2 or equivalent examination from any recognised board. Mathematics as one of the subjects in class XI and XII is preferred. Those who do not have mathematics in class XI and XII have to undergo an additional non-credit remedial course in the subject in the first semester. Candidates have to pass this remedial course in order to continue in the program.",
+            "programs": [
+                "B.Sc (Economics)"
+            ],
+            "min_aggregate": 50,
+            "subject_options": null,
+            "conditions": [
+                "without Mathematics in class 11 and 12, a non-credit remedial Mathematics course in the first semester must be passed"
+            ],
+            "verified": true
+        },
+        {
+            "text": "Minimum 50% aggregate in 10+2 or equivalent from any recognized board with respective subjects.",
+            "programs": [
+                "B.Sc (Biochemistry)",
+                "B.Sc (Microbiology)"
+            ],
+            "min_aggregate": 50,
+            "subject_options": [
+                [
+                    "Chemistry",
+                    "Biology"
+                ]
+            ],
+            "conditions": [],
+            "verified": true,
+            "note": "'Respective subjects' read as Chemistry and Biology."
+        },
+        {
+            "text": "Minimum 55% aggregate in 10+2 or equivalent from any recognized board with respective subjects.",
+            "programs": [
+                "B.Sc (Biotechnology)"
+            ],
+            "min_aggregate": 55,
+            "subject_options": [
+                [
+                    "Chemistry",
+                    "Biology"
+                ],
+                [
+                    "Chemistry",
+                    "Biotechnology"
+                ]
+            ],
+            "conditions": [],
+            "verified": true,
+            "note": "'Respective subjects' read as Chemistry with Biology or Biotechnology."
+        },
+        {
+            "text": "Minimum 60% aggregate in 10+2 or equivalent from any recognized board with PC + Mathematics/BioTech. / Biology / Technical Vocational with 45% in respective subject.",
+            "programs": [
+                "B.Tech (Biotechnology)",
+                "B.Tech (Food Technology)"
+            ],
+            "min_aggregate": 60,
+            "subject_options": [
+                [
+                    "Physics",
+                    "Chemistry",
+                    "Mathematics"
+                ],
+                [
+                    "Physics",
+                    "Chemistry",
+                    "Biotechnology"
+                ],
+                [
+                    "Physics",
+                    "Chemistry",
+                    "Biology"
+                ],
+                [
+                    "Physics",
+                    "Chemistry",
+                    "Technical Vocational"
+                ]
+            ],
+            "conditions": [
+                "at least 45% in each of those subjects"
+            ],
+            "verified": true
+        },
+        {
+            "text": "Minimum 60% aggregate in 10+2 or equivalent from any recognized board conducted by the respective state/central government authorities recognized as equivalent to 10+2 examination by the Association of Indian Universities (AIU) with English as one of the subjects and Physics, Chemistry, Mathematics/Biology as optional subjects individually. Students have to secure a minimum of 60% marks in the qualifying examination. \"However, the students possessing 10+2 qualification from non-formal and non-class rooms based schooling such as National Institute of Open Schooling, open school systems of States etc. shall not be eligible for admission to B. Pharm Course.\" Any other qualification approved by the Pharmacy Council of India as equivalent to any of the above examinations.",
+            "programs": [
+                "B.Pharm"
+            ],
+            "min_aggregate": 60,
+            "subject_options": [
+                [
+                    "Physics",
+                    "Chemistry",
+                    "Mathematics"
+                ],
+                [
+                    "Physics",
+                    "Chemistry",
+                    "Biology"
+                ]
+            ],
+            "conditions": [
+                "English as a subject in 10+2",
+                "10+2 from open schooling such as NIOS is not accepted"
+            ],
+            "verified": true
+        },
+        {
+            "text": "Minimum 50% aggregate in 10+2 or equivalent from any recognized board system of education or equivalent examination in science group with Chemistry, Physics & Biology, as main subjects conducted by a recognized Board/Council/ University.",
+            "programs": [
+                "Bachelor Of Medical Laboratory Science (BMLS)"
+            ],
+            "min_aggregate": 50,
+            "subject_options": [
+                [
+                    "Physics",
+                    "Chemistry",
+                    "Biology"
+                ]
+            ],
+            "conditions": [],
+            "verified": true
+        },
+        {
+            "text": "Minimum 50% aggregate in 10+2 or equivalent from any recognized board with Physics, Chemistry and Biology/Mathematics as the main subjects.",
+            "programs": [
+                "Bachelor of Optometry"
+            ],
+            "min_aggregate": 50,
+            "subject_options": [
+                [
+                    "Physics",
+                    "Chemistry",
+                    "Biology"
+                ],
+                [
+                    "Physics",
+                    "Chemistry",
+                    "Mathematics"
+                ]
+            ],
+            "conditions": [],
+            "verified": true
+        },
+        {
+            "text": "Minimum 50% aggregate in 10+2 or equivalent from any recognized board system of education or equivalent examination in science group with Chemistry, Biology, Nutrition, Human development, Home science, etc as main subjects conducted by a recognized Board/Council/ University.",
+            "programs": [
+                "Bachelor Of Food Nutrition and Dietetics"
+            ],
+            "min_aggregate": 50,
+            "subject_options": [
+                [
+                    "Chemistry",
+                    "Biology"
+                ],
+                [
+                    "Nutrition"
+                ],
+                [
+                    "Home Science"
+                ],
+                [
+                    "Human Development"
+                ]
+            ],
+            "conditions": [],
+            "verified": true,
+            "note": "'Science group with Chemistry, Biology, Nutrition, Human development, Home science, etc' read as Chemistry with Biology, or any one of Nutrition, Home Science, Human Development."
+        },
+        {
+            "text": "Minimum 50% aggregate in 10+2 or equivalent from any recognized board with Science background or Psychology as one of the subject in 10+2.",
+            "programs": [
+                "B.Sc (Psychology)"
+            ],
+            "min_aggregate": 50,
+            "subject_options": [
+                [
+                    "Physics",
+                    "Chemistry",
+                    "Mathematics"
+                ],
+                [
+                    "Physics",
+                    "Chemistry",
+                    "Biology"
+                ],
+                [
+                    "Psychology"
+                ]
+            ],
+            "conditions": [],
+            "verified": true,
+            "note": "'Science background' read as PCM or PCB."
+        },
+        {
+            "text": "Minimum 50% aggregate in 10+2 or equivalent from any recognized board with three subjects out of Physics (P), Chemistry (C), Mathematics (M), Biology (B) and Agriculture (A), as core course, combinations can be PCB/PCM/PCA/CMB/CMA/CBA /PMB/PMA/PBA /MBA",
+            "programs": [
+                "B. Sc. (Hons.) Agriculture"
+            ],
+            "min_aggregate": 50,
+            "subject_options": [
+                [
+                    "Physics",
+                    "Chemistry",
+                    "Biology"
+                ],
+                [
+                    "Physics",
+                    "Chemistry",
+                    "Mathematics"
+                ],
+                [
+                    "Physics",
+                    "Chemistry",
+                    "Agriculture"
+                ],
+                [
+                    "Chemistry",
+                    "Mathematics",
+                    "Biology"
+                ],
+                [
+                    "Chemistry",
+                    "Mathematics",
+                    "Agriculture"
+                ],
+                [
+                    "Chemistry",
+                    "Biology",
+                    "Agriculture"
+                ],
+                [
+                    "Physics",
+                    "Mathematics",
+                    "Biology"
+                ],
+                [
+                    "Physics",
+                    "Mathematics",
+                    "Agriculture"
+                ],
+                [
+                    "Physics",
+                    "Biology",
+                    "Agriculture"
+                ],
+                [
+                    "Mathematics",
+                    "Biology",
+                    "Agriculture"
+                ]
+            ],
+            "conditions": [],
+            "verified": true,
+            "note": "The ten combinations listed in the text."
+        }
+    ]
+}

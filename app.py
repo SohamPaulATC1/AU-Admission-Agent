@@ -197,7 +197,8 @@ class GeminiSessionDisconnected(Exception):
     """Raised when the Gemini Live session drops but may be resumable."""
     pass
 
-with open("prompt_au.txt", "r", encoding="utf-8") as f:
+PROMPT_FILE = os.getenv("PROMPT_FILE", "PROMPT_FILES/prompt_au_v2.txt")  # PROMPT_FILES/prompt_au.txt = rollback
+with open(PROMPT_FILE, "r", encoding="utf-8") as f:
     RAW_SYSTEM_PROMPT = f.read()
 
 
@@ -3558,6 +3559,7 @@ async def trigger_call():
 if __name__ == "__main__":
     logger.info(f'Starting the Quart Server on Port {PORT} with Hypercorn (Waiting for Dashboard trigger...)')
     logger.info(f"🧬 [MODEL] Gemini {describe_gemini_backend()}")
+    logger.info(f"📝 Prompt: {PROMPT_FILE} ({len(RAW_SYSTEM_PROMPT)} chars)")
     if GEMINI_BACKEND == "vertex":
         import google.auth.transport.requests
         load_vertex_credentials().refresh(google.auth.transport.requests.Request())

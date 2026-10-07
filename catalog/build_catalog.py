@@ -6,7 +6,7 @@ Run by hand whenever either Excel file changes, then commit the new JSON:
 
 Stdlib only (zipfile + ElementTree): requirements.txt is frozen, so no openpyxl.
 Anything the join rules below do not explain fails the build with BuildError.
-Design: docs/spec/course-catalog-tools-design.md sections 3 and 5.
+Design: docs/spec/course-catalog-tools-design.md sections 3, 5 and 11.
 """
 import collections
 import json
@@ -25,9 +25,14 @@ FEE_XLSX = os.path.join(DATA_DIR, "National Course fee 2026.xlsx")
 CATALOG_DIR = os.path.join(ROOT, "catalog")
 ALIASES_JSON = os.path.join(CATALOG_DIR, "aliases.json")
 COURSES_JSON = os.path.join(CATALOG_DIR, "courses.json")
+ELIGIBILITY_JSON = os.path.join(CATALOG_DIR, "eligibility_rules.json")
 
 SESSION = "2027"
 ADMISSION_FEE_NOTE = "one-time, paid with the first semester fee; includes T-shirt and blazer"
+
+# Phase 2 rule keys (spec 11.2). "note" is reviewer-only and not copied.
+RULE_KEYS = {"text", "programs", "min_aggregate", "subject_options", "conditions", "verified", "note"}
+RULE_FIELDS = ["min_aggregate", "subject_options", "conditions", "verified"]
 
 # Operator-confirmed join special cases (2026-10-05). An entry that no longer
 # matches the data is a build error, so this list cannot go stale silently.
@@ -225,6 +230,57 @@ def eligibility_text(text):
     return re.sub(r"10\s*\+\s*2", "10+2", tidy(text))
 
 
+def _check_rule(rule, known):
+    label = f"eligibility rule {str(rule.get('text', '?'))[:60]!r}"
+    extra = sorted(set(rule) - RULE_KEYS)
+    missing = sorted(RULE_KEYS - {"note"} - set(rule))
+    if extra:
+        raise BuildError(f"{label}: unexpected keys {extra}")
+    if missing:
+        raise BuildError(f"{label}: missing keys {missing}")
+    if not isinstance(rule["verified"], bool):
+        raise BuildError(f"{label}: verified must be true or false")
+    m = rule["min_aggregate"]
+    if m is not None and (isinstance(m, bool) or not isinstance(m, (int, float)) or not 0 <= m <= 100):
+        raise BuildError(f"{label}: min_aggregate must be a percentage or null")
+    options = rule["subject_options"]
+    if options is not None and not (isinstance(options, list) and options
+                                    and all(isinstance(o, list) and o for o in options)):
+        raise BuildError(f"{label}: subject_options must be null or a non-empty list of non-empty lists")
+    for option in options or []:
+        for subject in option:
+            if subject not in known:
+                raise BuildError(f"{label}: unknown subject {subject!r}")
+    if not (isinstance(rule["conditions"], list) and all(isinstance(c, str) and c for c in rule["conditions"])):
+        raise BuildError(f"{label}: conditions must be a list of non-empty strings")
+
+
+def attach_eligibility_rules(records, rules_file):
+    """Give every UG record its rule (matched on exact eligibility text); return the subjects."""
+    subjects = rules_file["subjects"]
+    by_text = {}
+    for rule in rules_file["rules"]:
+        _check_rule(rule, set(subjects))
+        if rule["text"] in by_text:
+            raise BuildError(f"two rules share the text {rule['text'][:60]!r}")
+        by_text[rule["text"]] = rule
+    ug = [r for r in records if r["level"] == "UG"]
+    for text in dict.fromkeys(r["eligibility"] for r in ug):
+        rule = by_text.get(text)
+        if rule is None:
+            raise BuildError(f"no eligibility rule for UG text {text[:60]!r}")
+        names = [r["name"] for r in ug if r["eligibility"] == text]
+        if rule["programs"] != names:
+            raise BuildError(f"eligibility rule {text[:60]!r} lists {rule['programs']}; "
+                             f"the UG records with that text are {names}")
+    for text in by_text:
+        if not any(r["eligibility"] == text for r in ug):
+            raise BuildError(f"eligibility rule matches no UG record: {text[:60]!r}")
+    for r in ug:
+        r["eligibility_rule"] = {k: by_text[r["eligibility"]][k] for k in RULE_FIELDS}
+    return subjects
+
+
 def build():
     programs = table_rows(PROGRAM_XLSX)
     fees = table_rows(FEE_XLSX)
@@ -334,10 +390,14 @@ def build():
             if alias not in record["aliases"]:
                 record["aliases"].append(alias)
 
+    with open(ELIGIBILITY_JSON, encoding="utf-8") as f:
+        subjects = attach_eligibility_rules(records, json.load(f))
+
     return {
         "session": SESSION,
         "source": [os.path.basename(PROGRAM_XLSX), os.path.basename(FEE_XLSX)],
         "excluded": sorted(excluded),
+        "subjects": subjects,
         "records": records,
     }
 
@@ -356,6 +416,8 @@ def main():
         print(f"  {code}: {count}")
     print("excluded (incomplete data):", ", ".join(catalog["excluded"]))
     print("records with aliases:", sum(1 for r in records if r["aliases"]))
+    rules = [r["eligibility_rule"] for r in records if "eligibility_rule" in r]
+    print(f"eligibility rules: {sum(r['verified'] for r in rules)} verified / {len(rules)} UG records")
 
 
 if __name__ == "__main__":

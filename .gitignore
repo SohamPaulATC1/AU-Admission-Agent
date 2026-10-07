@@ -55,3 +55,4 @@ ltm/snapshots/*
 # --- /ltm-power ---
 venv312/
 TEST_FILES/
+*.pdf
