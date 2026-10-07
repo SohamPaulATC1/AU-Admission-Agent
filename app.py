@@ -3566,8 +3566,24 @@ if __name__ == "__main__":
         logger.info("🔐 Vertex AI credentials loaded and access token obtained")
     import hypercorn.asyncio
     from hypercorn.config import Config as HypercornConfig
-    
+    import signal
+
     hconfig = HypercornConfig()
     hconfig.bind = [f"0.0.0.0:{PORT}"]
     hconfig.graceful_timeout = 0.5
-    asyncio.run(hypercorn.asyncio.serve(app, hconfig))
+
+    async def main():
+        shutdown_event = asyncio.Event()
+        def _signal_handler():
+            shutdown_event.set()
+
+        loop = asyncio.get_running_loop()
+        try:
+            loop.add_signal_handler(signal.SIGINT, _signal_handler)
+            loop.add_signal_handler(signal.SIGTERM, _signal_handler)
+        except NotImplementedError:
+            pass
+
+        await hypercorn.asyncio.serve(app, hconfig, shutdown_trigger=shutdown_event.wait)
+
+    asyncio.run(main())
