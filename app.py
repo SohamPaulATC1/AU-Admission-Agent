@@ -29,8 +29,6 @@ from google.genai import types
 
 load_dotenv()
 
-# Choose the Acoustic Echo Canceller (AEC) implementation.
-# Defaults to "aec1" (trial version). Set AEC_IMPL=aec in the environment to use the stock version.
 AEC_IMPL = os.getenv("AEC_IMPL", "aec1").strip().lower()
 if AEC_IMPL == "aec":
     from aec import AcousticEchoCanceller
@@ -1638,18 +1636,15 @@ def log_call_stats(call_state):
     logger.info(f"Estimated Call Cost (lower-bound): ${total_cost:.6f}")
     logger.info(f"⚠️  Note: Actual cost is higher due to compounding — past tokens are re-billed each turn.")
     logger.info("====================================")
-    reason = call_state.get("end_call_summary", "call completed")
-    if reason and reason not in ["call completed", "user hung up", "AI triggered endCall", "Plivo disconnected", "customer hung up"]:
-        emit_call_event(call_state.get("call_uuid"), "call_failed", {
-            "phone": call_state.get("from_number", ""),
-            "error": f"Agent Error: {reason}"
-        })
-    else:
-        emit_call_event(call_state.get("call_uuid"), "call_ended", {
-            "reason": reason,
-            "cost": f"${total_cost:.4f}",
-            "phone": call_state.get("from_number", ""),
-        })
+    reason = call_state.get("end_call_summary", "")
+    if not reason:
+        reason = "call completed"
+        
+    emit_call_event(call_state.get("call_uuid"), "call_ended", {
+        "reason": reason,
+        "cost": f"${total_cost:.4f}",
+        "phone": call_state.get("from_number", ""),
+    })
 
 
 async def play_disclaimer(plivo_ws, call_state, disclaimer_finished_event):
@@ -2078,7 +2073,7 @@ async def handle_media_stream():
                     types.Part.from_text(text=system_instruction_text)
                 ]),
                 tools=LOCAL_GEMINI_TOOLS,
-                temperature=0.2,
+                #temperature=0.2,
                 session_resumption=types.SessionResumptionConfig(
                     handle=call_state.get("session_resumption_handle")
                 ),
