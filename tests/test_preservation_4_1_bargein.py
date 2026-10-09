@@ -3,15 +3,18 @@
 OBSERVATION-FIRST. Every number below was read off the UNFIXED code first and
 then asserted. Requirement 3.1.
 
-Golden records observed on unfixed code (``recorded.wav`` resampled to 8 kHz,
-fed one 20 ms frame at a time through ``app.stream_plivo_to_gemini``):
+Golden records (``recorded.wav`` resampled to 8 kHz, fed one 20 ms frame at a
+time through ``app.stream_plivo_to_gemini``). The idle row was re-baselined
+2026-10-09 on the operator's decision (TEST8: a 4-frame noise blip opened a
+phantom turn); it was index 4 / count 3 / 60 ms. The while-speaking row is
+unchanged: raising it breaks the echo gate, which is tuned around 4 frames.
 
   assistant_speaking = True   -> ``is_speaking`` flips on fed-frame index 5,
                                  with ``rnnoise_speech_count == 4``
                                  (VAD_SPEECH_ONSET_FRAMES_WHILE_SPEAKING, 80 ms)
-  assistant_speaking = False  -> flips on fed-frame index 4,
-                                 with ``rnnoise_speech_count == 3``
-                                 (VAD_SPEECH_ONSET_FRAMES, 60 ms)
+  assistant_speaking = False  -> flips on fed-frame index 7,
+                                 with ``rnnoise_speech_count == 6``
+                                 (VAD_SPEECH_ONSET_FRAMES, 120 ms)
 
   side-effect order on barge-in:
       1. "\N{studio microphone} [TIMING] AI Speech Interrupted at: HH:MM:SS.mmm"
@@ -40,9 +43,9 @@ from tests.harness.fakes import FakeClock, FakePlivoWS, FakeSession, InboundDriv
 
 # --- golden records, observed on unfixed code --------------------------------
 ONSET_FRAME_INDEX_WHILE_SPEAKING = 5
-ONSET_FRAME_INDEX_WHILE_SILENT = 4
+ONSET_FRAME_INDEX_WHILE_SILENT = 7
 ONSET_COUNT_WHILE_SPEAKING = 4      # == VAD_SPEECH_ONSET_FRAMES_WHILE_SPEAKING
-ONSET_COUNT_WHILE_SILENT = 3        # == VAD_SPEECH_ONSET_FRAMES
+ONSET_COUNT_WHILE_SILENT = 6        # == VAD_SPEECH_ONSET_FRAMES
 
 BARGEIN_LOG_ORDER = [
     "\U0001F3A4 User speech detected",
@@ -75,7 +78,7 @@ def _prime_playback(call_state, clock, *, delivered_ms: float, queued_frames: in
 
 
 class TestGenuineBargeInLatency(unittest.TestCase):
-    def _run(self, *, assistant_speaking: bool, delivered_ms: float = 200.0, frames: int = 10):
+    def _run(self, *, assistant_speaking: bool, delivered_ms: float = 200.0, frames: int = 14):
         async def scenario():
             clock = FakeClock()
             ws = FakePlivoWS(clock)
@@ -100,16 +103,16 @@ class TestGenuineBargeInLatency(unittest.TestCase):
         self.assertEqual(ONSET_COUNT_WHILE_SPEAKING * 20, 80)
         self.assertTrue(log.contains("Cleared Plivo playback buffer"))
 
-    def test_while_silent_cuts_at_three_frames_sixty_ms(self):
+    def test_while_silent_cuts_at_six_frames_120_ms(self):
         call_state, ws, session, log, driver, onset = self._run(assistant_speaking=False)
         self.assertEqual(onset, ONSET_FRAME_INDEX_WHILE_SILENT)
         self.assertEqual(driver.snapshots[onset]["speech_count"], ONSET_COUNT_WHILE_SILENT)
         self.assertEqual(ONSET_COUNT_WHILE_SILENT, app.VAD_SPEECH_ONSET_FRAMES)
         self.assertEqual(ws.clear_audio_count, 0, "no playback to clear when the assistant is silent")
 
-    def test_while_speaking_costs_exactly_one_extra_frame(self):
+    def test_while_speaking_cuts_two_frames_before_idle(self):
         self.assertEqual(
-            ONSET_FRAME_INDEX_WHILE_SPEAKING - ONSET_FRAME_INDEX_WHILE_SILENT, 1)
+            ONSET_FRAME_INDEX_WHILE_SPEAKING - ONSET_FRAME_INDEX_WHILE_SILENT, -2)
 
 
 class TestBargeInSideEffectOrdering(unittest.TestCase):
@@ -123,7 +126,7 @@ class TestBargeInSideEffectOrdering(unittest.TestCase):
             queue_sizes = []
             with clock.install(), LogCapture() as log:
                 async with InboundDriver(call_state, ws, session) as driver:
-                    for frame in scenarios.caller_speech_frames(8):
+                    for frame in scenarios.caller_speech_frames(14):
                         await driver.feed_pcm8(frame)
                         queue_sizes.append(call_state["plivo_output_queue"].qsize())
             return call_state, ws, session, log, driver, queue_sizes
@@ -185,7 +188,7 @@ class TestLongTriggerModeStillCutsPromptly(unittest.TestCase):
                 _prime_playback(call_state, clock, delivered_ms=delivered_ms)
                 with clock.install(), LogCapture() as log:
                     async with InboundDriver(call_state, ws, session) as driver:
-                        for frame in scenarios.caller_speech_frames(8):
+                        for frame in scenarios.caller_speech_frames(14):
                             await driver.feed_pcm8(frame)
                         onset = driver.first_frame_index_where(lambda snap: snap["is_speaking"])
                 return onset, ws.clear_audio_count, session.count("activityStart"), log.lines
@@ -223,7 +226,7 @@ class TestLongTriggerModeStillCutsPromptly(unittest.TestCase):
                 _prime_playback(call_state, clock, delivered_ms=delivered_ms)
                 with clock.install(), LogCapture() as log:
                     async with InboundDriver(call_state, ws, session) as driver:
-                        for frame in scenarios.caller_speech_frames(8):
+                        for frame in scenarios.caller_speech_frames(14):
                             await driver.feed_pcm8(frame)
                 return log, ws.events, session.sent_kinds
 

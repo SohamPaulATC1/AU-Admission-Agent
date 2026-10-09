@@ -239,7 +239,7 @@ class TestTask58ResetsFarEndOnClearAudio(unittest.TestCase):
                     bytes([index]) * app.PLIVO_ULAW_CHUNK_SIZE)
             with clock.install():
                 async with InboundDriver(call_state, ws, session) as driver:
-                    for frame in scenarios.caller_speech_frames(10):
+                    for frame in scenarios.caller_speech_frames(14):
                         await driver.feed_pcm8(frame)
             return spy.calls, ws.events
 

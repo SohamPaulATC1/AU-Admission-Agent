@@ -190,7 +190,7 @@ Full audio path mapped. Key facts:
   downsample 16k → AGC + soft limiter → `clean_pcm_16k`. `avg_prob = mean(speech_probs)`.
   VAD gate: while `assistant_speaking and not is_speaking` uses
   `VAD_THRESHOLD_WHILE_SPEAKING=0.82` / `VAD_SPEECH_ONSET_FRAMES_WHILE_SPEAKING=4`
-  (80 ms); else `VAD_THRESHOLD=0.75` / `VAD_SPEECH_ONSET_FRAMES=3`. Preroll
+  (80 ms); else `VAD_THRESHOLD=0.75` / `VAD_SPEECH_ONSET_FRAMES=6` (120 ms; was 3 until 2026-10-09). Preroll
   (~200 ms / `PREROLL_MAX_BYTES_PCM16=6400`) on `clean_pcm_16k` while not
   `user_activity_open`.
 - OUTBOUND `send_plivo_audio` → `emit_chunk`: NO pacing, frames dumped

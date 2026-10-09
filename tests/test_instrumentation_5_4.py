@@ -367,7 +367,7 @@ def _truncation_scenario(queued_ms, *, heard_ms=None, transcript=TRANSCRIPT):
         clock.advance_ms(elapsed_ms)
         with clock.install(), LogCapture() as log:
             async with InboundDriver(call_state, ws, session) as driver:
-                for frame in scenarios.caller_speech_frames(8):
+                for frame in scenarios.caller_speech_frames(14):
                     await driver.feed_pcm8(frame)
         return call_state, ws, log
 
@@ -645,7 +645,7 @@ class TestAlignedRecorders(unittest.TestCase):
     once the queue runs dry) and the canceller's output.
     """
 
-    NEAR_FRAMES = 12
+    NEAR_FRAMES = 18
     FAR_FRAMES = 5
 
     @staticmethod
@@ -769,7 +769,7 @@ class _ScalingAec:
 
 
 class TestAecOutputGuard(unittest.TestCase):
-    NEAR_FRAMES = 12
+    NEAR_FRAMES = 18
 
     @staticmethod
     def _frame(level):

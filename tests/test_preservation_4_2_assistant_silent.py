@@ -5,14 +5,14 @@ OBSERVATION-FIRST. Requirements 3.1, 3.2, 3.3.
 Golden records observed on unfixed code:
 
 * with ``assistant_speaking`` False the gate uses ``VAD_THRESHOLD`` (0.75) and
-  ``VAD_SPEECH_ONSET_FRAMES`` (3), and ``is_speaking`` flips on fed-frame index 4
+  ``VAD_SPEECH_ONSET_FRAMES`` (6), and ``is_speaking`` flips on fed-frame index 7
   for the ``recorded.wav`` fixture.
 * the bytes handed to the model are byte-for-byte reproducible across runs: the
   whole inbound chain (AEC -> ratecv 8k/48k -> RNNoise -> ratecv 48k/16k -> AGC ->
   soft limiter) is deterministic for a fixed input sequence.
 * no ``clearAudio`` and no ``playAudio`` is emitted on this path at all.
-* speech end: after 8 speech frames followed by silence, ``speech_ended`` fires
-  on fed-frame index 18, via ``VAD_SILENCE_OFFSET_FRAMES`` (10).
+* speech end: after 12 speech frames followed by silence, ``speech_ended`` fires
+  on fed-frame index 22, via ``VAD_SILENCE_OFFSET_FRAMES`` (10).
 """
 
 from __future__ import annotations
@@ -26,9 +26,9 @@ from tests.harness.appctl import LogCapture, app, live_call_state
 from tests.harness.fakes import FakeClock, FakePlivoWS, FakeSession, InboundDriver
 
 # --- golden records, observed on unfixed code --------------------------------
-ONSET_FRAME_INDEX = 4
-SPEECH_END_FRAME_INDEX = 18
-SPEECH_FRAMES = 8
+ONSET_FRAME_INDEX = 7
+SPEECH_END_FRAME_INDEX = 22
+SPEECH_FRAMES = 12
 TRAILING_SILENCE_FRAMES = 14
 
 ASSISTANT_SILENT_LOG_SEQUENCE = [
@@ -57,16 +57,16 @@ def _run(frames):
 
 
 class TestAssistantSilentPath(unittest.TestCase):
-    def test_uses_the_three_frame_threshold_path(self):
-        call_state, ws, session, log, driver = _run(scenarios.caller_speech_frames(8))
+    def test_uses_the_six_frame_threshold_path(self):
+        call_state, ws, session, log, driver = _run(scenarios.caller_speech_frames(12))
         onset = driver.first_frame_index_where(lambda snap: snap["is_speaking"])
         self.assertEqual(onset, ONSET_FRAME_INDEX)
         self.assertEqual(driver.snapshots[onset]["speech_count"], app.VAD_SPEECH_ONSET_FRAMES)
-        self.assertEqual(app.VAD_SPEECH_ONSET_FRAMES, 3)
+        self.assertEqual(app.VAD_SPEECH_ONSET_FRAMES, 6)
         self.assertEqual(app.VAD_THRESHOLD, 0.75)
 
     def test_no_outbound_plivo_traffic_at_all(self):
-        call_state, ws, session, log, driver = _run(scenarios.caller_speech_frames(8))
+        call_state, ws, session, log, driver = _run(scenarios.caller_speech_frames(12))
         self.assertEqual(ws.frames, [])
 
     def test_bytes_to_the_model_are_byte_for_byte_reproducible(self):

@@ -59,11 +59,11 @@ class TestAppImportContainment(unittest.TestCase):
         self.assertIn("bgsf_offline_tests", app.TRANSFER_CONTEXT_DB_PATH)
 
     def test_frozen_constants_untouched(self):
-        """Standing constraint: these two are left at their current values."""
+        """Pinned values. The idle onset count was raised 3 -> 6 on 2026-10-09 (operator, TEST8 blips). The while-speaking count stays 4: the echo gate is tuned around it."""
         self.assertEqual(app.VAD_THRESHOLD_WHILE_SPEAKING, 0.82)
         self.assertEqual(app.VAD_SPEECH_ONSET_FRAMES_WHILE_SPEAKING, 4)
         self.assertEqual(app.VAD_THRESHOLD, 0.75)
-        self.assertEqual(app.VAD_SPEECH_ONSET_FRAMES, 3)
+        self.assertEqual(app.VAD_SPEECH_ONSET_FRAMES, 6)
         self.assertEqual(app.PLIVO_ULAW_CHUNK_SIZE, 160)
 
     def test_corroborated_gate_constants(self):

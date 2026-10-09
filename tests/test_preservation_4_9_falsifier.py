@@ -240,8 +240,8 @@ class TestInboundBargeInFalsifier(unittest.TestCase):
         return (samples * 32767.0).astype(np.int16).tobytes()
 
     def test_property(self):
-        base_frames = scenarios.caller_speech_frames(10)
-        far_fixture = scenarios.caller_speech_frames(10, fixture="ring1.wav")
+        base_frames = scenarios.caller_speech_frames(14)
+        far_fixture = scenarios.caller_speech_frames(14, fixture="ring1.wav")
         rng = np.random.default_rng(self.SEED)
 
         for index in range(self.CASES):
@@ -357,7 +357,7 @@ class TestBoundaryTriggerAt350ms(unittest.TestCase):
             )
             with clock.install(), LogCapture() as log:
                 async with InboundDriver(call_state, ws, session) as driver:
-                    for frame in scenarios.caller_speech_frames(8):
+                    for frame in scenarios.caller_speech_frames(14):
                         await driver.feed_pcm8(frame)
                     onset = driver.first_frame_index_where(lambda snap: snap["is_speaking"])
             return (onset, ws.events, session.sent_kinds,
@@ -428,7 +428,7 @@ class TestBoundaryFarEndAtTheActivityFloor(unittest.TestCase):
                         call_state["aec"].add_far_end(pattern)
                 with clock.install(), LogCapture() as log:
                     async with InboundDriver(call_state, ws, session) as driver:
-                        for frame in scenarios.caller_speech_frames(8):
+                        for frame in scenarios.caller_speech_frames(14):
                             await driver.feed_pcm8(frame)
                         onset = driver.first_frame_index_where(lambda snap: snap["is_speaking"])
                 # ``existing_lines``: the new 🧭 [TRIGGER] line carries the measured

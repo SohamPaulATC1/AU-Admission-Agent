@@ -319,7 +319,7 @@ class TestCallStats(unittest.TestCase):
         # catalog declarations, the [CATALOG] stats line, the call_state
         # counters and the catalog / unknown-tool branches). And +1 for the
         # PROMPT_FILE switch (prompt_au_v2.txt default) above these sites.
-        self.assertEqual(references, [61, 1613, 2130, 2140, 2553])
+        self.assertEqual(references, [59, 1611, 2125, 2135, 2548])
 
 
 if __name__ == "__main__":

@@ -180,7 +180,7 @@ COMMIT_GATE_IDLE_RELEASE_POLLS = 3
 # Max delta traces per turn to prevent unbounded growth on long calls.
 DELTA_TRACE_MAX_ENTRIES = 240
 
-VAD_SPEECH_ONSET_FRAMES = 3
+VAD_SPEECH_ONSET_FRAMES = 6   # ~120 ms of sustained speech to open a turn (TEST8: 4-frame blips)
 VAD_SILENCE_OFFSET_FRAMES = 10   # ~200 ms trailing silence before end-of-turn (was 15 = 300 ms)
 TERMINAL_ACTION_RECHECK_SECONDS = 0.2
 LOG_EVERY_N_CHUNKS = 50

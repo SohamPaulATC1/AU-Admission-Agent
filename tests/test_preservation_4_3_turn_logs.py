@@ -201,7 +201,7 @@ class TestInterruptedTimingLineFromTheInboundPath(unittest.TestCase):
             call_state["ai_playback_start_time"] = clock.now(app.ist_tz)
             with clock.install(), LogCapture() as log:
                 async with InboundDriver(call_state, ws, session) as driver:
-                    for frame in scenarios.caller_speech_frames(8):
+                    for frame in scenarios.caller_speech_frames(14):
                         await driver.feed_pcm8(frame)
             return log
 
