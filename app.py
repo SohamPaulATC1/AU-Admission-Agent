@@ -195,7 +195,7 @@ class GeminiSessionDisconnected(Exception):
     """Raised when the Gemini Live session drops but may be resumable."""
     pass
 
-PROMPT_FILE = os.getenv("PROMPT_FILE", "PROMPT_FILES/prompt_au_v2.txt")  # PROMPT_FILES/prompt_au.txt = rollback
+PROMPT_FILE = "PROMPT_FILES/prompt_au_v3.txt"
 with open(PROMPT_FILE, "r", encoding="utf-8") as f:
     RAW_SYSTEM_PROMPT = f.read()
 
