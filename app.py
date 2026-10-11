@@ -8,6 +8,8 @@ from datetime import datetime, timezone, timedelta
 import os
 import traceback
 import contextlib
+import contextvars
+import hmac
 import logging
 import audioop
 import time
@@ -22,6 +24,7 @@ import course_catalog
 from pyrnnoise import RNNoise
 import numpy as np
 import urllib.parse
+import httpx
 
 # Import the new GenAI SDK
 from google import genai
@@ -37,18 +40,40 @@ elif AEC_IMPL == "aec1":
 else:
     raise ValueError(f"AEC_IMPL must be 'aec' or 'aec1', got {AEC_IMPL!r}")
 
+# Debug WAV recordings in debug_recordings/ (5 files per call). 1 = on, 0 = off (saves CPU and disk).
+# Does not affect Plivo's own call recording.
+DEBUG_RECORDING = os.getenv("DEBUG_RECORDING", "1").strip()
+if DEBUG_RECORDING not in ("0", "1"):
+    raise ValueError(f"DEBUG_RECORDING must be '0' or '1', got {DEBUG_RECORDING!r}")
+DEBUG_RECORDING = DEBUG_RECORDING == "1"
+
+# Multi-process: a media-only process sends its dashboard events to the main process
+# (e.g. EVENT_FORWARD_URL=http://127.0.0.1:5001/internal/call-event). Empty = this is the main process.
+EVENT_FORWARD_URL = os.getenv("EVENT_FORWARD_URL", "").strip()
+# Shared secret for /internal/call-event; same value in every process. Empty on the main process = endpoint off.
+INTERNAL_EVENT_TOKEN = os.getenv("INTERNAL_EVENT_TOKEN", "").strip()
+if EVENT_FORWARD_URL and not INTERNAL_EVENT_TOKEN:
+    raise ValueError("EVENT_FORWARD_URL is set but INTERNAL_EVENT_TOKEN is empty")
+
 # --- Logging Setup ---
 ist_tz = timezone(timedelta(hours=5, minutes=30))
 logging.Formatter.converter = lambda *args: datetime.now(ist_tz).timetuple()
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] %(message)s',
-    handlers=[
-        logging.FileHandler("Gemini_Assistant.log"),
-        logging.StreamHandler()
-    ]
-)
+# "[<call uuid prefix>] " on every line logged inside a call, so concurrent calls can be told apart.
+call_log_tag = contextvars.ContextVar("call_log_tag", default="")
+
+
+class CallTagFilter(logging.Filter):
+    def filter(self, record):
+        record.call_tag = call_log_tag.get()
+        return True
+
+
+LOG_FORMAT = '%(asctime)s [%(levelname)s] %(call_tag)s%(message)s'
+_log_handlers = [logging.FileHandler("Gemini_Assistant.log"), logging.StreamHandler()]
+for _handler in _log_handlers:
+    _handler.addFilter(CallTagFilter())
+logging.basicConfig(level=logging.INFO, format=LOG_FORMAT, handlers=_log_handlers)
 logger = logging.getLogger(__name__)
 PRICE_TEXT_INPUT = float(os.getenv("PRICE_TEXT_INPUT", "0.75"))
 PRICE_TEXT_OUTPUT = float(os.getenv("PRICE_TEXT_OUTPUT", "4.50"))
@@ -1079,8 +1104,47 @@ call_event_subscribers = set()
 
 def emit_call_event(call_id, event_type, data=None):
     """Fire-and-forget: push a JSON event to all connected dashboard browsers."""
+    if EVENT_FORWARD_URL:
+        forward_call_event(call_id, event_type, data)
+    else:
+        emit_call_event_local(call_id, event_type, data)
+
+
+# Per event loop: one queue and one sender task, so forwarded events keep their order.
+_forward_loop = None
+_forward_queue = None
+
+
+def forward_call_event(call_id, event_type, data):
+    """Media-only process: hand the event to the main process. Never blocks or raises."""
+    global _forward_loop, _forward_queue
+    try:
+        loop = asyncio.get_running_loop()
+        if _forward_loop is not loop:
+            _forward_loop, _forward_queue = loop, asyncio.Queue(maxsize=1000)
+            # Empty context: the sender's own log lines must not carry the first call's tag.
+            loop.create_task(_forward_call_events(_forward_queue), context=contextvars.Context())
+        _forward_queue.put_nowait({"call_id": str(call_id) if call_id else "", "type": event_type, "data": data or {}})
+    except (RuntimeError, asyncio.QueueFull) as e:
+        logger.warning(f"⚠️ [EVENT-FWD] {event_type} dropped: {e!r}")
+
+
+async def _forward_call_events(queue):
+    headers = {"X-Internal-Token": INTERNAL_EVENT_TOKEN}
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        while True:
+            event = await queue.get()
+            try:
+                resp = await client.post(EVENT_FORWARD_URL, json=event, headers=headers)
+                if resp.status_code != 200:
+                    logger.warning(f"⚠️ [EVENT-FWD] {event['type']} for {event['call_id']} rejected: HTTP {resp.status_code}")
+            except Exception as e:
+                logger.warning(f"⚠️ [EVENT-FWD] {event['type']} for {event['call_id']} not delivered: {e!r}")
+
+
+def emit_call_event_local(call_id, event_type, data=None):
     global call_event_subscribers
-    
+
     if call_id and event_type in ["call_queued", "call_ringing", "call_connected", "call_ended", "call_failed"]:
         try:
             loop = asyncio.get_running_loop()
@@ -1105,6 +1169,22 @@ def emit_call_event(call_id, event_type, data=None):
     except Exception as e:
         logger.error(f"SSE Emit Error: {e}")
         pass  # Never let SSE emission interfere with call processing
+
+
+@app.route("/internal/call-event", methods=["POST"])
+async def internal_call_event():
+    """Main process: receive an event forwarded by a media-only process."""
+    token = request.headers.get("X-Internal-Token", "")
+    if not INTERNAL_EVENT_TOKEN or not hmac.compare_digest(token, INTERNAL_EVENT_TOKEN):
+        return {"status": "error"}, 404
+    event = await request.get_json(silent=True)
+    if (not isinstance(event, dict) or not isinstance(event.get("type"), str)
+            or not isinstance(event.get("data", {}), dict)):
+        return {"status": "error", "message": "bad event"}, 400
+    # Always local: a forwarded event is never forwarded again.
+    emit_call_event_local(event.get("call_id") or "", event["type"], event.get("data"))
+    return {"status": "ok"}, 200
+
 
 @app.route('/call-events')
 async def call_events_stream():
@@ -1901,62 +1981,65 @@ async def handle_media_stream():
 
     try:
         await wait_for_plivo_start(plivo_ws, call_state)
+        # Every task created from here on (the four stream tasks, disclaimer, timers) inherits the tag.
+        call_log_tag.set(f"[{(call_state.get('call_uuid') or 'no-uuid')[:8]}] ")
 
-        # Open debug WAV recorder for preprocessed audio
-        try:
-            os.makedirs("debug_recordings", exist_ok=True)
-            safe_name = "".join(c if c.isalnum() or c in ("_", "-") else "_" for c in user_name)
-            timestamp_str = datetime.now(ist_tz).strftime("%Y%m%d_%H%M%S")
-            debug_wav_path = f"debug_recordings/{safe_name}_{timestamp_str}.wav"
-            debug_wf = wave.open(debug_wav_path, "wb")
-            debug_wf.setnchannels(1)
-            debug_wf.setsampwidth(2)  # 16-bit
-            debug_wf.setframerate(GEMINI_INPUT_RATE)  # 16kHz
-            call_state["debug_wav_writer"] = debug_wf
-            logger.info(f"🎙️ Debug recording started: {debug_wav_path}")
-        except Exception as e:
-            logger.warning(f"⚠️ Could not open debug WAV file: {e}")
-
-        # Task 5.4a — the outbound far-end, written next to the inbound recording
-        # so cross-correlating the two sides is possible for the first time. The
-        # rates DIFFER on purpose: the inbound writer above records post-resample
-        # ``clean_pcm_16k`` at 16 kHz, while the far-end is tapped pre-resample at
-        # the telephony rate. Declaring 16 kHz here would silently corrupt every
-        # future lag estimate. Opened in its own try/except so a failure here
-        # cannot take the inbound recording down with it.
-        try:
-            # Same ``safe_name`` / ``timestamp_str`` as the inbound writer, so the
-            # pair sorts together and the pairing needs no log parsing.
-            farend_wav_path = f"debug_recordings/{safe_name}_{timestamp_str}_farend.wav"
-            farend_wf = wave.open(farend_wav_path, "wb")
-            farend_wf.setnchannels(1)
-            farend_wf.setsampwidth(2)  # 16-bit
-            farend_wf.setframerate(PLIVO_SAMPLE_RATE)  # 8 kHz — NOT GEMINI_INPUT_RATE
-            call_state["debug_farend_wav_writer"] = farend_wf
-            logger.info(
-                f"🎚️ [FAR-END] recording started: {farend_wav_path} "
-                f"(mono/16-bit/{PLIVO_SAMPLE_RATE} Hz; pairs with {debug_wav_path} "
-                f"at {GEMINI_INPUT_RATE} Hz)"
-            )
-        except Exception as e:
-            logger.warning(f"⚠️ Could not open far-end debug WAV file: {e}")
-
-        # Aligned inbound-loop recordings. The pair above cannot be globally
-        # aligned (send-time far-end vs a near-end that catches up a backlog
-        # after the disclaimer), which left the TEST1 echo delay unmeasurable.
-        # These three are written in the same loop iteration, so frame N of each
-        # is the same 20 ms. Each opened on its own so one failure costs one file.
-        for kind in ALIGNED_RECORDING_KINDS:
+        if DEBUG_RECORDING:
+            # Open debug WAV recorder for preprocessed audio
             try:
-                aligned_path = f"debug_recordings/{safe_name}_{timestamp_str}_{kind}.wav"
-                aligned_wf = wave.open(aligned_path, "wb")
-                aligned_wf.setnchannels(1)
-                aligned_wf.setsampwidth(2)  # 16-bit
-                aligned_wf.setframerate(PLIVO_SAMPLE_RATE)  # 8 kHz
-                call_state["debug_aligned_wav_writers"][kind] = aligned_wf
-                logger.info(f"🎛️ [ALIGNED-REC] recording started: {aligned_path}")
+                os.makedirs("debug_recordings", exist_ok=True)
+                safe_name = "".join(c if c.isalnum() or c in ("_", "-") else "_" for c in user_name)
+                timestamp_str = datetime.now(ist_tz).strftime("%Y%m%d_%H%M%S")
+                debug_wav_path = f"debug_recordings/{safe_name}_{timestamp_str}.wav"
+                debug_wf = wave.open(debug_wav_path, "wb")
+                debug_wf.setnchannels(1)
+                debug_wf.setsampwidth(2)  # 16-bit
+                debug_wf.setframerate(GEMINI_INPUT_RATE)  # 16kHz
+                call_state["debug_wav_writer"] = debug_wf
+                logger.info(f"🎙️ Debug recording started: {debug_wav_path}")
             except Exception as e:
-                logger.warning(f"⚠️ Could not open aligned debug WAV '{kind}': {e}")
+                logger.warning(f"⚠️ Could not open debug WAV file: {e}")
+
+            # Task 5.4a — the outbound far-end, written next to the inbound recording
+            # so cross-correlating the two sides is possible for the first time. The
+            # rates DIFFER on purpose: the inbound writer above records post-resample
+            # ``clean_pcm_16k`` at 16 kHz, while the far-end is tapped pre-resample at
+            # the telephony rate. Declaring 16 kHz here would silently corrupt every
+            # future lag estimate. Opened in its own try/except so a failure here
+            # cannot take the inbound recording down with it.
+            try:
+                # Same ``safe_name`` / ``timestamp_str`` as the inbound writer, so the
+                # pair sorts together and the pairing needs no log parsing.
+                farend_wav_path = f"debug_recordings/{safe_name}_{timestamp_str}_farend.wav"
+                farend_wf = wave.open(farend_wav_path, "wb")
+                farend_wf.setnchannels(1)
+                farend_wf.setsampwidth(2)  # 16-bit
+                farend_wf.setframerate(PLIVO_SAMPLE_RATE)  # 8 kHz — NOT GEMINI_INPUT_RATE
+                call_state["debug_farend_wav_writer"] = farend_wf
+                logger.info(
+                    f"🎚️ [FAR-END] recording started: {farend_wav_path} "
+                    f"(mono/16-bit/{PLIVO_SAMPLE_RATE} Hz; pairs with {debug_wav_path} "
+                    f"at {GEMINI_INPUT_RATE} Hz)"
+                )
+            except Exception as e:
+                logger.warning(f"⚠️ Could not open far-end debug WAV file: {e}")
+
+            # Aligned inbound-loop recordings. The pair above cannot be globally
+            # aligned (send-time far-end vs a near-end that catches up a backlog
+            # after the disclaimer), which left the TEST1 echo delay unmeasurable.
+            # These three are written in the same loop iteration, so frame N of each
+            # is the same 20 ms. Each opened on its own so one failure costs one file.
+            for kind in ALIGNED_RECORDING_KINDS:
+                try:
+                    aligned_path = f"debug_recordings/{safe_name}_{timestamp_str}_{kind}.wav"
+                    aligned_wf = wave.open(aligned_path, "wb")
+                    aligned_wf.setnchannels(1)
+                    aligned_wf.setsampwidth(2)  # 16-bit
+                    aligned_wf.setframerate(PLIVO_SAMPLE_RATE)  # 8 kHz
+                    call_state["debug_aligned_wav_writers"][kind] = aligned_wf
+                    logger.info(f"🎛️ [ALIGNED-REC] recording started: {aligned_path}")
+                except Exception as e:
+                    logger.warning(f"⚠️ Could not open aligned debug WAV '{kind}': {e}")
 
         disclaimer_task = asyncio.create_task(
             play_disclaimer(plivo_ws, call_state, disclaimer_finished)
