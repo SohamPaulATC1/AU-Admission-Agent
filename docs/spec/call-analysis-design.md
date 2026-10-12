@@ -196,7 +196,7 @@ existing `init_call_history_db` / `persist_call_event_sync` / `/api/call-history
 | `ANALYSIS_CONCURRENCY` | `2` | |
 | `NLP_PRICE_INPUT`, `NLP_PRICE_OUTPUT` | `0.11`, `0.55` | USD per million tokens (Anthropic price + 10% US route); check the first AWS bill |
 | `PLIVO_COST_ENABLED` | `1` | |
-| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION` | (none) | read by the SDK; in `/etc/au-app/common.env` on EC2. Missing keys: the worker logs one error at start and marks runs `failed` (`error="aws credentials"`); calls are unaffected |
+| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION` | (none) | read by the SDK; in `.env` (operator, 2026-10-12: `.env` is the place for secrets; `common.env` is not needed). Missing keys: the worker logs one error at start and marks runs `failed` (`error="aws credentials"`); calls are unaffected |
 
 ## 4. Testing and rollout
 
@@ -230,7 +230,7 @@ goes back into the code before deploy.
 ### Deploy
 
 1. `venv/bin/pip install "anthropic[bedrock]"` on EC2 (once).
-2. AWS keys and `AWS_DEFAULT_REGION` in `/etc/au-app/common.env`.
+2. AWS keys and `AWS_DEFAULT_REGION` in `.env`.
 3. `git pull`, restart `au-app@800{0,1,2,3}` when no call is live.
 4. Startup log: the worker started (8000 only) and how many old transcripts it queued.
 5. One live call: the `call_analysis` row, the four costs on the `calls` row, the `[ANALYSIS]` and

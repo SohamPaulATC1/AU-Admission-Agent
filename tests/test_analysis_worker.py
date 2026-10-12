@@ -174,6 +174,16 @@ class TestAnalyze(WorkerCase):
         for private in ("হ্যাঁ", "Asha", "9876543210"):
             self.assertNotIn(private, line)
 
+    def test_cached_prompt_is_counted_and_priced(self):
+        reply = make_response(json.dumps(SAMPLE_FIELDS), tokens=(500, 500), cache=(0, 7000))
+        with LogCaptureFor(call_analysis.logger) as log:
+            self.assertEqual(run(self.analyzer(FakeClient([reply])).analyze("u-1", self.transcript())), "ok")
+        self.assertEqual(self.analysis()["input_tokens"], 7500, "the whole prompt, cached or not")
+        self.assertAlmostEqual(self.call()["nlp_cost_usd"], 0.000407)
+        [line] = [l for l in log.lines if "[ANALYSIS]" in l]
+        self.assertIn("tokens=7500/500 cost=$0.0004", line)
+        self.assertTrue(line.endswith("cache_write=0 cache_read=7000"), line)
+
     def test_no_caller_speech_needs_no_haiku(self):
         client = FakeClient([good_reply()])
         analyzer = self.analyzer(client)

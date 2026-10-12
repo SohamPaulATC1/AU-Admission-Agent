@@ -200,7 +200,9 @@ class TestWebhooks(DbCase):
 
     def post(self, path, form):
         async def go():
-            return (await app.app.test_client().post(path, form=form)).status_code
+            status = (await app.app.test_client().post(path, form=form)).status_code
+            await asyncio.gather(*app._background_tasks)   # the background database writes finish too
+            return status
         return run(go())
 
     def test_hangup_schedules_the_plivo_cost(self):
@@ -220,6 +222,27 @@ class TestWebhooks(DbCase):
         form = {"DialBLegStatus": "completed", "CallUUID": "c-1", "From": "+919876543210", "DialBLegUUID": "b-1"}
         self.assertEqual(self.post("/dial-action?call_uuid=c-1", form), 200)
         self.assertEqual(json.loads(self.row("c-1")["plivo_b_legs"]), ["b-1"])
+
+    def test_dial_action_does_not_wait_for_the_database(self):
+        self.queued("c-1")
+        stuck = asyncio.Event()   # never set: a database that does not answer
+
+        async def stuck_run(*args, **kwargs):
+            await stuck.wait()
+
+        form = {"DialBLegStatus": "completed", "CallUUID": "c-1", "From": "+919876543210", "DialBLegUUID": "b-1"}
+
+        async def go():
+            with mock.patch.object(app.call_store, "run", stuck_run):
+                response = await asyncio.wait_for(
+                    app.app.test_client().post("/dial-action?call_uuid=c-1", form=form), 2)
+                pending = len(app._background_tasks)
+                for task in list(app._background_tasks):
+                    task.cancel()
+                await asyncio.gather(*app._background_tasks, return_exceptions=True)
+            return response.status_code, "<Stream" in await response.get_data(as_text=True), pending
+
+        self.assertEqual(run(go()), (200, True, 1))
 
     def test_dial_action_without_a_human_leg(self):
         self.queued("c-1")

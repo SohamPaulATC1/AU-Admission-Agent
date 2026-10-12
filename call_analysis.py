@@ -106,7 +106,8 @@ list fields, false for the yes/no fields). Never guess.
 - Write every text field in English, whatever language the call was in. The one exception is \
 prospective_evidence: quote the caller's own words as they were said.
 - Lines marked "User (fallback)" come from a less accurate transcription: use them, with care.
-- programs_of_interest and primary_program must be exact names from the catalog list in the message. \
+- programs_of_interest and primary_program must be exact names from the catalog program list at the end \
+of these instructions. \
 primary_program is the one program the caller was most interested in; null if no specific program \
 was named, or recommended and accepted.
 
@@ -140,16 +141,25 @@ agent_issues: only clear cases where Neha stated a fact that looks invented, ask
 after it was answered, ignored a direct question, or spoke a language other than the caller's.
 """
 
+PROGRAM_LIST = "\n".join(
+    ["Catalog program names (programs_of_interest and primary_program must be exactly one of these):",
+     *(f"- {name}" for name in PROGRAM_NAMES)])
+
+# The fixed part of every request (instructions + program list) is one byte-identical system block with a
+# cache marker (Bedrock has no automatic caching). Analyses starting less than 5 minutes apart read it at
+# 0.1x the input price instead of paying for it again; a cold start writes it at 1.25x.
+SYSTEM_BLOCK = {"type": "text", "text": SYSTEM_PROMPT + "\n" + PROGRAM_LIST, "cache_control": {"type": "ephemeral"}}
+CACHE_WRITE_MULTIPLIER = 1.25   # 5-minute TTL
+CACHE_READ_MULTIPLIER = 0.1
+
 
 def user_message(context, transcript):
+    """The per-call part: who was called, how long, and the transcript."""
     duration = context.get("duration_sec")
     lines = [
         f"Contact name: {context.get('name') or 'unknown'}",
         f"Call length: {duration if duration is not None else 'unknown'} seconds",
         f"Agent's end-of-call note: {context.get('end_reason') or 'none'}",
-        "",
-        "Catalog program names (programs_of_interest and primary_program must be exactly one of these):",
-        *(f"- {name}" for name in PROGRAM_NAMES),
         "",
         "Transcript:",
         # Pre-step-2 files end each segment with a cost line; spec §2.5: the analysis ignores it.
@@ -163,14 +173,15 @@ def build_request(context, transcript, model=None):
     return {
         "model": model or ANALYSIS_MODEL,
         "max_tokens": MAX_TOKENS,
-        "system": SYSTEM_PROMPT,
+        "system": [dict(SYSTEM_BLOCK)],
         "output_config": {"effort": "low", "format": {"type": "json_schema", "schema": SCHEMA}},
         "messages": [{"role": "user", "content": user_message(context, transcript)}],
     }
 
 
 def parse_reply(response):
-    """(fields, problem, input_tokens, output_tokens). problem is None when fields is usable."""
+    """(fields, problem, input_tokens, output_tokens). problem is None when fields is usable.
+    input_tokens is usage.input_tokens, the uncached remainder; see cache_tokens for the rest."""
     usage = getattr(response, "usage", None)
     tin = getattr(usage, "input_tokens", 0) or 0
     tout = getattr(usage, "output_tokens", 0) or 0
@@ -208,8 +219,17 @@ def school_for(primary_program, programs_looked_up):
     return record["school"]["code"], record["school"]["name"], source
 
 
-def nlp_cost(input_tokens, output_tokens):
-    return (input_tokens * NLP_PRICE_INPUT + output_tokens * NLP_PRICE_OUTPUT) / 1_000_000
+def cache_tokens(response):
+    """(cache_write, cache_read) prompt tokens of a reply; 0 when the response reports none."""
+    usage = getattr(response, "usage", None)
+    return (getattr(usage, "cache_creation_input_tokens", 0) or 0,
+            getattr(usage, "cache_read_input_tokens", 0) or 0)
+
+
+def nlp_cost(input_tokens, output_tokens, cache_write=0, cache_read=0):
+    """USD for one request. input_tokens is the uncached remainder (usage.input_tokens)."""
+    prompt = (input_tokens + cache_write * CACHE_WRITE_MULTIPLIER + cache_read * CACHE_READ_MULTIPLIER)
+    return (prompt * NLP_PRICE_INPUT + output_tokens * NLP_PRICE_OUTPUT) / 1_000_000
 
 
 _CALLER_LINE = re.compile(r"^\[\d+:\d\d\] User(?: \(fallback\))?: ", re.MULTILINE)
@@ -364,21 +384,24 @@ class Analyzer:
                 await self.sleep(self.retry_delays[attempts - 1])
 
         fields, problem, tin, tout = parse_reply(response)
-        cost = nlp_cost(tin, tout)
+        cache_write, cache_read = cache_tokens(response)
+        cost = nlp_cost(tin, tout, cache_write, cache_read)
+        prompt = tin + cache_write + cache_read   # stored and logged: the whole prompt, cached or not
+        cache = f"cache_write={cache_write} cache_read={cache_read}"
         latency = time.perf_counter() - started
         if problem:
             await self._db(call_store.save_failure, call_uuid, problem, attempts=attempts, model=self.model,
-                           input_tokens=tin, output_tokens=tout, cost_usd=cost)
-            logger.warning(f"🧠 [ANALYSIS] call={tag} status=failed error={problem} tokens={tin}/{tout} "
-                           f"cost=${cost:.4f} latency={latency:.1f}s attempts={attempts}")
+                           input_tokens=prompt, output_tokens=tout, cost_usd=cost)
+            logger.warning(f"🧠 [ANALYSIS] call={tag} status=failed error={problem} tokens={prompt}/{tout} "
+                           f"cost=${cost:.4f} latency={latency:.1f}s attempts={attempts} {cache}")
             return "failed"
         code, name, source = school_for(fields.get("primary_program"), context["programs_looked_up"])
         await self._db(call_store.save_analysis, call_uuid, fields, school_code=code, school_name=name,
-                       transferred=transferred, model=self.model, input_tokens=tin, output_tokens=tout,
+                       transferred=transferred, model=self.model, input_tokens=prompt, output_tokens=tout,
                        cost_usd=cost, attempts=attempts, raw_json=json.dumps(fields, ensure_ascii=False))
         logger.info(f"🧠 [ANALYSIS] call={tag} status=ok lead={fields.get('lead_status')} "
-                    f"prospective={fields.get('is_prospective')} tokens={tin}/{tout} cost=${cost:.4f} "
-                    f"latency={latency:.1f}s attempts={attempts} school_from={source}")
+                    f"prospective={fields.get('is_prospective')} tokens={prompt}/{tout} cost=${cost:.4f} "
+                    f"latency={latency:.1f}s attempts={attempts} school_from={source} {cache}")
         return "ok"
 
     async def backfill(self, transcript_dir):

@@ -353,7 +353,8 @@ class TestCallStats(unittest.TestCase):
         # And again for the Plivo signature gate and the media-stream token hook.
         # And again for the operator view (API_AUTH_TOKEN removed, cost removal, /trigger-call JSON).
         # And again 2026-10-12 for step 2 (call_store / call_analysis / plivo_cost imports, call_ended numbers, catalog_found).
-        self.assertEqual(references, [107, 1874, 2400, 2410, 2841])
+        # And again for the background save of the transfer's human leg (spawn_background, store_b_leg).
+        self.assertEqual(references, [107, 1890, 2416, 2426, 2857])
 
 
 if __name__ == "__main__":

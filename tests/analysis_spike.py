@@ -26,7 +26,10 @@ async def main(path):
     fields, problem, tin, tout = call_analysis.parse_reply(response)
     print(f"model: {request['model']}")
     print(f"stop_reason: {response.stop_reason}  problem: {problem}")
-    print(f"tokens: in={tin} out={tout}  cost: ${call_analysis.nlp_cost(tin, tout):.5f}")
+    cache_write, cache_read = call_analysis.cache_tokens(response)
+    cost = call_analysis.nlp_cost(tin, tout, cache_write, cache_read)
+    print(f"tokens: in={tin} cache_write={cache_write} cache_read={cache_read} out={tout}  cost: ${cost:.5f}")
+    print("(run it twice within 5 minutes: the second run should show cache_read > 0)")
     print(json.dumps(fields, ensure_ascii=False, indent=2))
 
 

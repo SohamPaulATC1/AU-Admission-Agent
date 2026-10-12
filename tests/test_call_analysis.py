@@ -18,13 +18,16 @@ from tests.test_call_store import PROGRAM, SAMPLE_FIELDS
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
-def make_response(text=None, stop="end_turn", tokens=(3000, 500), category=None, blocks=None):
-    """A stand-in for an anthropic Message: content blocks, stop reason, usage."""
+def make_response(text=None, stop="end_turn", tokens=(3000, 500), category=None, blocks=None, cache=None):
+    """A stand-in for an anthropic Message: content blocks, stop reason, usage.
+    cache=(write, read) adds the prompt-cache usage fields; None leaves them out, like an older reply."""
     if blocks is None:
         blocks = [types.SimpleNamespace(type="thinking", thinking="")]
         if text is not None:
             blocks.append(types.SimpleNamespace(type="text", text=text))
     usage = None if tokens is None else types.SimpleNamespace(input_tokens=tokens[0], output_tokens=tokens[1])
+    if usage is not None and cache is not None:
+        usage.cache_creation_input_tokens, usage.cache_read_input_tokens = cache
     details = None if category is None else types.SimpleNamespace(category=category)
     return types.SimpleNamespace(content=blocks, stop_reason=stop, usage=usage, stop_details=details)
 
@@ -78,7 +81,7 @@ class TestRequest(unittest.TestCase):
         request = call_analysis.build_request(CONTEXT, TRANSCRIPT)
         self.assertEqual(request["model"], "us.anthropic.claude-haiku-5-5")
         self.assertEqual(request["max_tokens"], 4000)
-        self.assertEqual(request["system"], call_analysis.SYSTEM_PROMPT)
+        self.assertEqual(request["system"], [call_analysis.SYSTEM_BLOCK])
         self.assertEqual(request["output_config"],
                          {"effort": "low", "format": {"type": "json_schema", "schema": call_analysis.SCHEMA}})
         for banned in ("temperature", "top_p", "top_k"):
@@ -92,9 +95,23 @@ class TestRequest(unittest.TestCase):
         self.assertIn("Contact name: Asha Das\n", text)
         self.assertIn("Call length: 95 seconds\n", text)
         self.assertIn("Agent's end-of-call note: Parent agreed to visit on Saturday.\n", text)
-        for name in call_analysis.PROGRAM_NAMES:
-            self.assertIn(f"- {name}\n", text)
+        self.assertNotIn("Catalog program names", text, "the program list lives in the cached system block")
         self.assertTrue(text.endswith("Transcript:\n" + TRANSCRIPT.strip()))
+
+    def test_fixed_part_is_one_cached_system_block(self):
+        block = call_analysis.SYSTEM_BLOCK
+        self.assertEqual((block["type"], block["cache_control"]), ("text", {"type": "ephemeral"}))
+        self.assertTrue(block["text"].startswith(call_analysis.SYSTEM_PROMPT))
+        lines = block["text"].splitlines()
+        for name in call_analysis.PROGRAM_NAMES:
+            self.assertIn(f"- {name}", lines)
+        self.assertIn("catalog program list at the end of these instructions", call_analysis.SYSTEM_PROMPT)
+        # Byte-identical whatever the call, or the cache never hits.
+        other = call_analysis.build_request({"name": "Someone Else", "duration_sec": 5}, "[00:00] User: x")
+        self.assertEqual(other["system"], call_analysis.build_request(CONTEXT, TRANSCRIPT)["system"])
+        other["system"][0]["text"] = "changed"
+        self.assertTrue(call_analysis.SYSTEM_BLOCK["text"].startswith(call_analysis.SYSTEM_PROMPT),
+                        "each request gets its own copy of the block")
 
     def test_user_message_drops_old_cost_lines(self):
         old = TRANSCRIPT + "\ntranscription_cost_usd: 0.0011 (audio_in=1 text_in=2 output=3 tokens, model=m)\n"
@@ -161,6 +178,17 @@ class TestSchoolAndCost(unittest.TestCase):
     def test_cost(self):
         # (3000 * 0.11 + 500 * 0.55) / 1e6 = 0.000605
         self.assertAlmostEqual(call_analysis.nlp_cost(3000, 500), 0.000605, places=12)
+
+    def test_cost_with_the_prompt_cache(self):
+        # read: (500 * 0.11 + 7000 * 0.11 * 0.1 + 500 * 0.55) / 1e6 = 0.000407
+        self.assertAlmostEqual(call_analysis.nlp_cost(500, 500, cache_read=7000), 0.000407, places=12)
+        # write: (500 * 0.11 + 7000 * 0.11 * 1.25 + 500 * 0.55) / 1e6 = 0.0012925
+        self.assertAlmostEqual(call_analysis.nlp_cost(500, 500, cache_write=7000), 0.0012925, places=12)
+
+    def test_cache_tokens(self):
+        self.assertEqual(call_analysis.cache_tokens(make_response("{}", cache=(7000, 0))), (7000, 0))
+        self.assertEqual(call_analysis.cache_tokens(make_response("{}")), (0, 0))
+        self.assertEqual(call_analysis.cache_tokens(make_response("{}", tokens=None)), (0, 0))
 
 
 class TestTranscriptHelpers(unittest.TestCase):

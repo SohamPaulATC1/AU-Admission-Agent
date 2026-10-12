@@ -1561,6 +1561,23 @@ async def transfer_xml():
     """
     return Response(xml_data, mimetype='application/xml')
 
+_background_tasks = set()   # fire-and-forget work started by a request, held so it is not garbage-collected
+
+
+def spawn_background(coroutine):
+    task = asyncio.get_running_loop().create_task(coroutine)
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
+    return task
+
+
+async def store_b_leg(call_uuid, b_leg_uuid):
+    try:
+        await call_store.run(CALL_HISTORY_DB_PATH, call_store.add_b_leg, call_uuid, b_leg_uuid)
+    except Exception as e:
+        logger.error(f"❌ [PLIVO-COST] could not store the human leg: {type(e).__name__}")
+
+
 @app.route('/dial-action', methods=['GET', 'POST'])
 async def dial_action():
     """
@@ -1589,10 +1606,9 @@ async def dial_action():
     dial_status = dial_status.lower()
     logger.info(f"📲 DialStatus={dial_status}, call_uuid={call_uuid}")
     if b_leg_uuid and call_uuid and not EVENT_FORWARD_URL:
-        try:   # the human leg is billed as its own call: its cost is added after hangup
-            await call_store.run(CALL_HISTORY_DB_PATH, call_store.add_b_leg, call_uuid, b_leg_uuid)
-        except Exception as e:
-            logger.error(f"❌ [PLIVO-COST] could not store the human leg: {type(e).__name__}")
+        # The human leg is billed as its own call; its cost is added after hangup. Saved in the
+        # background: Plivo is waiting for this XML, and the caller hears silence until it arrives.
+        spawn_background(store_b_leg(call_uuid, b_leg_uuid))
 
     context = await asyncio.to_thread(load_transfer_context, call_uuid)
     if not context:
