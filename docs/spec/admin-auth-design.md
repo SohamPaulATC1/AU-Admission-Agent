@@ -1,7 +1,7 @@
 # Step 1: login and protection
 
 Status: design approved by the operator 2026-10-12 (all four parts). Shared decisions:
-`docs/spec/admin-system-overview.md`. Implemented 2026-10-12, plan docs/spec/admin-auth-plan.md; not yet on EC2.
+`docs/spec/admin-system-overview.md`. Implemented 2026-10-12, plan docs/spec/admin-auth-plan.md; live on EC2 2026-10-12 (enforce).
 
 ## Problem
 

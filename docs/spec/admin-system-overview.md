@@ -37,7 +37,7 @@ Plus `/login` and `/logout`. Everything else is closed by default (step 1).
 ## Build order
 
 1. **Login and protection** (`docs/spec/admin-auth-design.md`): logins, default-deny routes,
-   Plivo webhook signatures, signed `/media-stream` URLs. Before the URL is handed over. Implemented 2026-10-12; EC2 rollout per that spec's §6.
+   Plivo webhook signatures, signed `/media-stream` URLs. Before the URL is handed over. Live on EC2 2026-10-12 (commit f55e5c4, enforce).
 2. **Data model and the post-call NLP step**, including every cost part.
 3. **Bulk campaigns and the dispatcher**, on the calls page.
 4. **Admin panel**: overview, calls and leads table, call detail with transcript, campaign reports,
