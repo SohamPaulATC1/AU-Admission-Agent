@@ -112,9 +112,11 @@ class TestWiring(unittest.TestCase):
     def test_job_starts_in_the_finally_after_the_stats(self):
         final = self.media.rindex("    finally:\n")
         stats = self.media.index("log_call_stats(call_state)", final)
-        job = self.media.index("call_transcript.start_job(", final)
+        job = self.media.index("finish_transcript(call_state)", final)
         self.assertLess(stats, job)
-        self.assertIn("VERTEX_PROJECT, vertex_access_token)", self.media[job:job + 300])
+        helper = inspect.getsource(app.finish_transcript)
+        self.assertIn("call_transcript.start_job(", helper)
+        self.assertIn("VERTEX_PROJECT, vertex_access_token", helper)
 
     def test_hook_counts(self):
         source = self.inbound + self.outbound

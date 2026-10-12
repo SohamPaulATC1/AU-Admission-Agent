@@ -299,16 +299,8 @@ class TestCost(unittest.TestCase):
         # (2074 * 2.00 + 311 * 2.00 + 158 * 12.00) / 1e6 = 0.006666
         self.assertAlmostEqual(ct.cost_usd(2074, 311, 158), 0.006666, places=9)
 
-    def test_cost_line_ok(self):
-        self.assertEqual(ct.cost_line((2074, 311, 158), "ok", ""),
-                         "transcription_cost_usd: 0.0067 (audio_in=2074 text_in=311 output=158 tokens, "
-                         "model=gemini-3.5-transcribe-preview)")
-
-    def test_cost_line_failed_and_skipped(self):
-        self.assertEqual(ct.cost_line(None, "failed", "http 429"),
-                         "transcription_cost_usd: 0.0000 (stt failed: http 429)")
-        self.assertEqual(ct.cost_line(None, "skipped", "no caller audio"),
-                         "transcription_cost_usd: 0.0000 (stt skipped: no caller audio)")
+    def test_cost_line_is_gone(self):
+        self.assertFalse(hasattr(ct, "cost_line"))
 
     def test_status_text(self):
         self.assertEqual(ct.status_text("ok", ""), "ok")
@@ -318,13 +310,10 @@ class TestCost(unittest.TestCase):
 class TestRenderAndWrite(unittest.TestCase):
     def test_render(self):
         text = ct.render_file(call_uuid="u-1", started_at="2026-10-12 10:00:00 IST", duration_s=20,
-                              language="bn-IN", kind="ok", reason="",
-                              lines=["[00:00] Neha: hi"], tokens=(10, 0, 1))
+                              language="bn-IN", kind="ok", reason="", lines=["[00:00] Neha: hi"])
         self.assertEqual(text, "call_uuid: u-1\nstarted_at: 2026-10-12 10:00:00 IST\nduration_sec: 20\n"
                                "language: bn-IN\nstt_model: gemini-3.5-transcribe-preview\nstt_status: ok\n"
-                               "\n[00:00] Neha: hi\n\n"
-                               "transcription_cost_usd: 0.0000 (audio_in=10 text_in=0 output=1 tokens, "
-                               "model=gemini-3.5-transcribe-preview)\n")
+                               "\n[00:00] Neha: hi\n")
 
     def test_append_segment_creates_the_file(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -506,9 +495,6 @@ EXPECTED_GOLDEN = (
     "[00:07] Neha (interrupted): B.Tech এর fees\n"
     "[00:08] User: MBA টা\n"
     "[00:12] User (fallback): ঠিক আছে।\n"
-    "\n"
-    "transcription_cost_usd: 0.0011 (audio_in=125 text_in=311 output=20 tokens, "
-    "model=gemini-3.5-transcribe-preview)\n"
 )
 
 GOLDEN_RESPONSE = {
@@ -595,7 +581,7 @@ class TestWriteTranscript(unittest.TestCase):
         self.assertIn("[00:08] User (fallback): MBA টা\n", text)
         self.assertIn("[00:12] User (fallback): ঠিক আছে।\n", text)
         self.assertNotIn("[00:05]", text, "turn 1 had no Gemini text, so it is dropped")
-        self.assertTrue(text.endswith("transcription_cost_usd: 0.0000 (stt failed: http 400)\n"))
+        self.assertNotIn("transcription_cost_usd", text)
 
     def test_ok_response_without_words_is_a_failure(self):
         empty = {"candidates": [{"content": {"parts": [{"text": "x"}]}}], "usageMetadata": {}}
@@ -614,7 +600,8 @@ class TestWriteTranscript(unittest.TestCase):
         self.assertIn("language: en-IN\nstt_model: gemini-3.5-transcribe-preview\n"
                       "stt_status: skipped (no caller audio)\n", text)
         self.assertIn("[00:00] Neha: Hello, this is Neha\n", text)
-        self.assertTrue(text.endswith("transcription_cost_usd: 0.0000 (stt skipped: no caller audio)\n"))
+        self.assertTrue(text.endswith("[00:00] Neha: Hello, this is Neha\n"))
+        self.assertNotIn("transcription_cost_usd", text)
 
     def test_open_caller_turn_at_teardown_is_transcribed(self):
         t = ct.CallTranscript(clock=StepClock(0.0))
@@ -670,6 +657,37 @@ class TestWriteTranscript(unittest.TestCase):
         self.assertIn("stt_status: failed (http 400)\n", text.split(ct.SEGMENT_SEPARATOR)[1])
         [line] = [l for l in log.lines if l.startswith("📝 [TRANSCRIPT]")]
         self.assertTrue(line.endswith(" appended"))
+
+    def test_on_done_gets_the_result(self):
+        results = []
+        path = self._write(golden_transcript(), lambda r: httpx.Response(200, json=GOLDEN_RESPONSE),
+                           on_done=results.append)
+        self.assertEqual(results, [{"path": path, "stt_status": "ok", "audio_in": 125, "text_in": 311,
+                                    "output": 20, "stt_cost_usd": 0.001112, "language": "bn-IN",
+                                    "user_turns": 3}])
+
+    def test_on_done_after_a_failed_stt_reports_zero_cost(self):
+        results = []
+        self._write(golden_transcript(), lambda r: httpx.Response(400, text="bad"), on_done=results.append)
+        self.assertEqual((results[0]["stt_status"], results[0]["stt_cost_usd"], results[0]["audio_in"]),
+                         ("failed (http 400)", 0.0, 0))
+
+    def test_raising_on_done_is_logged_not_raised(self):
+        def broken(result):
+            raise RuntimeError("boom")
+
+        with LogCaptureTranscript() as log:
+            path = self._write(golden_transcript(), lambda r: httpx.Response(200, json=GOLDEN_RESPONSE),
+                               on_done=broken)
+        self.assertIsNotNone(path)
+        self.assertTrue(any("⚠️ [TRANSCRIPT] on_done failed" in line for line in log.lines))
+
+    def test_no_on_done_when_the_write_fails(self):
+        results = []
+        with mock.patch.object(ct, "append_segment", side_effect=OSError("disk full")):
+            self._write(golden_transcript(), lambda r: httpx.Response(200, json=GOLDEN_RESPONSE),
+                        on_done=results.append)
+        self.assertEqual(results, [])
 
 
 class TestJobOrderPerCall(unittest.TestCase):
@@ -745,6 +763,23 @@ class TestStartJob(unittest.TestCase):
         with LogCaptureTranscript() as log:
             self.assertIsNone(_run(go()))
         self.assertTrue(any("❌ [TRANSCRIPT] job crashed" in line for line in log.lines))
+
+    def test_on_done_is_passed_through(self):
+        seen = {}
+
+        async def fake_write(transcript, call_uuid, project, get_token, **kwargs):
+            seen.update(kwargs)
+            return "path"
+
+        def done(result):
+            pass
+
+        async def go():
+            with mock.patch.object(ct, "write_transcript", fake_write):
+                await ct.start_job(object(), "u-1", "p", _token, on_done=done)
+
+        _run(go())
+        self.assertIs(seen["on_done"], done)
 
 
 class LogCaptureTranscript:

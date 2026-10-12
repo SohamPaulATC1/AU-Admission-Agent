@@ -239,6 +239,11 @@ class TestWithoutCost(unittest.TestCase):
         odd = json.dumps({"call_id": "u-1", "type": "x", "data": "text"})
         self.assertIs(web_auth.without_cost(odd), odd)
 
+    def test_every_cost_key_is_removed(self):
+        payload = json.dumps({"call_id": "u-1", "type": "call_ended",
+                              "data": {"cost": "$1", "cost_usd": 1.0, "stt_cost_usd": 0.1, "reason": "x"}})
+        self.assertEqual(json.loads(web_auth.without_cost(payload))["data"], {"reason": "x"})
+
 
 class TestAccessTable(unittest.TestCase):
     def test_every_class_is_known(self):

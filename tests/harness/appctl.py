@@ -183,6 +183,7 @@ def new_call_state(
         # --- course catalog tools: calls and response characters this call.
         "catalog_calls": 0,
         "catalog_chars": 0,
+        "catalog_found": [],
 
         # --- task 5.1: per-delta trace and the three per-turn byte counters.
         "delta_trace": [],
@@ -275,6 +276,8 @@ DIAGNOSTIC_LOG_TAGS = (
     "[LATCH]",        # per-call latch summary in call stats
     "[TRANSCRIPT]",   # post-call transcript job (call_transcript.py)
     "[AUTH]",         # logins, refused endpoints, Plivo signature and media-stream token checks
+    "[ANALYSIS]",     # step 2: Haiku analysis worker (call_analysis.py)
+    "[PLIVO-COST]",   # step 2: Plivo call-record cost fetch (plivo_cost.py)
 )
 
 

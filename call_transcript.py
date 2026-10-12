@@ -2,7 +2,7 @@
 
 During the call app.py feeds a CallTranscript (in-memory appends only). After teardown
 start_job() sends the caller's turns to gemini-3.5-transcribe on Vertex in one request
-and writes TRANSCRIPT_DIR/<call_uuid>.txt, turn by turn, with the STT cost last.
+and writes TRANSCRIPT_DIR/<call_uuid>.txt, turn by turn. The STT cost goes to on_done (step 2).
 """
 
 import asyncio
@@ -240,19 +240,11 @@ def cost_usd(audio_in, text_in, output):
             + output * STT_PRICE_OUTPUT) / 1_000_000
 
 
-def cost_line(tokens, kind, reason):
-    if tokens is None:
-        return f"transcription_cost_usd: 0.0000 (stt {kind}: {reason})"
-    audio_in, text_in, output = tokens
-    return (f"transcription_cost_usd: {cost_usd(audio_in, text_in, output):.4f} "
-            f"(audio_in={audio_in} text_in={text_in} output={output} tokens, model={STT_MODEL})")
-
-
 def status_text(kind, reason):
     return kind if not reason else f"{kind} ({reason})"
 
 
-def render_file(*, call_uuid, started_at, duration_s, language, kind, reason, lines, tokens):
+def render_file(*, call_uuid, started_at, duration_s, language, kind, reason, lines):
     header = [
         f"call_uuid: {call_uuid}",
         f"started_at: {started_at}",
@@ -261,7 +253,8 @@ def render_file(*, call_uuid, started_at, duration_s, language, kind, reason, li
         f"stt_model: {STT_MODEL}",
         f"stt_status: {status_text(kind, reason)}",
     ]
-    return "\n".join(header + [""] + lines + ["", cost_line(tokens, kind, reason)]) + "\n"
+    # The STT cost goes to the database with the transcript_ready event (step 2), not into the file.
+    return "\n".join(header + [""] + lines) + "\n"
 
 
 # Between segments of one call_uuid (a transferred call that comes back gets a second segment).
@@ -352,14 +345,17 @@ _jobs = set()        # running jobs, held so they are not garbage-collected mid-
 _last_job = {}       # call_uuid -> its latest job, so segments are appended in call order
 
 
-def start_job(transcript, call_uuid, project, get_token):
+def start_job(transcript, call_uuid, project, get_token, on_done=None):
     """Start the post-call job detached from the call. It inherits the call's log tag.
 
     A second job for the same call_uuid (the leg after a transfer) runs its STT at once
     but appends only after the earlier job has finished, so the file stays in call order.
+    on_done(result) is called once the file is written (see write_transcript).
     """
     previous = _last_job.get(call_uuid)
     kwargs = {"before_write": previous} if previous is not None else {}
+    if on_done is not None:
+        kwargs["on_done"] = on_done
     task = asyncio.create_task(_guarded(write_transcript(transcript, call_uuid, project, get_token,
                                                          **kwargs)))
     _jobs.add(task)
@@ -383,7 +379,7 @@ async def _guarded(coroutine):
 
 
 async def write_transcript(transcript, call_uuid, project, get_token, *,
-                           client=None, sleep=asyncio.sleep, out_dir=None, before_write=None):
+                           client=None, sleep=asyncio.sleep, out_dir=None, before_write=None, on_done=None):
     started = time.perf_counter()
     transcript.caller_end()   # the caller may have hung up mid-turn
     turns = list(transcript.turns)
@@ -427,7 +423,7 @@ async def write_transcript(transcript, call_uuid, project, get_token, *,
         results = caller_results(caller_turns, buckets)
         text = render_file(call_uuid=call_uuid, started_at=transcript.started_at,
                            duration_s=int(transcript.elapsed_s()), language=language,
-                           kind=kind, reason=reason, lines=body_lines(turns, results), tokens=tokens)
+                           kind=kind, reason=reason, lines=body_lines(turns, results))
         return text, sum(1 for result in results if result and result[0] == "User (fallback)")
 
     try:
@@ -448,11 +444,20 @@ async def write_transcript(transcript, call_uuid, project, get_token, *,
         logger.error(f"❌ [TRANSCRIPT] write failed: {type(e).__name__}: {e} file={path}")
         return None
 
-    cost = cost_usd(*tokens) if tokens else 0.0
+    audio_in, text_in, output = tokens or (0, 0, 0)
+    cost = cost_usd(audio_in, text_in, output)
     logger.info(
         f"📝 [TRANSCRIPT] status={status_text(kind, reason)} lang={language} "
         f"user_turns={len(caller_turns)} fallback={fallback} words={words} audio_s={audio_s:.0f} "
         f"latency={time.perf_counter() - started:.1f}s retries={retries} cost=${cost:.4f} file={path}"
         f"{' appended' if appended else ''}"
     )
+    if on_done is not None:
+        result = {"path": path, "stt_status": status_text(kind, reason), "audio_in": audio_in,
+                  "text_in": text_in, "output": output, "stt_cost_usd": round(cost, 6),
+                  "language": language, "user_turns": len(caller_turns)}
+        try:
+            on_done(result)
+        except Exception:
+            logger.exception("⚠️ [TRANSCRIPT] on_done failed")
     return path

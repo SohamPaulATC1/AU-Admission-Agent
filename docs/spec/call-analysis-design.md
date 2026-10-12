@@ -1,6 +1,6 @@
 # Step 2: call analysis, data model and full call cost
 
-Status: design approved by the operator 2026-10-12 (all four parts). Shared decisions:
+Status: design approved by the operator 2026-10-12 (all four parts). Implemented and deployed on EC2 2026-10-12 (plan `docs/spec/call-analysis-plan.md`, report `docs/handoff_step2_report.md`); live call pending. Shared decisions:
 `docs/spec/admin-system-overview.md`. Step 1 (logins) is live; step 4 (admin panel) reads what this
 step stores.
 

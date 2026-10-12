@@ -36,6 +36,8 @@ transfer_context.sqlite3
 senco_chroma_db/
 chroma_db/
 *.db
+# Database backups before a deploy (names and phone numbers).
+*.db.bak*
 
 # OS / editor
 .DS_Store

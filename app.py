@@ -53,6 +53,11 @@ import call_transcript
 # Logins and Plivo request checks (web_auth.py). Imported after load_dotenv() so its config sees .env.
 import web_auth
 
+# Step 2: per-call costs and the Haiku analysis (call_store.py, call_analysis.py, plivo_cost.py).
+import call_store
+import call_analysis
+import plivo_cost
+
 # Multi-process: a media-only process sends its dashboard events to the main process
 # (e.g. EVENT_FORWARD_URL=http://127.0.0.1:5001/internal/call-event). Empty = this is the main process.
 EVENT_FORWARD_URL = os.getenv("EVENT_FORWARD_URL", "").strip()
@@ -1048,7 +1053,8 @@ app.config.update(
 CALL_HISTORY_DB_PATH = "call_history.db"
 
 def init_call_history_db():
-    with sqlite3.connect(CALL_HISTORY_DB_PATH) as conn:
+    # timeout=30: four processes run the schema upgrade at once on first deploy.
+    with sqlite3.connect(CALL_HISTORY_DB_PATH, timeout=30) as conn:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS calls (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1065,6 +1071,7 @@ def init_call_history_db():
                 connected_at TEXT
             )
         """)
+        call_store.upgrade(conn)   # step 2 columns and call_analysis; every process, race-safe
         conn.commit()
 
 init_call_history_db()
@@ -1117,9 +1124,20 @@ def persist_call_event_sync(call_uuid, event_type, data):
                         
                 conn.execute("""
                     UPDATE calls 
-                    SET status=?, updated_at=?, cost=?, end_reason=?, fail_reason=?, duration_sec=?
+                    SET status=?, updated_at=?, cost=COALESCE(?, cost), end_reason=?, fail_reason=?, duration_sec=?
                     WHERE call_uuid=?
                 """, (status, now_ist_str, cost, end_reason, fail_reason, duration_sec, call_uuid))
+                if event_type == "call_ended":
+                    cost_usd = data.get("cost_usd")
+                    if cost_usd is None and isinstance(cost, str):   # pre-step-2 event: only the "$x" text
+                        try:
+                            cost_usd = float(cost.lstrip("$"))
+                        except ValueError:
+                            cost_usd = None
+                    call_store.add_leg(conn, call_uuid, cost_usd, data.get("programs_looked_up"))
+
+            elif event_type == "transcript_ready":
+                call_store.add_stt(conn, call_uuid, data.get("stt_cost_usd"), data.get("path"))
                 
             conn.commit()
     except Exception as e:
@@ -1127,6 +1145,9 @@ def persist_call_event_sync(call_uuid, event_type, data):
 
 # --- SSE (Server-Sent Events) Infrastructure for Dashboard ---
 call_event_subscribers = set()
+
+# call_analysis.Analyzer, started by start_background_work in the main process; None elsewhere.
+ANALYZER = None
 
 def emit_call_event(call_id, event_type, data=None):
     """Fire-and-forget: push a JSON event to all connected dashboard browsers."""
@@ -1171,12 +1192,18 @@ async def _forward_call_events(queue):
 def emit_call_event_local(call_id, event_type, data=None):
     global call_event_subscribers
 
-    if call_id and event_type in ["call_queued", "call_ringing", "call_connected", "call_ended", "call_failed"]:
+    if call_id and event_type in ["call_queued", "call_ringing", "call_connected", "call_ended", "call_failed", "transcript_ready"]:
         try:
             loop = asyncio.get_running_loop()
             loop.run_in_executor(None, persist_call_event_sync, call_id, event_type, data)
         except RuntimeError:
             pass  # Fallback if no loop
+
+    if event_type == "transcript_ready":
+        # Internal: carries costs, so it never goes to dashboards. The main process queues the analysis.
+        if ANALYZER is not None and call_id:
+            ANALYZER.enqueue(str(call_id), (data or {}).get("path"))
+        return
 
     try:
         payload = json.dumps({
@@ -1548,10 +1575,12 @@ async def dial_action():
         dial_status = form_data.get('DialBLegStatus') or form_data.get('DialCallStatus') or form_data.get('DialStatus', 'unknown')
         from_number = form_data.get('From', 'Unknown')
         plivo_call_uuid = form_data.get('CallUUID', '')
+        b_leg_uuid = form_data.get('DialBLegUUID', '')
     else:
         dial_status = request.args.get('DialBLegStatus') or request.args.get('DialCallStatus') or request.args.get('DialStatus', 'unknown')
         from_number = request.args.get('From', 'Unknown')
         plivo_call_uuid = request.args.get('CallUUID', '')
+        b_leg_uuid = request.args.get('DialBLegUUID', '')
 
     # Safely get call_uuid from URL args first, fallback to form data
     call_uuid = request.args.get("call_uuid") or plivo_call_uuid
@@ -1559,6 +1588,11 @@ async def dial_action():
     # Normalize status (Plivo sends "hangup" when the human ends an answered call)
     dial_status = dial_status.lower()
     logger.info(f"📲 DialStatus={dial_status}, call_uuid={call_uuid}")
+    if b_leg_uuid and call_uuid and not EVENT_FORWARD_URL:
+        try:   # the human leg is billed as its own call: its cost is added after hangup
+            await call_store.run(CALL_HISTORY_DB_PATH, call_store.add_b_leg, call_uuid, b_leg_uuid)
+        except Exception as e:
+            logger.error(f"❌ [PLIVO-COST] could not store the human leg: {type(e).__name__}")
 
     context = await asyncio.to_thread(load_transfer_context, call_uuid)
     if not context:
@@ -1873,7 +1907,9 @@ def log_call_stats(call_state):
     emit_call_event(call_state.get("call_uuid"), "call_ended", {
         "reason": reason,
         "cost": f"${total_cost:.4f}",
+        "cost_usd": round(total_cost, 6),
         "phone": call_state.get("from_number", ""),
+        "programs_looked_up": list(call_state.get("catalog_found", [])),
     })
 
 
@@ -2102,6 +2138,8 @@ async def handle_media_stream():
         # Course catalog tool calls this call, and the response characters sent.
         "catalog_calls": 0,
         "catalog_chars": 0,
+        # Catalog names get_program_details found on this call (step 2: school fallback for the analysis).
+        "catalog_found": [],
 
         # Per-delta trace and byte counters — task 5.1. Observability only.
         "delta_trace": [],
@@ -2482,10 +2520,24 @@ async def handle_media_stream():
                 f"{call_state['aligned_frames_written']} frames @ {PLIVO_SAMPLE_RATE} Hz"
             )
         log_call_stats(call_state)
-        if call_state["transcript"] and call_state["transcript"].has_turns():
-            call_transcript.start_job(call_state["transcript"],
-                                      call_state.get("call_uuid") or f"no-uuid-{int(time.time())}",
-                                      VERTEX_PROJECT, vertex_access_token)
+        finish_transcript(call_state)
+
+def finish_transcript(call_state):
+    """After a call leg: start the transcript job, which reports transcript_ready when its file is
+    written, or report a leg where nobody spoke. Transcripts switched off: nothing (no fake rows)."""
+    transcript = call_state.get("transcript")
+    if transcript is None:
+        return None
+    real_uuid = call_state.get("call_uuid")
+    call_uuid = real_uuid or f"no-uuid-{int(time.time())}"
+    if transcript.has_turns():
+        # No call_uuid: the file is still written, but there is no calls row to analyse it against.
+        on_done = (lambda result: emit_call_event(call_uuid, "transcript_ready", result)) if real_uuid else None
+        return call_transcript.start_job(transcript, call_uuid, VERTEX_PROJECT, vertex_access_token,
+                                         on_done=on_done)
+    if real_uuid:
+        emit_call_event(call_uuid, "transcript_ready", {"path": None, "user_turns": 0, "stt_cost_usd": 0.0})
+    return None
 
 async def stream_plivo_to_gemini(plivo_ws, session, call_state):
     logger.info('Ready to stream audio from Plivo to Gemini')
@@ -2998,6 +3050,11 @@ async def stream_gemini_to_plivo(session, plivo_ws, call_state,plivo_client):
                                     chars = course_catalog.response_chars(result)
                                     call_state["catalog_calls"] += 1
                                     call_state["catalog_chars"] += chars
+                                    if call.name == "get_program_details":
+                                        for entry in result.get("results", []):
+                                            name = entry.get("name")
+                                            if entry.get("status") == "found" and name not in call_state["catalog_found"]:
+                                                call_state["catalog_found"].append(name)
                                     logger.info(
                                         f"🔎 [CATALOG] tool={call.name} "
                                         f"status={course_catalog.result_status(call.name, result)} "
@@ -3756,6 +3813,9 @@ async def plivo_hangup():
     if call_uuid in call_ringing_status:
         call_ringing_status.pop(call_uuid, None)
     
+    if call_uuid and plivo_cost.PLIVO_COST_ENABLED and not EVENT_FORWARD_URL:
+        plivo_cost.schedule(CALL_HISTORY_DB_PATH, call_uuid, plivo_client.calls.get)
+
     if hangup_cause and hangup_cause != "NORMAL_CLEARING":
         emit_call_event(call_uuid, "call_failed", {"phone": to_number, "error": hangup_cause})
         
@@ -3805,6 +3865,30 @@ async def trigger_call():
         logger.error(f"❌ Failed to initiate outbound call: {e}")
         emit_call_event("", "call_failed", {"name": target_user_name, "phone": target_phone_number, "error": str(e)})
         return {"status": "error", "message": str(e)}, 500
+
+@app.before_serving
+async def start_background_work():
+    """Main process only: the Haiku worker (with its catch-up of old transcripts) and the Plivo
+    costs that a restart may have missed (spec §2.5)."""
+    global ANALYZER
+    if EVENT_FORWARD_URL:
+        return
+    if call_analysis.ANALYSIS_ENABLED:
+        ANALYZER = call_analysis.Analyzer(CALL_HISTORY_DB_PATH)
+        ANALYZER.start(backfill_dir=call_transcript.TRANSCRIPT_DIR)
+        logger.info(f"🧠 [ANALYSIS] worker started model={call_analysis.ANALYSIS_MODEL} "
+                    f"concurrency={call_analysis.ANALYSIS_CONCURRENCY}")
+    if plivo_cost.PLIVO_COST_ENABLED:
+        since = (datetime.now(ist_tz) - timedelta(hours=24)).strftime("%Y-%m-%d %H:%M:%S")
+        try:   # a locked database must not stop the server from serving
+            missing = await call_store.run(CALL_HISTORY_DB_PATH, call_store.calls_needing_plivo_cost, since)
+        except Exception as e:
+            logger.error(f"❌ [PLIVO-COST] startup catch-up failed: {type(e).__name__}")
+            missing = []
+        for i, call_uuid in enumerate(missing):
+            # Staggered, so the catch-up never fills the thread pool the call path also uses.
+            plivo_cost.schedule(CALL_HISTORY_DB_PATH, call_uuid, plivo_client.calls.get,
+                                delays=(2 * i, 180, 600))
 
 if __name__ == "__main__":
     logger.info(f'Starting the Quart Server on Port {PORT} with Hypercorn (Waiting for Dashboard trigger...)')

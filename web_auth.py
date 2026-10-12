@@ -188,10 +188,13 @@ def plivo_signature_ok(method, public_base_url, path, query_string, form, header
 
 
 def without_cost(event_payload):
-    """A dashboard event (JSON text) without data.cost, for operator browsers."""
+    """A dashboard event (JSON text) without its cost fields (cost, *cost_usd), for operator browsers."""
     event = json.loads(event_payload)
     data = event.get("data")
-    if isinstance(data, dict) and "cost" in data:
-        del data["cost"]
-        return json.dumps(event)
+    if isinstance(data, dict):
+        costly = [key for key in data if key == "cost" or key.endswith("cost_usd")]
+        if costly:
+            for key in costly:
+                del data[key]
+            return json.dumps(event)
     return event_payload

@@ -352,7 +352,8 @@ class TestCallStats(unittest.TestCase):
         # And again for the admin login (import web_auth, session config, login routes and hook).
         # And again for the Plivo signature gate and the media-stream token hook.
         # And again for the operator view (API_AUTH_TOKEN removed, cost removal, /trigger-call JSON).
-        self.assertEqual(references, [102, 1840, 2362, 2372, 2789])
+        # And again 2026-10-12 for step 2 (call_store / call_analysis / plivo_cost imports, call_ended numbers, catalog_found).
+        self.assertEqual(references, [107, 1874, 2400, 2410, 2841])
 
 
 if __name__ == "__main__":
