@@ -56,3 +56,4 @@ ltm/snapshots/*
 venv312/
 TEST_FILES/
 *.pdf
+TRANSCRIPTS/

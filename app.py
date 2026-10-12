@@ -47,6 +47,9 @@ if DEBUG_RECORDING not in ("0", "1"):
     raise ValueError(f"DEBUG_RECORDING must be '0' or '1', got {DEBUG_RECORDING!r}")
 DEBUG_RECORDING = DEBUG_RECORDING == "1"
 
+# Post-call transcript files (call_transcript.py). Imported after load_dotenv() so its config sees .env.
+import call_transcript
+
 # Multi-process: a media-only process sends its dashboard events to the main process
 # (e.g. EVENT_FORWARD_URL=http://127.0.0.1:5001/internal/call-event). Empty = this is the main process.
 EVENT_FORWARD_URL = os.getenv("EVENT_FORWARD_URL", "").strip()
@@ -1592,6 +1595,12 @@ async def ensure_vertex_token():
             logger.info("🔐 Vertex AI access token refreshed")
 
 
+async def vertex_access_token():
+    """Bearer token for call_transcript's REST request, refreshed off the event loop."""
+    await ensure_vertex_token()
+    return load_vertex_credentials().token
+
+
 def create_gemini_client():
     if GEMINI_BACKEND == "studio":
         return genai.Client(api_key=LIVE_API_KEY)
@@ -1974,8 +1983,9 @@ async def handle_media_stream():
         "commit_gate_idle_polls": 0,
         "commit_gate_last_verdict": "",
         "commit_gate_committed": False,
+        "transcript": None,
     }
-    
+
     disclaimer_finished = asyncio.Event()
     disclaimer_task = None
 
@@ -1983,6 +1993,8 @@ async def handle_media_stream():
         await wait_for_plivo_start(plivo_ws, call_state)
         # Every task created from here on (the four stream tasks, disclaimer, timers) inherits the tag.
         call_log_tag.set(f"[{(call_state.get('call_uuid') or 'no-uuid')[:8]}] ")
+        if call_transcript.TRANSCRIPT_ENABLED:
+            call_state["transcript"] = call_transcript.CallTranscript()
 
         if DEBUG_RECORDING:
             # Open debug WAV recorder for preprocessed audio
@@ -2328,6 +2340,10 @@ async def handle_media_stream():
                 f"{call_state['aligned_frames_written']} frames @ {PLIVO_SAMPLE_RATE} Hz"
             )
         log_call_stats(call_state)
+        if call_state["transcript"] and call_state["transcript"].has_turns():
+            call_transcript.start_job(call_state["transcript"],
+                                      call_state.get("call_uuid") or f"no-uuid-{int(time.time())}",
+                                      VERTEX_PROJECT, vertex_access_token)
 
 async def stream_plivo_to_gemini(plivo_ws, session, call_state):
     logger.info('Ready to stream audio from Plivo to Gemini')
@@ -2672,6 +2688,7 @@ async def stream_plivo_to_gemini(plivo_ws, session, call_state):
                             await session.send_realtime_input(
                                 activity_start=types.ActivityStart()
                             )
+                            if call_state["transcript"]: call_state["transcript"].caller_start()
                             logger.info("▶️ Sent activityStart to Gemini")
 
                             # Flush the clean preroll buffer
@@ -2693,23 +2710,27 @@ async def stream_plivo_to_gemini(plivo_ws, session, call_state):
                             await session.send_realtime_input(
                                 audio=types.Blob(data=audio_chunk, mime_type="audio/pcm;rate=16000")
                             )
+                            if call_state["transcript"]: call_state["transcript"].caller_audio(audio_chunk)
                 if speech_ended and call_state["user_activity_open"]:
                     logger.info(" 🔇 User speech end detected")
                     emit_call_event(call_state.get("call_uuid"), "user_silent")
 
                     # Flush remainder before ending activity
                     if call_state["gemini_input_buffer"]:
+                        remainder = bytes(call_state["gemini_input_buffer"])
                         await session.send_realtime_input(
                             audio=types.Blob(
-                                data=bytes(call_state["gemini_input_buffer"]),
+                                data=remainder,
                                 mime_type="audio/pcm;rate=16000"
                             )
                         )
+                        if call_state["transcript"]: call_state["transcript"].caller_audio(remainder)
                         call_state["gemini_input_buffer"].clear()
 
                     await session.send_realtime_input(
                         activity_end=types.ActivityEnd()
                     )
+                    if call_state["transcript"]: call_state["transcript"].caller_end()
                     call_state["user_activity_open"] = False
                     call_state["awaiting_model"] = True
                     call_state["model_response_deadline"] = (
@@ -2890,6 +2911,7 @@ async def stream_gemini_to_plivo(session, plivo_ws, call_state,plivo_client):
                             await session.send_realtime_input(
                                 activity_start=types.ActivityStart()
                             )
+                            if call_state["transcript"]: call_state["transcript"].caller_start()
                             logger.info("▶️ Sent deferred activityStart to Gemini (tool call finished)")
 
                             # Speech that began DURING the tool call was captured in
@@ -2900,12 +2922,14 @@ async def stream_gemini_to_plivo(session, plivo_ws, call_state,plivo_client):
                                 call_state["gemini_input_buffer"][:0] = call_state["preroll_pcm16"]
                                 call_state["preroll_pcm16"].clear()
                             if call_state["gemini_input_buffer"]:
+                                deferred = bytes(call_state["gemini_input_buffer"])
                                 await session.send_realtime_input(
                                     audio=types.Blob(
                                         mime_type="audio/pcm;rate=16000",
-                                        data=bytes(call_state["gemini_input_buffer"]),
+                                        data=deferred,
                                     )
                                 )
+                                if call_state["transcript"]: call_state["transcript"].caller_audio(deferred)
                                 call_state["gemini_input_buffer"].clear()
 
                 # ==========================================
@@ -2925,6 +2949,7 @@ async def stream_gemini_to_plivo(session, plivo_ws, call_state,plivo_client):
                         # Task 5.1 — trace the delta before it is folded into the
                         # buffer, so the join boundary can be classified. The
                         # accumulation itself is unchanged (3.4 / 3.5).
+                        if call_state["transcript"]: call_state["transcript"].agent_started()
                         record_text_delta(
                             call_state, call_state["ai_text_buffer"], output_transcription.text
                         )
@@ -2935,6 +2960,7 @@ async def stream_gemini_to_plivo(session, plivo_ws, call_state,plivo_client):
                         
                         if call_state["ai_text_buffer"].strip():
                             logger.info(f"🤖 [GEMINI] (Interrupted): {call_state['ai_text_buffer'].strip()}")
+                            if call_state["transcript"]: call_state["transcript"].agent_text(call_state["ai_text_buffer"].strip(), interrupted=True)
                             call_state["ai_text_buffer"] = ""
                             
                         call_state["assistant_speaking"] = False
@@ -2976,6 +3002,7 @@ async def stream_gemini_to_plivo(session, plivo_ws, call_state,plivo_client):
                                 "text": ai_transcript
                             })
                             emit_call_event(call_state.get("call_uuid"), "ai_transcript", {"text": ai_transcript})
+                            if call_state["transcript"]: call_state["transcript"].agent_text(ai_transcript)
                             call_state["ai_text_buffer"] = ""
 
                         logger.debug(f"🧾 [DELTA] turn summary {delta_trace_verdict(call_state)}")
@@ -2997,6 +3024,7 @@ async def stream_gemini_to_plivo(session, plivo_ws, call_state,plivo_client):
                                 "text": user_transcript
                             })
                             emit_call_event(call_state.get("call_uuid"), "user_transcript", {"text": user_transcript})
+                            if call_state["transcript"]: call_state["transcript"].caller_gemini_text(user_transcript)
                             call_state["user_text_buffer"] = ""
                             
                         for part in model_turn.parts:

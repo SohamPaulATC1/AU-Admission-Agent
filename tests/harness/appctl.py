@@ -204,6 +204,7 @@ def new_call_state(
         "commit_gate_idle_polls": 0,
         "commit_gate_last_verdict": "",
         "commit_gate_committed": False,
+        "transcript": None,
     }
     state.update(overrides)
     return state
@@ -271,6 +272,7 @@ DIAGNOSTIC_LOG_TAGS = (
     "[LATCH-HOLD]",   # onset held only by the echo latch
     "[LATCH-END]",    # how a latch episode ended (broken vs dropped)
     "[LATCH]",        # per-call latch summary in call stats
+    "[TRANSCRIPT]",   # post-call transcript job (call_transcript.py)
 )
 
 

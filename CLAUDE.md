@@ -6,13 +6,14 @@ Numbering: HANDOFF uses "Redesign Task N"; docs/spec/tasks.md uses 1-10 / 5.x. M
 
 ## Current state (as of 2026-10-06)
 
-- Suite: **473 tests run, all OK** (2 skipped, 1 expected failure). `GEMINI_MODEL` pins in the 4_8 test unchanged (app.py untouched by the find_eligible_programs and find_scholarships work). Re-pin whenever app.py's line count changes.
+- Suite: **632 tests run, 3 failures** (2 skipped, 1 expected failure). The 3 failures predate the transcript work and are all in `tests/test_prompt_catalog.py` (`TestAppLoadsV2.test_v2_is_the_default_prompt`, `TestPromptCatalogV2.test_language_mix_is_critical_with_examples`, `TestPromptV2Counselor.test_size_stays_close_to_v1`): the live prompt moved to `prompt_au_v3.txt`, which those v2 checks do not fit. `GEMINI_MODEL` pins in the 4_8 test re-pinned 2026-10-12 to `[87, 1700, 2220, 2230, 2647]` for the transcript wiring. Re-pin whenever app.py's line count changes.
   - Skips: the retired Case C and the deferred reconnect test. Expected failure: `TestCaseDQuietCallerKnownLimitation`. The 6 `TestGoldenProfiles` run now that all rules are verified (they skip again if any UG rule goes back to `verified: false`).
   - `test_reply_language_counts_as_the_choice` fixed 2026-10-07: operator restored the TEST6 guard sentence ("If the user answers in Bengali or Hindi, that is their choice even if they never name a language: switch at once.") in `PROMPT_FILES/prompt_au.txt` call-flow step 1, replacing the `db6fe2b` wording.
 - Branch `dev`, no upstream: nothing pushed to origin. EC2 is synced by copying files (see memory / HANDOFF).
 - Never commit `.env`, credential JSON, `CALL_RECORDINGS/`, `TEST_FILES/`, `debug_recordings/`, `*.db` (all gitignored; never force-add them). Commit only when asked.
 
 ### Resume here
+00. **Post-call transcript files, built and tested offline (2026-10-12), uncommitted, not yet on a live call.** `call_transcript.py` writes `TRANSCRIPTS/<call_uuid>.txt` after each call (spec `docs/spec/call-transcript-design.md`, plan `docs/spec/call-transcript-plan.md`). Next: commit when asked, deploy to EC2 (git pull, restart idle), one live call, check the file and the `[TRANSCRIPT]` log line; confirm Vertex prices against `STT_PRICE_*`; extend `LATIN_TERMS` from live files. Kill switch `TRANSCRIPT_ENABLED=0`.
 0. **Course catalog tools, built and tested offline, NOT yet on a live call (2026-10-05). Summary: `docs/HANDOFF2.md`.** `course_catalog.py` + `catalog/` give Gemini `list_programs` and `get_program_details` over 87 programs (2027 session). Spec `docs/spec/course-catalog-tools-design.md`, plan `docs/spec/course-catalog-tools-plan.md`.
    - Rebuild `catalog/courses.json` with `venv312/Scripts/python.exe catalog/build_catalog.py` whenever the Excel in `AU Admission Data/` changes; `test_committed_courses_json_is_fresh` fails until you do.
    - Try tools offline: `venv312/Scripts/python.exe tests/tool_playground.py` (interactive) or `... list_programs degree=B.Tech`.
@@ -219,3 +220,19 @@ Numbering: HANDOFF uses "Redesign Task N"; docs/spec/tasks.md uses 1-10 / 5.x. M
 - **Live text-only results (Vertex, harness scenarios funnel, fee_objection, think, parent_decides, firm_no):** funnel reached a fixed visit day with the confirmation line and a summary naming the day in 7 of 8 (the miss was the known stall); think 6 of 6; parent_decides 6 of 6 (invites the family); firm_no 3 of 3 (one rescue, then endCall); fee_objection reaches the visit in about 2 of 3 (the miss used both `ask_about` questions on a vague caller who then left). Replies ending on a forward question: 86-100%. Regression scenarios (scholarship, eligible_btech, unknown, parent, bengali) pass.
 - **Found, not fixed (app.py, pre-existing, affects v1 too):** after app.py's `endCall` reply (`"Call will end after audio playback completes."`) the model sometimes speaks again: "This call has ended." / "The call has been ended." (about 2 of 20 closings, even with the say-nothing rule) or a repeat of the farewell. If the app plays that audio before hanging up, the caller hears it. Possible fixes: a reply that does not invite speech, or dropping model audio after the farewell already played; needs operator decision. Watch for it on live calls.
 - Harness: counselor scenarios and checks (`COUNSELOR_CHECKS`, `forward_share`, `end_summary`), the terminal reply now mirrors app.py exactly and speech after it is reported as "spoken after the terminal tool reply". Runs `TEST_FILES/_v2*.txt`.
+
+### 2026-10-12: post-call transcript files (uncommitted)
+- Spec `docs/spec/call-transcript-design.md`, plan `docs/spec/call-transcript-plan.md`. After each call,
+  `TRANSCRIPTS/<call_uuid>.txt`: Neha from `output_transcription`, caller from one post-call
+  `gemini-3.5-transcribe-preview` request on Vertex `global` (REST via httpx, word timestamps, split back
+  into turns), cost on the last line. Fallback to Gemini Live's caller text, marked `User (fallback)`.
+- `call_transcript.py` (new); app.py one-line hooks at the caller audio sends, activityStart/End and
+  the Neha/caller text flushes, `vertex_access_token`, `start_job` after `log_call_stats`.
+  `call_state["transcript"]` mirrored. Kill switch `TRANSCRIPT_ENABLED=0`.
+- Spike (2026-10-11, TEST8): per-turn requests hit 429 at ~12/min; one whole-call request 3.5-5 s;
+  GA id 404s, `-preview` works; `bn-IN` only is the best language setting; English terms come back in
+  Bengali script, mapped by `LATIN_TERMS`.
+- Tests `tests/test_call_transcript.py` (68), `tests/test_transcript_capture.py` (10). Real-audio run on TEST8
+  (`TEST_FILES/_transcript_check.py` -> `TEST_FILES/_transcripts/TEST8.txt`): status ok, 6.2 s, cost $0.0067.
+- Next: commit when asked, deploy to EC2 (git pull, restart idle), one live call, check the file and
+  the `[TRANSCRIPT]` line; confirm Vertex prices against `STT_PRICE_*`; extend `LATIN_TERMS` from live files.
