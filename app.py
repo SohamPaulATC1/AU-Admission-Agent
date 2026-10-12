@@ -83,6 +83,18 @@ PRICE_TEXT_OUTPUT = float(os.getenv("PRICE_TEXT_OUTPUT", "4.50"))
 PRICE_AUDIO_INPUT = float(os.getenv("PRICE_AUDIO_INPUT", "3.00"))
 PRICE_AUDIO_OUTPUT = float(os.getenv("PRICE_AUDIO_OUTPUT", "12.00"))
 
+# Input transcription is billed at the text-output rate, but usage_metadata never reports it
+# (Vertex probe 2026-10-12; output transcription does arrive, as response TEXT tokens). So it is
+# estimated from its characters; the ratios are fitted on output transcription the API counted.
+TOKEN_CHARS_LATIN, TOKEN_CHARS_BENGALI, TOKEN_CHARS_DEVANAGARI = 4.0, 2.5, 1.8
+
+
+def estimate_text_tokens(text):
+    bengali = sum(1 for c in text if "\u0980" <= c <= "\u09ff")
+    devanagari = sum(1 for c in text if "\u0900" <= c <= "\u097f")
+    other = len(text) - bengali - devanagari
+    return other / TOKEN_CHARS_LATIN + bengali / TOKEN_CHARS_BENGALI + devanagari / TOKEN_CHARS_DEVANAGARI
+
 LIVE_API_KEY = os.getenv('GOOGLE_API_KEY')
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-live")
 PUBLIC_BASE_URL = os.getenv('PUBLIC_BASE_URL')
@@ -1691,7 +1703,10 @@ def log_call_stats(call_state):
     cost_text_out = (call_state["tokens_text_out"] / 1_000_000) * PRICE_TEXT_OUTPUT
     cost_audio_in = (call_state["tokens_audio_in"] / 1_000_000) * PRICE_AUDIO_INPUT
     cost_audio_out = (call_state["tokens_audio_out"] / 1_000_000) * PRICE_AUDIO_OUTPUT
-    total_cost = cost_text_in + cost_text_out + cost_audio_in + cost_audio_out
+    # tokens_text_out already holds the output transcription (reported by the API).
+    input_tx_tokens = round(call_state.get("tokens_input_transcription_est", 0))
+    cost_input_tx = (input_tx_tokens / 1_000_000) * PRICE_TEXT_OUTPUT
+    total_cost = cost_text_in + cost_text_out + cost_audio_in + cost_audio_out + cost_input_tx
 
     logger.info("=== CALL ENDED : STATS & PRICING ===")
     # Task 5.2 / defect 1.8: without this the next affected call is as
@@ -1722,8 +1737,9 @@ def log_call_stats(call_state):
     logger.info(f"Tokens Used - Text In: {call_state['tokens_text_in']}, Audio In: {call_state['tokens_audio_in']}, Text Out: {call_state['tokens_text_out']}, Audio Out: {call_state['tokens_audio_out']}")
     logger.info(f"Last usage_metadata.total_token_count seen: {call_state['last_usage_total_token_count']}")
     logger.info(f"usage_metadata.total_token_count updates: {call_state['usage_total_updates']}, non-monotonic transitions: {call_state['usage_total_non_monotonic_count']}")
-    logger.info(f"Estimated Call Cost (lower-bound): ${total_cost:.6f}")
-    logger.info(f"⚠️  Note: Actual cost is higher due to compounding — past tokens are re-billed each turn.")
+    logger.info(f"Input transcription (estimated, not in usage_metadata): ~{input_tx_tokens} tokens, ${cost_input_tx:.6f}")
+    logger.info(f"Estimated Call Cost: ${total_cost:.6f}")
+    logger.info("ℹ️  Includes every turn's re-billed context and both transcriptions; the post-call transcript is billed separately.")
     logger.info("====================================")
     reason = call_state.get("end_call_summary", "")
     if not reason:
@@ -1926,6 +1942,7 @@ async def handle_media_stream():
         "tokens_text_out": 0,
         "tokens_audio_in": 0,
         "tokens_audio_out": 0,
+        "tokens_input_transcription_est": 0.0,
         "last_usage_total_token_count": None,
         "usage_total_updates": 0,
         "usage_total_non_monotonic_count": 0,
@@ -2942,6 +2959,7 @@ async def stream_gemini_to_plivo(session, plivo_ws, call_state,plivo_client):
                     input_transcription = getattr(server_content, 'input_transcription', None)
                     if input_transcription and getattr(input_transcription, 'text', None):
                         call_state["user_text_buffer"] += input_transcription.text
+                        call_state["tokens_input_transcription_est"] += estimate_text_tokens(input_transcription.text)
                         
                     # 2. Accumulate AI Transcriptions silently
                     output_transcription = getattr(server_content, 'output_transcription', None)

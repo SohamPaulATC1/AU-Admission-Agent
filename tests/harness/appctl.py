@@ -153,6 +153,7 @@ def new_call_state(
         "tokens_text_out": 0,
         "tokens_audio_in": 0,
         "tokens_audio_out": 0,
+        "tokens_input_transcription_est": 0.0,
         "last_usage_total_token_count": None,
         "usage_total_updates": 0,
         "usage_total_non_monotonic_count": 0,

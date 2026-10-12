@@ -259,13 +259,40 @@ class TestCallStats(unittest.TestCase):
             "Tokens Used - Text In: 1000, Audio In: 2000, Text Out: 300, Audio Out: 400",
             "Last usage_metadata.total_token_count seen: 3700",
             "usage_metadata.total_token_count updates: 5, non-monotonic transitions: 1",
-            "Estimated Call Cost (lower-bound): $0.012900",
-            "\u26A0\uFE0F  Note: Actual cost is higher due to compounding \u2014 past tokens are "
-            "re-billed each turn.",
+            # INTENTIONAL BASELINE UPDATE (operator, 2026-10-12): the sum already holds every
+            # turn's re-billed context, so "lower-bound" and the compounding note were wrong;
+            # the estimated input transcription is added (usage_metadata never reports it).
+            "Input transcription (estimated, not in usage_metadata): ~0 tokens, $0.000000",
+            "Estimated Call Cost: $0.012900",
+            "\u2139\uFE0F  Includes every turn's re-billed context and both transcriptions; "
+            "the post-call transcript is billed separately.",
             "====================================",
         ])
         self.assertEqual(log.lines[1], f"🧬 [MODEL] {app.GEMINI_MODEL} | "
                                       "gemini_reconnect_count: 0")
+
+    def test_input_transcription_is_added_at_the_text_output_rate(self):
+        call_state = live_call_state(
+            with_denoiser=False, with_aec=False,
+            tokens_text_in=1000, tokens_audio_in=2000,
+            tokens_text_out=300, tokens_audio_out=400,
+            tokens_input_transcription_est=1000.4,
+        )
+        with LogCapture() as log:
+            app.log_call_stats(call_state)
+        extra = 1000 / 1_000_000 * app.PRICE_TEXT_OUTPUT
+        self.assertIn(f"Input transcription (estimated, not in usage_metadata): ~1000 tokens, ${extra:.6f}",
+                      log.lines)
+        base = (1000 * app.PRICE_TEXT_INPUT + 300 * app.PRICE_TEXT_OUTPUT
+                + 2000 * app.PRICE_AUDIO_INPUT + 400 * app.PRICE_AUDIO_OUTPUT) / 1_000_000
+        self.assertIn(f"Estimated Call Cost: ${base + extra:.6f}", log.lines)
+
+    def test_estimate_text_tokens_by_script(self):
+        # Ratios fitted 2026-10-12 on output transcription the API counted.
+        self.assertAlmostEqual(app.estimate_text_tokens("abcd" * 10), 10)
+        self.assertAlmostEqual(app.estimate_text_tokens("আমি" * 5), 15 / 2.5)
+        self.assertAlmostEqual(app.estimate_text_tokens("हाँ" * 6), 18 / 1.8)
+        self.assertEqual(app.estimate_text_tokens(""), 0)
 
     def test_model_identifier_is_recorded(self):
         """INTENTIONAL BASELINE UPDATE — task 5.2 / defect 1.8 is closed.
@@ -321,7 +348,8 @@ class TestCallStats(unittest.TestCase):
         # PROMPT_FILE switch (prompt_au_v2.txt default) above these sites.
         # And again for the post-call transcript wiring (import call_transcript,
         # vertex_access_token, the transcript call_state key and its creation).
-        self.assertEqual(references, [87, 1700, 2220, 2230, 2647])
+        # And again for the input-transcription cost estimate (estimate_text_tokens, its call_state key).
+        self.assertEqual(references, [99, 1715, 2237, 2247, 2664])
 
 
 if __name__ == "__main__":

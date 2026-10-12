@@ -7,7 +7,6 @@ and writes TRANSCRIPT_DIR/<call_uuid>.txt, turn by turn, with the STT cost last.
 
 import asyncio
 import base64
-import contextlib
 import io
 import logging
 import os
@@ -265,17 +264,27 @@ def render_file(*, call_uuid, started_at, duration_s, language, kind, reason, li
     return "\n".join(header + [""] + lines + ["", cost_line(tokens, kind, reason)]) + "\n"
 
 
-def write_atomic(path, text):
-    """Write path.tmp then os.replace, so a reader never sees a half-written file."""
-    temporary = path + ".tmp"
+# Between segments of one call_uuid (a transferred call that comes back gets a second segment).
+SEGMENT_SEPARATOR = "\n" + "=" * 60 + "\n\n"
+
+
+def append_segment(path, text):
+    """Append one call segment to path, never replacing what is already there.
+
+    One O_APPEND write per segment, so two jobs for the same call (same or another
+    process) cannot overwrite or interleave each other. Returns True if the file
+    already held a segment (the separator was written first).
+    """
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND | getattr(os, "O_BINARY", 0), 0o644)
     try:
-        with open(temporary, "w", encoding="utf-8", newline="\n") as handle:
-            handle.write(text)
-        os.replace(temporary, path)
-    except BaseException:
-        with contextlib.suppress(OSError):
-            os.remove(temporary)
-        raise
+        appended = os.fstat(fd).st_size > 0
+        data = ((SEGMENT_SEPARATOR if appended else "") + text).encode("utf-8")
+        view = memoryview(data)
+        while view:
+            view = view[os.write(fd, view):]
+    finally:
+        os.close(fd)
+    return appended
 
 
 RETRY_DELAYS_S = (2, 4, 8, 16, 32, 60)   # 7 attempts, about 2 minutes
@@ -339,14 +348,29 @@ async def request_transcription(client, url, body, get_token, *, sleep=asyncio.s
         await sleep(RETRY_DELAYS_S[attempt])
 
 
-_jobs = set()   # running jobs, held so they are not garbage-collected mid-run
+_jobs = set()        # running jobs, held so they are not garbage-collected mid-run
+_last_job = {}       # call_uuid -> its latest job, so segments are appended in call order
 
 
 def start_job(transcript, call_uuid, project, get_token):
-    """Start the post-call job detached from the call. It inherits the call's log tag."""
-    task = asyncio.create_task(_guarded(write_transcript(transcript, call_uuid, project, get_token)))
+    """Start the post-call job detached from the call. It inherits the call's log tag.
+
+    A second job for the same call_uuid (the leg after a transfer) runs its STT at once
+    but appends only after the earlier job has finished, so the file stays in call order.
+    """
+    previous = _last_job.get(call_uuid)
+    kwargs = {"before_write": previous} if previous is not None else {}
+    task = asyncio.create_task(_guarded(write_transcript(transcript, call_uuid, project, get_token,
+                                                         **kwargs)))
     _jobs.add(task)
     task.add_done_callback(_jobs.discard)
+    _last_job[call_uuid] = task
+
+    def forget(done, call_uuid=call_uuid):
+        if _last_job.get(call_uuid) is done:
+            del _last_job[call_uuid]
+
+    task.add_done_callback(forget)
     return task
 
 
@@ -359,7 +383,7 @@ async def _guarded(coroutine):
 
 
 async def write_transcript(transcript, call_uuid, project, get_token, *,
-                           client=None, sleep=asyncio.sleep, out_dir=None):
+                           client=None, sleep=asyncio.sleep, out_dir=None, before_write=None):
     started = time.perf_counter()
     transcript.caller_end()   # the caller may have hung up mid-turn
     turns = list(transcript.turns)
@@ -413,9 +437,13 @@ async def write_transcript(transcript, call_uuid, project, get_token, *,
         kind, reason, buckets, tokens = "failed", f"internal error: {type(e).__name__}", None, None
         text, fallback = render()   # buckets None: no latinize / no STT words involved
 
+    if before_write is not None:
+        # The earlier leg of this call appends first; asyncio.wait never raises its outcome.
+        await asyncio.wait({before_write})
+
     try:
         os.makedirs(out_dir, exist_ok=True)
-        write_atomic(path, text)
+        appended = append_segment(path, text)
     except Exception as e:
         logger.error(f"❌ [TRANSCRIPT] write failed: {type(e).__name__}: {e} file={path}")
         return None
@@ -425,5 +453,6 @@ async def write_transcript(transcript, call_uuid, project, get_token, *,
         f"📝 [TRANSCRIPT] status={status_text(kind, reason)} lang={language} "
         f"user_turns={len(caller_turns)} fallback={fallback} words={words} audio_s={audio_s:.0f} "
         f"latency={time.perf_counter() - started:.1f}s retries={retries} cost=${cost:.4f} file={path}"
+        f"{' appended' if appended else ''}"
     )
     return path

@@ -123,9 +123,17 @@ milliseconds; the rest is network wait.
 ## 5. Output file
 
 Path `TRANSCRIPT_DIR/<call_uuid>.txt` (created with `os.makedirs(exist_ok=True)`), UTF-8,
-`\n` line ends. Written to `<call_uuid>.txt.tmp`, then `os.replace`, so a reader never sees
-a partial file. `TRANSCRIPTS/` is added to `.gitignore` (caller PII). Each process writes
-its own calls; names are unique per `call_uuid`.
+`\n` line ends. `TRANSCRIPTS/` is added to `.gitignore` (caller PII).
+
+One file per `call_uuid`, appended, never overwritten (operator, 2026-10-12). A transferred
+call that comes back opens a second media session with the same `call_uuid`; its segment
+(own header, body and cost line) is appended after `SEGMENT_SEPARATOR` (a blank line, 60 `=`,
+a blank line). Each segment is one `O_APPEND` write, so jobs in the same or another process
+never overwrite or interleave each other. `start_job` chains jobs per `call_uuid`: a later
+leg runs its STT at once but appends only after the earlier leg's job has finished, so the
+file stays in call order. The log line ends with ` appended` for a second or later segment.
+Trade-off versus the earlier `.tmp` + `os.replace`: a reader polling during the write, or a
+crash mid-write, can see a partial last segment.
 
 ```
 call_uuid: 3f2a9c1e-7b4d-4e8a-9f10-2c5d6e7a8b90

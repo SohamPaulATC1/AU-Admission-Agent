@@ -326,21 +326,23 @@ class TestRenderAndWrite(unittest.TestCase):
                                "transcription_cost_usd: 0.0000 (audio_in=10 text_in=0 output=1 tokens, "
                                "model=gemini-3.5-transcribe-preview)\n")
 
-    def test_write_atomic(self):
+    def test_append_segment_creates_the_file(self):
         with tempfile.TemporaryDirectory() as folder:
             path = os.path.join(folder, "u-1.txt")
-            ct.write_atomic(path, "নমস্কার\n")
+            self.assertFalse(ct.append_segment(path, "নমস্কার\n"))
             with open(path, encoding="utf-8") as handle:
                 self.assertEqual(handle.read(), "নমস্কার\n")
             self.assertEqual(os.listdir(folder), ["u-1.txt"])
 
-    def test_write_failure_leaves_no_tmp(self):
+    def test_append_segment_keeps_the_earlier_segment(self):
+        # A transferred call that comes back has the same call_uuid: append, never overwrite.
         with tempfile.TemporaryDirectory() as folder:
             path = os.path.join(folder, "u-1.txt")
-            with mock.patch.object(ct.os, "replace", side_effect=OSError("disk full")):
-                with self.assertRaises(OSError):
-                    ct.write_atomic(path, "x")
-            self.assertEqual(os.listdir(folder), [])
+            ct.append_segment(path, "first leg\n")
+            self.assertTrue(ct.append_segment(path, "second leg\n"))
+            with open(path, encoding="utf-8") as handle:
+                self.assertEqual(handle.read(), "first leg\n" + ct.SEGMENT_SEPARATOR + "second leg\n")
+            self.assertEqual(os.listdir(folder), ["u-1.txt"])
 
 
 def _run(coro):
@@ -636,7 +638,7 @@ class TestWriteTranscript(unittest.TestCase):
         self.assertIn("User (fallback): MBA টা", text)
 
     def test_write_error_returns_none_and_raises_nothing(self):
-        with mock.patch.object(ct, "write_atomic", side_effect=OSError("disk full")):
+        with mock.patch.object(ct, "append_segment", side_effect=OSError("disk full")):
             with LogCaptureTranscript() as log:
                 path = self._write(golden_transcript(), lambda r: httpx.Response(200, json=GOLDEN_RESPONSE))
         self.assertIsNone(path)
@@ -655,6 +657,61 @@ class TestWriteTranscript(unittest.TestCase):
         paths = _run(go())
         self.assertEqual(sorted(os.listdir(folder)), ["call-a.txt", "call-b.txt"])
         self.assertTrue(all(path is not None for path in paths))
+
+    def test_returning_leg_is_appended_after_the_first(self):
+        first = self._write(golden_transcript(), lambda r: httpx.Response(200, json=GOLDEN_RESPONSE))
+        first_text = self._read(first)
+        with LogCaptureTranscript() as log:
+            second = self._write(golden_transcript(), lambda r: httpx.Response(400, text="bad"))
+        self.assertEqual(first, second)
+        text = self._read(second)
+        self.assertTrue(text.startswith(first_text + ct.SEGMENT_SEPARATOR + "call_uuid: test-uuid\n"))
+        self.assertEqual(text.count("call_uuid: test-uuid\n"), 2)
+        self.assertIn("stt_status: failed (http 400)\n", text.split(ct.SEGMENT_SEPARATOR)[1])
+        [line] = [l for l in log.lines if l.startswith("📝 [TRANSCRIPT]")]
+        self.assertTrue(line.endswith(" appended"))
+
+
+class TestJobOrderPerCall(unittest.TestCase):
+    """Two legs of one call: the later leg's STT may finish first, but it appends second."""
+
+    def setUp(self):
+        self.folder = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.folder, ignore_errors=True)
+
+    def test_slow_first_leg_still_lands_first(self):
+        release_first = None
+        real_write = ct.write_transcript
+
+        def leg(name):
+            t = ct.CallTranscript(clock=StepClock(0.0))
+            t.agent_text(name)
+            return t
+
+        async def go():
+            nonlocal release_first
+            release_first = asyncio.Event()
+
+            async def write(transcript, call_uuid, project, get_token, **kwargs):
+                if transcript.turns[0]["text"] == "leg one":
+                    await release_first.wait()   # first leg's STT is slow
+                return await real_write(transcript, call_uuid, project, get_token,
+                                        out_dir=self.folder, **kwargs)
+
+            with mock.patch.object(ct, "write_transcript", write):
+                first = ct.start_job(leg("leg one"), "u-9", "p", _token)
+                second = ct.start_job(leg("leg two"), "u-9", "p", _token)
+                await asyncio.sleep(0.05)
+                self.assertFalse(second.done(), "second leg waits for the first")
+                release_first.set()
+                await asyncio.gather(first, second)
+            self.assertNotIn("u-9", ct._last_job)
+
+        _run(go())
+        with open(os.path.join(self.folder, "u-9.txt"), encoding="utf-8") as handle:
+            text = handle.read()
+        self.assertLess(text.index("Neha: leg one"), text.index("Neha: leg two"))
+        self.assertEqual(text.count(ct.SEGMENT_SEPARATOR), 1)
 
 
 class TestStartJob(unittest.TestCase):
