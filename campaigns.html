@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Campaigns | AU Admission Assist</title>
+    <link rel="icon" href="/atc.png?v=2" type="image/png">
+    <style>
+        :root {
+            --bg-primary: #f4f7fb;
+            --bg-card: #ffffff;
+            --text-primary: #0a1b2d;
+            --text-secondary: #4a627d;
+            --border-color: #d6e2ee;
+            --accent: #005aab;
+            --accent-light: #e8f2fc;
+            --danger: #b42318;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: "Montserrat", system-ui, sans-serif;
+        }
+
+        nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 24px;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        nav img { height: 40px; }
+        .actions { display: flex; gap: 10px; align-items: center; }
+        .actions form { margin: 0; }
+
+        .nav-link, .btn {
+            height: 36px;
+            padding: 0 14px;
+            display: inline-flex;
+            align-items: center;
+            background: var(--accent-light);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font: inherit;
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+        .btn.danger { color: var(--danger); }
+        .btn:disabled { opacity: 0.5; cursor: default; }
+
+        main { max-width: 1280px; margin: 24px auto; padding: 0 24px; }
+        section {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            padding: 18px 20px;
+            margin-bottom: 20px;
+        }
+
+        h1 { font-size: 1.3rem; margin: 0 0 12px; }
+        h2 { font-size: 1.05rem; margin: 0 0 12px; }
+        p, .muted { color: var(--text-secondary); font-size: 0.9rem; }
+
+        .grid { display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: flex-end; }
+        label { display: flex; flex-direction: column; gap: 4px; font-size: 0.8rem; font-weight: 600; }
+        input { height: 36px; padding: 0 10px; border: 1px solid var(--border-color); border-radius: 8px; font: inherit; }
+        input[type=number] { width: 90px; }
+        select { height: 36px; border: 1px solid var(--border-color); border-radius: 8px; font: inherit; }
+
+        .table-wrap { overflow-x: auto; }
+        table { border-collapse: collapse; width: 100%; font-size: 0.85rem; }
+        th, td { text-align: left; padding: 7px 9px; border-bottom: 1px solid var(--border-color); vertical-align: top; }
+        th { color: var(--text-secondary); font-weight: 600; white-space: nowrap; }
+        td.summary { min-width: 260px; }
+        .status-calling { color: var(--accent); font-weight: 600; }
+        .status-failed, .status-cancelled { color: var(--text-secondary); }
+        .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 10px 0; }
+    </style>
+</head>
+
+<body>
+    <nav>
+        <img src="/AU_Logo.png?v=2" alt="Adamas University">
+        <div class="actions">
+            <a class="nav-link" href="/">Calls</a>
+            <a class="nav-link" href="/admin" id="adminLink" hidden>Admin</a>
+            <form method="post" action="/logout"><button class="nav-link" type="submit">Logout</button></form>
+        </div>
+    </nav>
+
+    <main>
+        <h1>Campaigns</h1>
+
+        <section>
+            <h2>New campaign</h2>
+            <p>Excel (.xlsx), first sheet. The first row needs a name column (Name / Student Name / Full Name) and a
+                phone column (Phone / Mobile / Phone Number / Mobile Number / Contact). Other columns are kept and shown
+                with each contact. Calling hours are IST.</p>
+            <form id="uploadForm" class="grid">
+                <label>Campaign name <input name="campaign_name" required maxlength="100"></label>
+                <label>Excel file <input name="file" type="file" accept=".xlsx" required></label>
+                <label>Calls at once <input name="concurrency" type="number" required></label>
+                <label>From <input name="hours_start" type="time" required></label>
+                <label>To <input name="hours_end" type="time" required></label>
+                <label>Retries <input name="max_retries" type="number" required></label>
+                <label>Minutes between tries <input name="retry_gap_min" type="number" required></label>
+                <button class="btn primary" type="submit">Upload</button>
+            </form>
+            <p id="uploadStatus"></p>
+            <div id="rejectedBox" hidden>
+                <div class="row">
+                    <strong>Rejected rows</strong>
+                    <button class="btn" type="button" id="downloadRejected">Download as CSV</button>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>Row</th><th>Name</th><th>Phone</th><th>Reason</th></tr></thead>
+                        <tbody id="rejectedRows"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <h2>All campaigns</h2>
+            <p id="noCampaigns" hidden>No campaigns yet.</p>
+            <div class="table-wrap">
+                <table>
+                    <thead><tr><th>Name</th><th>State</th><th>Finished / total</th><th>On call now</th><th>Created</th><th></th></tr></thead>
+                    <tbody id="campaignRows"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <section id="detail" hidden>
+            <h2 id="detailName"></h2>
+            <p><strong id="detailState"></strong> · <span id="detailSettings"></span></p>
+            <p id="detailCounts"></p>
+            <div class="row">
+                <button class="btn primary" type="button" id="startBtn">Start</button>
+                <button class="btn" type="button" id="pauseBtn">Pause</button>
+                <button class="btn primary" type="button" id="resumeBtn">Resume</button>
+                <button class="btn danger" type="button" id="stopBtn">Stop</button>
+                <span id="actionStatus" class="muted"></span>
+            </div>
+            <form id="settingsForm" class="grid" hidden>
+                <label>Calls at once <input name="concurrency" type="number" required></label>
+                <label>From <input name="hours_start" type="time" required></label>
+                <label>To <input name="hours_end" type="time" required></label>
+                <label>Retries <input name="max_retries" type="number" required></label>
+                <label>Minutes between tries <input name="retry_gap_min" type="number" required></label>
+                <button class="btn" type="submit">Save settings</button>
+            </form>
+            <div class="row">
+                <label>Show
+                    <select id="statusFilter">
+                        <option value="">All</option>
+                        <option value="pending">Waiting</option>
+                        <option value="calling">On call</option>
+                        <option value="retry_wait">Retry later</option>
+                        <option value="done">Done</option>
+                        <option value="failed">Not reached</option>
+                        <option value="cancelled">Cancelled</option>
+                    </select>
+                </label>
+                <button class="btn" type="button" id="prevPage">Previous</button>
+                <span id="pageInfo" class="muted"></span>
+                <button class="btn" type="button" id="nextPage">Next</button>
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead id="contactHead"></thead>
+                    <tbody id="contactRows"></tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // Every value from the server is set with textContent: names and extra columns come from an
+        // uploaded Excel and must never become markup.
+        const POLL_MS = 5000;
+        const STATUSES = ["pending", "calling", "retry_wait", "done", "failed", "cancelled"];
+        const LABELS = { pending: "Waiting", calling: "On call", retry_wait: "Retry later", done: "Done",
+                         failed: "Not reached", cancelled: "Cancelled" };
+        const REASONS = { missing_number: "No number", bad_number: "Not a 10-digit Indian mobile number",
+                          duplicate_in_file: "Duplicate in this file", on_do_not_call: "On the do-not-call list",
+                          called_recently: "Called recently" };
+        const ACTION_BUTTONS = { startBtn: ["start", ["draft"]], pauseBtn: ["pause", ["running"]],
+                                 resumeBtn: ["resume", ["paused"]], stopBtn: ["stop", ["draft", "running", "paused"]] };
+        const SETTING_KEYS = ["concurrency", "hours_start", "hours_end", "max_retries", "retry_gap_min"];
+
+        const $ = (id) => document.getElementById(id);
+        let limits = null, openId = null, page = 1, lastRejected = [];
+
+        function el(tag, text, cls) {
+            const node = document.createElement(tag);
+            if (text !== undefined && text !== null) node.textContent = String(text);
+            if (cls) node.className = cls;
+            return node;
+        }
+
+        async function api(path, options) {
+            const response = await fetch(path, options);
+            if (response.status === 401) {
+                window.location.href = "/login";
+                throw new Error("Login required");
+            }
+            const body = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                const error = new Error(body.message || ("Request failed (" + response.status + ")"));
+                error.body = body;
+                throw error;
+            }
+            return body;
+        }
+
+        function post(path, data) {
+            return api(path, { method: "POST", headers: { "Content-Type": "application/json" },
+                               body: JSON.stringify(data) });
+        }
+
+        function readSettings(form) {
+            const f = form.elements;
+            return { concurrency: Number(f.concurrency.value), hours_start: f.hours_start.value,
+                     hours_end: f.hours_end.value, max_retries: Number(f.max_retries.value),
+                     retry_gap_min: Number(f.retry_gap_min.value) };
+        }
+
+        function fillSettings(form, values) {
+            for (const key of SETTING_KEYS) form.elements[key].value = values[key];
+        }
+
+        function applyLimits(form) {
+            const f = form.elements;
+            f.concurrency.min = 1; f.concurrency.max = limits.max_concurrent;
+            for (const key of ["hours_start", "hours_end"]) { f[key].min = limits.hours_start; f[key].max = limits.hours_end; }
+            f.max_retries.min = 0; f.max_retries.max = limits.max_retries;
+            f.retry_gap_min.min = limits.min_retry_gap_min;
+        }
+
+        function stateText(c) {
+            if (!c.state_reason) return c.state;
+            return c.state + (c.state_reason === "dial_errors" ? " (paused after repeated dial errors)" : " (" + c.state_reason + ")");
+        }
+
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(String(reader.result).split(",")[1] || "");
+                reader.onerror = () => reject(reader.error);
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function showRejected(rows) {
+            lastRejected = rows || [];
+            const body = $("rejectedRows");
+            body.replaceChildren();
+            for (const r of lastRejected) {
+                const tr = el("tr");
+                tr.append(el("td", r.sheet_row), el("td", r.name), el("td", r.phone), el("td", REASONS[r.reason] || r.reason));
+                body.append(tr);
+            }
+            $("rejectedBox").hidden = lastRejected.length === 0;
+        }
+
+        function csvCell(value) {
+            let text = String(value ?? "");
+            if (/^[=+\-@\t\r]/.test(text)) text = "'" + text;   // a spreadsheet must not run a cell as a formula
+            return '"' + text.replace(/"/g, '""') + '"';
+        }
+
+        $("downloadRejected").addEventListener("click", () => {
+            const lines = [["Row", "Name", "Phone", "Reason"]].concat(
+                lastRejected.map((r) => [r.sheet_row, r.name, r.phone, REASONS[r.reason] || r.reason]));
+            const blob = new Blob([lines.map((line) => line.map(csvCell).join(",")).join("\r\n")], { type: "text/csv" });
+            const link = el("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = "rejected_rows.csv";
+            link.click();
+            URL.revokeObjectURL(link.href);
+        });
+
+        $("uploadForm").addEventListener("submit", async (event) => {
+            event.preventDefault();
+            const form = event.target, file = form.elements.file.files[0], status = $("uploadStatus");
+            const button = form.querySelector("button[type=submit]");
+            if (!file) { status.textContent = "Choose an .xlsx file."; return; }
+            if (limits && file.size > limits.max_file_bytes) { status.textContent = "The file is larger than 2 MB."; return; }
+            button.disabled = true;
+            status.textContent = "Uploading...";
+            try {
+                const body = await post("/api/campaigns", Object.assign({
+                    name: form.elements.campaign_name.value, file_name: file.name,
+                    file_b64: await fileToBase64(file) }, readSettings(form)));
+                status.textContent = "Saved as a draft: " + body.accepted + " contacts, " + body.rejected.length +
+                    " rows rejected" + (body.extras_dropped ? ", " + body.extras_dropped + " extra columns dropped (20 kept)" : "") +
+                    ". Check it below, then press Start.";
+                showRejected(body.rejected);
+                form.reset();
+                fillSettings(form, limits.defaults);
+                await loadList();
+                openCampaign(body.id);
+            } catch (error) {
+                status.textContent = error.message;
+                showRejected(error.body && error.body.rejected);
+            } finally {
+                button.disabled = false;
+            }
+        });
+
+        async function loadList() {
+            const body = await api("/api/campaigns");
+            if (!limits) {
+                limits = body.limits;
+                for (const form of [$("uploadForm"), $("settingsForm")]) applyLimits(form);
+                fillSettings($("uploadForm"), limits.defaults);
+            }
+            const rows = $("campaignRows");
+            rows.replaceChildren();
+            for (const c of body.campaigns) {
+                const total = STATUSES.reduce((sum, s) => sum + c.counts[s], 0);
+                const finished = c.counts.done + c.counts.failed + c.counts.cancelled;
+                const tr = el("tr");
+                tr.append(el("td", c.name), el("td", stateText(c)), el("td", finished + " / " + total),
+                          el("td", c.counts.calling), el("td", c.created_at));
+                const cell = el("td"), open = el("button", "Open", "btn");
+                open.type = "button";
+                open.addEventListener("click", () => openCampaign(c.id));
+                cell.append(open);
+                tr.append(cell);
+                rows.append(tr);
+            }
+            $("noCampaigns").hidden = body.campaigns.length > 0;
+        }
+
+        function openCampaign(id) {
+            openId = id;
+            page = 1;
+            $("detail").hidden = false;
+            $("actionStatus").textContent = "";
+            loadDetail().then(() => $("detail").scrollIntoView({ behavior: "smooth" })).catch(showDetailError);
+        }
+
+        function showDetailError(error) { $("actionStatus").textContent = error.message; }
+
+        async function loadDetail() {
+            if (openId === null) return;
+            const filter = $("statusFilter").value;
+            const body = await api("/api/campaigns/" + openId + "?page=" + page + (filter ? "&status=" + filter : ""));
+            const c = body.campaign;
+            $("detailName").textContent = c.name;
+            $("detailState").textContent = stateText(c);
+            $("detailSettings").textContent = c.concurrency + " at once, " + c.hours_start + "-" + c.hours_end +
+                " IST, " + c.max_retries + " retries " + c.retry_gap_min + " min apart · file " + (c.file_name || "") +
+                " · " + c.rejected_count + " rows rejected at upload";
+            $("detailCounts").textContent = STATUSES.map((s) => LABELS[s] + " " + c.counts[s]).join(" · ");
+            for (const [id, [, states]] of Object.entries(ACTION_BUTTONS)) $(id).hidden = !states.includes(c.state);
+            const settingsForm = $("settingsForm");
+            settingsForm.hidden = !["draft", "paused"].includes(c.state);
+            if (!settingsForm.contains(document.activeElement)) fillSettings(settingsForm, c);   // not while typing
+
+            const head = $("contactHead"), headRow = el("tr");
+            ["Row", "Name", "Phone"].concat(body.extra_columns, ["Status", "Tries", "Last result", "Next try", "Lead",
+                "Visit day", "Summary"]).forEach((title) => headRow.append(el("th", title)));
+            head.replaceChildren(headRow);
+            const rows = $("contactRows");
+            rows.replaceChildren();
+            for (const k of body.contacts) {
+                const tr = el("tr");
+                tr.append(el("td", k.sheet_row), el("td", k.name), el("td", k.phone));
+                for (const column of body.extra_columns) tr.append(el("td", k.extra[column] ?? ""));
+                tr.append(el("td", LABELS[k.status] || k.status, "status-" + k.status), el("td", k.attempts),
+                          el("td", k.last_cause ?? ""), el("td", k.next_attempt_at ?? ""), el("td", k.lead_status ?? ""),
+                          el("td", k.campus_visit_day ?? ""), el("td", k.summary ?? "", "summary"));
+                rows.append(tr);
+            }
+            const pages = Math.max(1, Math.ceil(body.total / body.page_size));
+            $("pageInfo").textContent = "Page " + body.page + " of " + pages + " (" + body.total + " contacts)";
+            $("prevPage").disabled = page <= 1;
+            $("nextPage").disabled = page >= pages;
+        }
+
+        for (const [id, [action]] of Object.entries(ACTION_BUTTONS)) {
+            $(id).addEventListener("click", async () => {
+                if (action === "stop" && !confirm("Stop this campaign? Contacts not called yet are cancelled. This cannot be undone.")) return;
+                $("actionStatus").textContent = "";
+                try {
+                    await post("/api/campaigns/" + openId + "/action", { action: action });
+                } catch (error) {
+                    $("actionStatus").textContent = error.message;
+                }
+                await Promise.all([loadDetail(), loadList()]).catch(showDetailError);
+            });
+        }
+
+        $("settingsForm").addEventListener("submit", async (event) => {
+            event.preventDefault();
+            try {
+                await post("/api/campaigns/" + openId + "/settings", readSettings(event.target));
+                $("actionStatus").textContent = "Settings saved.";
+                document.activeElement.blur();
+            } catch (error) {
+                $("actionStatus").textContent = error.message;
+            }
+            await loadDetail().catch(showDetailError);
+        });
+
+        $("statusFilter").addEventListener("change", () => { page = 1; loadDetail().catch(showDetailError); });
+        $("prevPage").addEventListener("click", () => { page = Math.max(1, page - 1); loadDetail().catch(showDetailError); });
+        $("nextPage").addEventListener("click", () => { page += 1; loadDetail().catch(showDetailError); });
+
+        fetch("/api/me").then((r) => (r.ok ? r.json() : null)).then((me) => {
+            if (me && me.role === "admin") $("adminLink").hidden = false;
+        }).catch(() => { });
+
+        loadList().catch((error) => { $("uploadStatus").textContent = error.message; });
+        setInterval(() => { if (openId !== null) loadDetail().catch(() => { }); }, POLL_MS);
+        setInterval(() => { loadList().catch(() => { }); }, POLL_MS * 2);
+    </script>
+</body>
+
+</html>

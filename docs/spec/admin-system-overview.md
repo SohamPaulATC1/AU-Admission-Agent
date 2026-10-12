@@ -40,7 +40,8 @@ Plus `/login` and `/logout`. Everything else is closed by default (step 1).
    Plivo webhook signatures, signed `/media-stream` URLs. Before the URL is handed over. Live on EC2 2026-10-12 (commit f55e5c4, enforce).
 2. **Data model and the post-call NLP step**, including every cost part. Deployed on EC2 2026-10-12 (uncommitted; live call pending; `docs/handoff_step2_report.md`).
 3. **Bulk campaigns and the dispatcher**, on a new `/campaigns` page. Design approved 2026-10-12:
-   `docs/spec/campaigns-design.md`.
+   `docs/spec/campaigns-design.md`. Implemented 2026-10-12; plan docs/spec/campaigns-plan.md. Deployed on EC2
+   (uncommitted; live campaigns pending; `docs/handoff_step3_report.md`).
 4. **Admin panel**: overview, calls and leads table, call detail with transcript, campaign reports,
    Excel/CSV export.
 

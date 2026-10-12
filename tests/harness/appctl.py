@@ -278,6 +278,7 @@ DIAGNOSTIC_LOG_TAGS = (
     "[AUTH]",         # logins, refused endpoints, Plivo signature and media-stream token checks
     "[ANALYSIS]",     # step 2: Haiku analysis worker (call_analysis.py)
     "[PLIVO-COST]",   # step 2: Plivo call-record cost fetch (plivo_cost.py)
+    "[CAMPAIGN]",     # step 3: campaign dispatcher, uploads and hangup results (campaigns.py)
 )
 
 

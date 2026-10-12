@@ -1,6 +1,6 @@
 # Step 3: bulk campaigns and the dispatcher
 
-Status: design approved by the operator 2026-10-12 (all five sections, in chat). Shared decisions:
+Status: design approved by the operator 2026-10-12 (all five sections, in chat); implemented (plan docs/spec/campaigns-plan.md), deviations in the report docs/handoff_step3_report.md. Correction found in the build (D14): app.py does put the answer URL's `user_name` into the Gemini prompt and greeting, so campaign dials send `Unknown` there. Shared decisions:
 `docs/spec/admin-system-overview.md`. Step 1 (logins) and step 2 (call analysis, full call cost)
 are live; step 4 (admin panel) adds campaign cost reports and the do-not-call UI on top of this.
 

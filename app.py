@@ -57,6 +57,7 @@ import web_auth
 import call_store
 import call_analysis
 import plivo_cost
+import campaigns
 
 # Multi-process: a media-only process sends its dashboard events to the main process
 # (e.g. EVENT_FORWARD_URL=http://127.0.0.1:5001/internal/call-event). Empty = this is the main process.
@@ -1055,6 +1056,13 @@ CALL_HISTORY_DB_PATH = "call_history.db"
 def init_call_history_db():
     # timeout=30: four processes run the schema upgrade at once on first deploy.
     with sqlite3.connect(CALL_HISTORY_DB_PATH, timeout=30) as conn:
+        if not EVENT_FORWARD_URL:
+            try:   # main process; the mode stays in the file. A busy database must not stop the start.
+                mode = conn.execute("PRAGMA journal_mode=WAL").fetchone()[0]
+                if mode != "wal":
+                    logger.warning(f"⚠️ [CAMPAIGN] journal_mode is {mode}, not wal")
+            except sqlite3.OperationalError as e:
+                logger.warning(f"⚠️ [CAMPAIGN] could not switch to WAL: {e}")
         conn.execute("""
             CREATE TABLE IF NOT EXISTS calls (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1072,6 +1080,7 @@ def init_call_history_db():
             )
         """)
         call_store.upgrade(conn)   # step 2 columns and call_analysis; every process, race-safe
+        campaigns.upgrade(conn)    # step 3 campaign tables; every process, safe on every start
         conn.commit()
 
 init_call_history_db()
@@ -3831,11 +3840,41 @@ async def plivo_hangup():
     
     if call_uuid and plivo_cost.PLIVO_COST_ENABLED and not EVENT_FORWARD_URL:
         plivo_cost.schedule(CALL_HISTORY_DB_PATH, call_uuid, plivo_client.calls.get)
+    if call_uuid and not EVENT_FORWARD_URL:
+        # A campaign contact behind this call is settled in the background; Plivo is not kept waiting.
+        # Plain dict of first values: dict() on a werkzeug MultiDict can give lists.
+        spawn_background(settle_campaign_contact(call_uuid, {key: data.get(key) for key in data}))
 
     if hangup_cause and hangup_cause != "NORMAL_CLEARING":
         emit_call_event(call_uuid, "call_failed", {"phone": to_number, "error": hangup_cause})
         
     return "OK", 200
+
+async def place_call(name, phone, answer_name=None):
+    """Create one outbound Plivo call and emit call_queued; returns the call_uuid (Plivo's
+    request_uuid). Raises on a Plivo error. Shared by /trigger-call and the campaign dispatcher."""
+    encoded_name = urllib.parse.quote(answer_name or name)
+    encoded_phone = urllib.parse.quote(phone)
+
+    answer_url = f"{PUBLIC_BASE_URL}/outbound-webhook?user_name={encoded_name}&phone_number={encoded_phone}"
+    hangup_url = f"{PUBLIC_BASE_URL}/plivo-hangup"
+    ring_url = f"{PUBLIC_BASE_URL}/plivo-ringing"
+
+    call_made = await asyncio.to_thread(
+        plivo_client.calls.create,
+        from_=PLIVO_PHONE_NUMBER,
+        to_="+91" + phone,
+        answer_url=answer_url,
+        answer_method='GET',
+        ring_url=ring_url,
+        ring_method='POST',
+        hangup_url=hangup_url,
+        hangup_method='POST'
+    )
+    logger.info(f"✅ Outbound call successfully queued: {call_made}")
+    call_id = str(getattr(call_made, 'request_uuid', call_made))
+    emit_call_event(call_id, "call_queued", {"name": name, "phone": phone})
+    return call_id
 
 @app.route("/trigger-call", methods=["POST"])
 async def trigger_call():
@@ -3853,40 +3892,206 @@ async def trigger_call():
     if not target_phone_number:
         return {"status": "error", "message": "Phone number is required"}, 400
 
-    encoded_name = urllib.parse.quote(target_user_name)
-    encoded_phone = urllib.parse.quote(target_phone_number)
-    
-    answer_url = f"{PUBLIC_BASE_URL}/outbound-webhook?user_name={encoded_name}&phone_number={encoded_phone}"
-    hangup_url = f"{PUBLIC_BASE_URL}/plivo-hangup"
-    ring_url = f"{PUBLIC_BASE_URL}/plivo-ringing"
-    
     try:
         logger.info(f"Initiating outbound call to {target_phone_number} via Dashboard...")
-        call_made = await asyncio.to_thread(
-            plivo_client.calls.create,
-            from_=PLIVO_PHONE_NUMBER,
-            to_="+91" + target_phone_number,
-            answer_url=answer_url,
-            answer_method='GET',
-            ring_url=ring_url,
-            ring_method='POST',
-            hangup_url=hangup_url,
-            hangup_method='POST'
-        )
-        logger.info(f"✅ Outbound call successfully queued: {call_made}")
-        call_id = str(getattr(call_made, 'request_uuid', call_made))
-        emit_call_event(call_id, "call_queued", {"name": target_user_name, "phone": target_phone_number})
+        call_id = await place_call(target_user_name, target_phone_number)
         return {"status": "success", "message": "Call queued", "call_uuid": call_id}, 200
     except Exception as e:
         logger.error(f"❌ Failed to initiate outbound call: {e}")
         emit_call_event("", "call_failed", {"name": target_user_name, "phone": target_phone_number, "error": str(e)})
         return {"status": "error", "message": str(e)}, 500
 
+# --- Step 3: bulk campaigns (docs/spec/campaigns-design.md). Main process only. ---
+
+CAMPAIGN_TASK = None            # the dispatcher loop, started by start_background_work
+_hangup_fields_logged = False   # the first campaign hangup logs Plivo's field names once (never values)
+
+
+async def campaign_tick(now=None):
+    """One dispatcher pass: backstop, finished campaigns, then dial what is due, spaced out."""
+    now_is_live = now is None   # tests pass a fixed clock; live, the re-check before each dial reads the time again
+    now = now or datetime.now(ist_tz)
+    expired = await call_store.run(CALL_HISTORY_DB_PATH, campaigns.expire_stuck, now)
+    if expired:
+        logger.warning(f"📣 [CAMPAIGN] backstop: {expired} contact(s) had no hangup within "
+                       f"{campaigns.CALL_TIMEOUT_MIN} min, marked done")
+    for finished in await call_store.run(CALL_HISTORY_DB_PATH, campaigns.finish_done, now):
+        counts = " ".join(f"{k}={v}" for k, v in finished["counts"].items())
+        logger.info(f"📣 [CAMPAIGN] campaign={finished['id']} done {counts}")
+    picked = await call_store.run(CALL_HISTORY_DB_PATH, campaigns.due_contacts, now)
+    paused = set()
+    # Picked ids the cleanup below must leave alone: released, refused and settled, or possibly a real
+    # call (from the moment place_call starts). Any other pick is released if this pass fails, so it
+    # is not left in calling for the backstop to mark done.
+    settled = set()
+    try:
+        for i, contact in enumerate(picked):
+            if contact["campaign_id"] in paused:
+                await call_store.run(CALL_HISTORY_DB_PATH, campaigns.release, contact["id"])
+                settled.add(contact["id"])
+                continue
+            if i:
+                await asyncio.sleep(campaigns.DIAL_GAP_S)
+                # Up to 8 dials take 10 s or more: a Stop / Pause / 21:00 in between wins (TRAI hours).
+                if not await call_store.run(CALL_HISTORY_DB_PATH, campaigns.still_due, contact["campaign_id"],
+                                            datetime.now(ist_tz) if now_is_live else now):
+                    await call_store.run(CALL_HISTORY_DB_PATH, campaigns.release, contact["id"])
+                    settled.add(contact["id"])
+                    continue
+            settled.add(contact["id"])
+            try:
+                # Spec decision 4: the Excel name never reaches Gemini (the answer URL's user_name goes
+                # into the prompt); the calls page still shows it via call_queued.
+                call_uuid = await place_call(contact["name"] or "Unknown", contact["phone"], answer_name="Unknown")
+            except Exception as e:   # type only: Plivo's error text can hold the number
+                settled.discard(contact["id"])   # Plivo refused: no call, so the cleanup may release it
+                logger.error(f"❌ [CAMPAIGN] dial failed campaign={contact['campaign_id']} contact={contact['id']}: "
+                             f"{type(e).__name__}")
+                stopped = await call_store.run(CALL_HISTORY_DB_PATH, campaigns.dial_failed, contact["id"])
+                settled.add(contact["id"])
+                if stopped:
+                    paused.add(contact["campaign_id"])
+                    logger.warning(f"📣 [CAMPAIGN] campaign={contact['campaign_id']} paused reason=dial_errors")
+                continue
+            # The call is real: if record_dial fails it stays calling and on_hangup's number fallback settles it.
+            await call_store.run(CALL_HISTORY_DB_PATH, campaigns.record_dial, contact["id"], call_uuid)
+            logger.info(f"📣 [CAMPAIGN] dial campaign={contact['campaign_id']} contact={contact['id']} "
+                        f"attempt={contact['attempt']} phone={campaigns.masked(contact['phone'])} call={call_uuid[:8]}")
+    except BaseException:
+        for contact in picked:
+            if contact["id"] in settled:
+                continue
+            try:
+                await call_store.run(CALL_HISTORY_DB_PATH, campaigns.release, contact["id"])
+            except Exception as e:   # never mask the error that ended the pass
+                logger.error(f"❌ [CAMPAIGN] release failed contact={contact['id']}: {type(e).__name__}")
+        raise
+
+
+async def campaign_loop():
+    while True:
+        await asyncio.sleep(campaigns.TICK_S)   # sleep first: startup settles before the first dial
+        try:
+            await campaign_tick()
+        except Exception as e:   # a locked database or anything else: skip this tick, never die
+            logger.error(f"❌ [CAMPAIGN] tick failed: {type(e).__name__}: {e}")
+
+
+async def settle_campaign_contact(call_uuid, form):
+    global _hangup_fields_logged
+    try:
+        result = await call_store.run(CALL_HISTORY_DB_PATH, campaigns.on_hangup, call_uuid, form,
+                                      datetime.now(ist_tz))
+    except Exception as e:
+        logger.error(f"❌ [CAMPAIGN] hangup not stored call={call_uuid[:8]}: {type(e).__name__}")
+        return
+    if result is None:
+        return
+    if not _hangup_fields_logged:
+        _hangup_fields_logged = True
+        logger.info(f"📣 [CAMPAIGN] hangup fields: {sorted(form)}")
+    logger.info(f"📣 [CAMPAIGN] hangup campaign={result['campaign_id']} contact={result['contact_id']} "
+                f"status={result['status']} cause={result['cause']} attempt={result['attempts']}")
+
+
+async def json_body():
+    """(data, None) for a JSON object body, else (None, error reply). JSON only: CSRF, as /trigger-call."""
+    if not request.is_json:
+        return None, ({"status": "error", "message": "JSON body required"}, 415)
+    data = await request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return None, ({"status": "error", "message": "JSON object required"}, 400)
+    return data, None
+
+
+def campaign_error(e):
+    status = 404 if isinstance(e, campaigns.NotFound) else 409 if isinstance(e, campaigns.BadMove) else 400
+    body = {"status": "error", "message": str(e)}
+    if isinstance(e, campaigns.NothingToCall):
+        body["rejected"] = e.rejected
+    return body, status
+
+
+@app.route("/campaigns", methods=["GET"])
+async def campaigns_page():
+    return await send_file("campaigns.html")
+
+
+@app.route("/api/campaigns", methods=["GET"])
+async def list_campaigns_api():
+    rows = await call_store.run(CALL_HISTORY_DB_PATH, campaigns.list_campaigns)
+    return {"campaigns": rows, "limits": campaigns.limits()}
+
+
+@app.route("/api/campaigns", methods=["POST"])
+async def create_campaign_api():
+    data, error = await json_body()
+    if error:
+        return error
+    try:
+        name = campaigns.check_name(data.get("name"))
+        settings = campaigns.check_settings(data)
+        try:
+            raw = base64.b64decode(str(data.get("file_b64") or ""), validate=True)
+        except ValueError:
+            raise campaigns.CampaignError("The file did not arrive intact (bad base64)")
+        # Off the event loop: a 5,000-row file takes ~0.7 s and this process also serves live calls.
+        rows, extra_columns, extras_dropped = await asyncio.to_thread(campaigns.parse_upload, raw)
+        result = await call_store.run(CALL_HISTORY_DB_PATH, campaigns.create_from_upload, name, settings, rows,
+                                      created_by=session.get("role"),
+                                      file_name=str(data.get("file_name") or "")[:200], now=datetime.now(ist_tz))
+    except campaigns.CampaignError as e:
+        return campaign_error(e)
+    logger.info(f"📣 [CAMPAIGN] created campaign={result['id']} accepted={result['accepted']} "
+                f"rejected={len(result['rejected'])} by={session.get('role')}")
+    return {"status": "success", **result, "extra_columns": extra_columns, "extras_dropped": extras_dropped}
+
+
+@app.route("/api/campaigns/<int:campaign_id>", methods=["GET"])
+async def campaign_detail_api(campaign_id):
+    try:
+        page = min(max(1, int(request.args.get("page", "1"))), 10**6)   # a huge OFFSET overflows SQLite
+    except ValueError:
+        page = 1
+    try:
+        return await call_store.run(CALL_HISTORY_DB_PATH, campaigns.campaign_detail, campaign_id, page,
+                                    request.args.get("status") or None)
+    except campaigns.CampaignError as e:
+        return campaign_error(e)
+
+
+@app.route("/api/campaigns/<int:campaign_id>/action", methods=["POST"])
+async def campaign_action_api(campaign_id):
+    data, error = await json_body()
+    if error:
+        return error
+    action = str(data.get("action") or "")
+    try:
+        state = await call_store.run(CALL_HISTORY_DB_PATH, campaigns.apply_action, campaign_id, action,
+                                     datetime.now(ist_tz))
+    except campaigns.CampaignError as e:
+        return campaign_error(e)
+    logger.info(f"📣 [CAMPAIGN] campaign={campaign_id} {action} -> {state} by={session.get('role')}")
+    return {"status": "success", "state": state}
+
+
+@app.route("/api/campaigns/<int:campaign_id>/settings", methods=["POST"])
+async def campaign_settings_api(campaign_id):
+    data, error = await json_body()
+    if error:
+        return error
+    try:
+        settings = campaigns.check_settings(data, require_all=True)
+        await call_store.run(CALL_HISTORY_DB_PATH, campaigns.update_settings, campaign_id, settings)
+    except campaigns.CampaignError as e:
+        return campaign_error(e)
+    logger.info(f"📣 [CAMPAIGN] campaign={campaign_id} settings changed by={session.get('role')}")
+    return {"status": "success", "settings": settings}
+
 @app.before_serving
 async def start_background_work():
-    """Main process only: the Haiku worker (with its catch-up of old transcripts) and the Plivo
-    costs that a restart may have missed (spec §2.5)."""
-    global ANALYZER
+    """Main process only: the Haiku worker (with its catch-up of old transcripts), the Plivo costs that a restart may have missed (spec §2.5), and the campaign dispatcher (step 3)."""
+    global ANALYZER, CAMPAIGN_TASK
     if EVENT_FORWARD_URL:
         return
     if call_analysis.ANALYSIS_ENABLED:
@@ -3905,6 +4110,10 @@ async def start_background_work():
             # Staggered, so the catch-up never fills the thread pool the call path also uses.
             plivo_cost.schedule(CALL_HISTORY_DB_PATH, call_uuid, plivo_client.calls.get,
                                 delays=(2 * i, 180, 600))
+    if campaigns.CAMPAIGNS_ENABLED:
+        CAMPAIGN_TASK = asyncio.get_running_loop().create_task(campaign_loop())
+        logger.info(f"📣 [CAMPAIGN] dispatcher started max_concurrent={campaigns.MAX_CONCURRENT} "
+                    f"hours={campaigns.HOURS_START}-{campaigns.HOURS_END} tick={campaigns.TICK_S}s")
 
 if __name__ == "__main__":
     logger.info(f'Starting the Quart Server on Port {PORT} with Hypercorn (Waiting for Dashboard trigger...)')

@@ -38,6 +38,8 @@ chroma_db/
 *.db
 # Database backups before a deploy (names and phone numbers).
 *.db.bak*
+*.db-wal
+*.db-shm
 
 # OS / editor
 .DS_Store
