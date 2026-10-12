@@ -267,6 +267,37 @@
             }
         }
 
+        /* ─── Admin link / Logout ─── */
+        .logout-form {
+            margin: 0;
+        }
+
+        .nav-link {
+            height: 40px;
+            padding: 0 14px;
+            display: inline-flex;
+            align-items: center;
+            background: var(--bg-subtle);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font: inherit;
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        .nav-link:hover {
+            background: var(--accent-light);
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .nav-link[hidden] {
+            display: none;
+        }
+
         /* ─── Theme Toggle ─── */
         .theme-toggle {
             width: 40px;
@@ -1455,6 +1486,10 @@
         </div>
 
         <div class="nav-right">
+            <a href="/admin" class="nav-link" id="adminLink" hidden>Admin</a>
+            <form method="post" action="/logout" class="logout-form">
+                <button type="submit" class="nav-link">Logout</button>
+            </form>
             <div class="sse-indicator" id="sseIndicator">
                 <span class="dot"></span>
                 <span id="sseLabel">Connecting</span>
@@ -1978,6 +2013,9 @@
                 sseIndicator.className = "sse-indicator error";
                 sseLabel.textContent = "Reconnecting";
 
+                // An expired login also ends the stream: go to the login page instead of retrying.
+                fetch("/api/me").then((r) => { if (r.status === 401) window.location.href = "/login"; }).catch(() => { });
+
                 // If server disconnects, mark all live calls as failed
                 activeCalls.forEach((callData, callId) => {
                     if (callData.status !== "ended" && callData.status !== "failed") {
@@ -1994,14 +2032,23 @@
 
         connectSSE();
 
+        // Admin link only for the admin login (the server enforces it either way).
+        fetch("/api/me").then((r) => (r.ok ? r.json() : null)).then((me) => {
+            if (me && me.role === "admin") document.getElementById("adminLink").hidden = false;
+        }).catch(() => { });
+
         // ─── Form Submit ───
         async function triggerBackendCall(name, phoneDigits) {
             try {
                 const response = await fetch("/trigger-call", {
                     method: "POST",
-                    headers: { "Content-Type": "application/json", "X-API-Key": "default-dev-token" },
+                    headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ user_name: name, phone_number: phoneDigits }),
                 });
+                if (response.status === 401) {
+                    window.location.href = "/login";
+                    return { ok: false, message: "Login expired.", callId: null };
+                }
 
                 let payload = {};
                 try { payload = await response.json(); } catch (e) { }
@@ -2317,6 +2364,10 @@
 
             try {
                 const res = await fetch(url);
+                if (res.status === 401) {
+                    window.location.href = "/login";
+                    return;
+                }
                 const data = await res.json();
 
                 renderHistory(data.calls, append);

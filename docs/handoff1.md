@@ -45,7 +45,7 @@ is also the reference for Redesign Task 8).
 - Tests: stdlib `unittest` only. Every new `call_state` key must also go into the
   mirror in `tests/harness/appctl.py`. Re-pin the `GEMINI_MODEL` line list in the
   4_8 test whenever app.py's line count changes.
-- `API_AUTH_TOKEN` issue: noted in HANDOFF §10, not to be fixed.
+- `API_AUTH_TOKEN` issue: fixed 2026-10-12 by the admin login (docs/spec/admin-auth-design.md); `/trigger-call` needs a login session.
 - Recordings, logs and `*.db` hold caller PII. Never copy them off EC2 or paste
   transcripts beyond what a finding needs.
 - Make no live API calls beyond the smoke test in section 4 without the

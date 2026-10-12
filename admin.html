@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin | AU Admission Assist</title>
+    <link rel="icon" href="/atc.png?v=2" type="image/png">
+    <style>
+        :root {
+            --bg-primary: #f4f7fb;
+            --bg-card: #ffffff;
+            --text-primary: #0a1b2d;
+            --text-secondary: #4a627d;
+            --border-color: #d6e2ee;
+            --accent: #005aab;
+            --accent-light: #e8f2fc;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: "Montserrat", system-ui, sans-serif;
+        }
+
+        nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 24px;
+            background: var(--bg-card);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        nav img { height: 40px; }
+        .actions { display: flex; gap: 10px; align-items: center; }
+        .actions form { margin: 0; }
+
+        .nav-link {
+            height: 40px;
+            padding: 0 14px;
+            display: inline-flex;
+            align-items: center;
+            background: var(--accent-light);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font: inherit;
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        main { max-width: 960px; margin: 40px auto; padding: 0 24px; }
+        h1 { font-size: 1.3rem; }
+        p { color: var(--text-secondary); }
+    </style>
+</head>
+
+<body>
+    <nav>
+        <img src="/AU_Logo.png?v=2" alt="Adamas University">
+        <div class="actions">
+            <a class="nav-link" href="/">Calls</a>
+            <form method="post" action="/logout"><button class="nav-link" type="submit">Logout</button></form>
+        </div>
+    </nav>
+    <main>
+        <h1>Admin</h1>
+        <p>Call costs, transcripts, lead results and campaign reports will appear here.</p>
+    </main>
+</body>
+
+</html>

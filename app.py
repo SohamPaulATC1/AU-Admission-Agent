@@ -1,5 +1,5 @@
 import plivo
-from quart import Quart, websocket, Response, request , send_from_directory , send_file
+from quart import Quart, websocket, Response, request , send_from_directory , send_file, session, redirect, abort
 import asyncio
 import json
 import base64
@@ -49,6 +49,9 @@ DEBUG_RECORDING = DEBUG_RECORDING == "1"
 
 # Post-call transcript files (call_transcript.py). Imported after load_dotenv() so its config sees .env.
 import call_transcript
+
+# Logins and Plivo request checks (web_auth.py). Imported after load_dotenv() so its config sees .env.
+import web_auth
 
 # Multi-process: a media-only process sends its dashboard events to the main process
 # (e.g. EVENT_FORWARD_URL=http://127.0.0.1:5001/internal/call-event). Empty = this is the main process.
@@ -130,7 +133,6 @@ GEMINI_RECONNECT_DELAY_SECONDS = float(os.getenv("GEMINI_RECONNECT_DELAY_SECONDS
 
 TRANSFER_CONTEXT_DB_PATH = os.getenv("TRANSFER_CONTEXT_DB_PATH", "./transfer_context.sqlite3")
 TRANSFER_CONTEXT_TTL_SECONDS = int(os.getenv("TRANSFER_CONTEXT_TTL_SECONDS", "86400"))
-API_AUTH_TOKEN = os.getenv("API_AUTH_TOKEN", "default-dev-token")
 
 # Telephony / model audio formats
 PLIVO_SAMPLE_RATE = 8000
@@ -1033,6 +1035,15 @@ def _format_echo_evidence(decision):
 
 
 app = Quart(__name__)
+# Login sessions (docs/spec/admin-auth-design.md §1): a signed cookie holding only the role.
+app.secret_key = web_auth.APP_SECRET or None
+app.config.update(
+    SESSION_COOKIE_NAME="au_session",
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=(PUBLIC_BASE_URL or "").startswith("https://"),
+    PERMANENT_SESSION_LIFETIME=timedelta(hours=12),
+    SESSION_REFRESH_EACH_REQUEST=False,   # absolute 12 h: activity must not extend the cookie
+)
 
 CALL_HISTORY_DB_PATH = "call_history.db"
 
@@ -1206,11 +1217,14 @@ async def call_events_stream():
     """SSE endpoint — the dashboard subscribes to this for real-time call events."""
     q = asyncio.Queue(maxsize=200)
     call_event_subscribers.add(q)
+    show_cost = session.get("role") == "admin"   # the operator never sees costs (spec §2)
 
     async def event_generator():
         try:
             while True:
                 payload = await q.get()
+                if not show_cost:
+                    payload = web_auth.without_cost(payload)
                 yield f"data: {payload}\n\n"
         except asyncio.CancelledError:
             pass
@@ -1230,7 +1244,8 @@ async def call_events_stream():
 @app.route('/api/call-history')
 async def get_call_history():
     args = dict(request.args)
-    
+    show_cost = session.get("role") == "admin"   # the operator never sees costs (spec §2)
+
     def fetch_history():
         start_date = args.get('start_date')
         end_date = args.get('end_date')
@@ -1278,6 +1293,8 @@ async def get_call_history():
             calls = []
             for r in rows:
                 d = dict(r)
+                if not show_cost:
+                    d.pop("cost", None)
                 if d["created_at"]:
                     d["created_at"] = d["created_at"].replace(" ", "T") + "+05:30"
                 calls.append(d)
@@ -1319,6 +1336,114 @@ async def serve_dashboard():
     logger.info("Serving the dashboard UI")
     return await send_file("index.html")
 
+
+@app.before_request
+async def enforce_access():
+    """Default deny (docs/spec/admin-auth-design.md §2): every endpoint must be in web_auth.ENDPOINT_ACCESS."""
+    endpoint = request.endpoint
+    if endpoint is None:
+        return None   # no such route: Quart answers 404 itself
+    access = web_auth.ENDPOINT_ACCESS.get(endpoint)
+    if access == web_auth.OPEN:
+        return None
+    if access == web_auth.PLIVO:
+        return await plivo_signature_gate(endpoint)
+    if access is None or access == web_auth.MEDIA:
+        logger.warning(f"🔐 [AUTH] refused endpoint={endpoint}")
+        return {"status": "error", "message": "forbidden"}, 403
+    verdict = web_auth.session_verdict(access, session.get("role"))
+    if verdict is None:
+        return None
+    if access in (web_auth.OPERATOR_PAGE, web_auth.ADMIN_PAGE):
+        return redirect("/" if verdict == "forbidden" else "/login")
+    if verdict == "forbidden":
+        return {"status": "error", "message": "forbidden"}, 403
+    return {"status": "error", "message": "login required"}, 401
+
+
+async def plivo_signature_gate(endpoint):
+    """Only Plivo may call its webhooks (X-Plivo-Signature-V3). PLIVO_SIGNATURE_CHECK=warn logs and allows."""
+    if web_auth.PLIVO_SIGNATURE_CHECK == "off":
+        return None
+    form = (await request.form).to_dict(flat=False) if request.method == "POST" else {}
+    if web_auth.plivo_signature_ok(request.method, PUBLIC_BASE_URL, request.path,
+                                   request.query_string.decode("utf-8", "replace"), form, request.headers):
+        return None
+    if web_auth.PLIVO_SIGNATURE_CHECK == "warn":
+        logger.warning(f"🔐 [AUTH] plivo signature rejected endpoint={endpoint} method={request.method} (warn, allowed)")
+        return None
+    logger.warning(f"🔐 [AUTH] plivo signature rejected endpoint={endpoint} method={request.method}")
+    return Response("forbidden", status=403)
+
+
+@app.before_websocket
+async def enforce_media_token():
+    """Only Plivo, holding a stream URL this app signed in the last 120 s, may open /media-stream.
+    Runs before handle_media_stream, so a refused connect never starts Gemini, STT or a recording."""
+    if web_auth.ENDPOINT_ACCESS.get(websocket.endpoint) != web_auth.MEDIA:
+        logger.warning(f"🔐 [AUTH] refused websocket endpoint={websocket.endpoint}")
+        abort(403)
+    if web_auth.PLIVO_SIGNATURE_CHECK == "off":
+        return
+    problem = web_auth.media_token_problem(websocket.args)
+    if problem is None:
+        return
+    if web_auth.PLIVO_SIGNATURE_CHECK == "warn":
+        logger.warning(f"🔐 [AUTH] media-stream rejected reason={problem} (warn, allowed)")
+        return
+    logger.warning(f"🔐 [AUTH] media-stream rejected reason={problem}")
+    abort(403)
+
+
+LOGIN_ERROR_MARK = "<!--LOGIN_ERROR-->"
+
+
+def login_response(message="", status=200):
+    """login.html with its error line filled in (fixed texts only, never user input)."""
+    with open("login.html", encoding="utf-8") as handle:
+        html = handle.read()
+    return Response(html.replace(LOGIN_ERROR_MARK, message), status=status, mimetype="text/html")
+
+
+@app.route("/login", methods=["GET"])
+async def login_page():
+    return login_response()
+
+
+@app.route("/login", methods=["POST"])
+async def login_submit():
+    ip = web_auth.client_ip(request.remote_addr, request.headers)
+    if web_auth.login_blocked(ip):
+        logger.warning(f"🔐 [AUTH] login throttled ip={ip}")
+        return login_response("Too many attempts. Try again later.", 429)
+    form = await request.form
+    role = web_auth.match_login(form.get("username", ""), form.get("password", ""))
+    if role is None:
+        web_auth.note_login_failure(ip)
+        logger.warning(f"🔐 [AUTH] login failed ip={ip}")
+        return login_response("Wrong username or password.", 401)
+    session.clear()
+    session["role"] = role
+    session.permanent = True
+    logger.info(f"🔐 [AUTH] login ok role={role} ip={ip}")
+    return redirect("/admin" if role == "admin" else "/")
+
+
+@app.route("/logout", methods=["POST"])
+async def logout():
+    session.clear()
+    return redirect("/login")
+
+
+@app.route("/api/me", methods=["GET"])
+async def api_me():
+    return {"role": session.get("role")}
+
+
+@app.route("/admin", methods=["GET"])
+async def admin_page():
+    return await send_file("admin.html")
+
 # FOR INCOMING CALL
 
 # @app.route("/webhook", methods=["GET", "POST"])
@@ -1354,16 +1479,14 @@ async def outbound_webhook():
     
     logger.info(f"📞 Outbound call answered by: {phone_number} ({user_name})")
     
-    import urllib.parse
-    encoded_name = urllib.parse.quote(user_name)
-    encoded_phone = urllib.parse.quote(phone_number)
-    
+    stream_query = web_auth.media_stream_query({"user_name": user_name, "phone_number": phone_number})
+
     ws_base_url = PUBLIC_BASE_URL.replace("https://", "wss://").replace("http://", "ws://")
     xml_data = f'''<?xml version="1.0" encoding="UTF-8"?>
     <Response>
         <Record action="{PUBLIC_BASE_URL}/recording-callback" redirect="false" recordSession="true" maxLength="3600" />
         <Stream streamTimeout="86400" keepCallAlive="true" bidirectional="true" contentType="audio/x-mulaw;rate=8000" audioTrack="inbound" >
-            {ws_base_url}/media-stream?user_name={encoded_name}&amp;phone_number={encoded_phone}
+            {ws_base_url}/media-stream?{stream_query}
         </Stream>
     </Response>
     '''
@@ -1446,12 +1569,14 @@ async def dial_action():
 
     logger.info(f"📋 Retrieved summary for re-entry: {summary}")
 
-    encoded_phone = urllib.parse.quote(original_from)
-    encoded_context_id = urllib.parse.quote(call_uuid or "")
-    
     # Map Plivo's successful states to 'completed' so handle_media_stream reads it correctly
     is_success = "completed" if dial_status in ["hangup", "answered", "completed"] else "failed"
-    encoded_status   = urllib.parse.quote(is_success)
+    stream_query = web_auth.media_stream_query({
+        "phone_number": original_from,
+        "transfer_context_id": call_uuid or "",
+        "dial_status": is_success,
+        "is_transfer_return": "1",
+    })
 
     # Strip protocol from PUBLIC_BASE_URL to build wss:// URL
     ws_host = PUBLIC_BASE_URL.replace("https://", "").replace("http://", "")
@@ -1462,7 +1587,7 @@ async def dial_action():
         <Play>{RECONNECTING_URL}</Play>
         <Stream streamTimeout="86400" keepCallAlive="true" bidirectional="true" 
                 contentType="audio/x-mulaw;rate=8000" audioTrack="inbound">
-            wss://{ws_host}/media-stream?phone_number={encoded_phone}&amp;transfer_context_id={encoded_context_id}&amp;dial_status={encoded_status}&amp;is_transfer_return=1
+            wss://{ws_host}/media-stream?{stream_query}
         </Stream>
     </Response>
     """
@@ -3638,12 +3763,13 @@ async def plivo_hangup():
 
 @app.route("/trigger-call", methods=["POST"])
 async def trigger_call():
-    api_key = request.headers.get("X-API-Key")
-    if not api_key or api_key != API_AUTH_TOKEN:
-        logger.warning(f"Unauthorized access attempt to /trigger-call from {request.remote_addr}")
-        return {"status": "error", "message": "Unauthorized"}, 401
-
-    data = await request.get_json()
+    # The login session (enforce_access) decides who may call. JSON only: a cross-site form cannot
+    # send it with our cookie, which blocks CSRF.
+    if not request.is_json:
+        return {"status": "error", "message": "JSON body required"}, 415
+    data = await request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return {"status": "error", "message": "JSON object required"}, 400
     
     target_user_name = data.get("user_name", "Unknown")
     target_phone_number = data.get("phone_number")
@@ -3684,6 +3810,8 @@ if __name__ == "__main__":
     logger.info(f'Starting the Quart Server on Port {PORT} with Hypercorn (Waiting for Dashboard trigger...)')
     logger.info(f"🧬 [MODEL] Gemini {describe_gemini_backend()}")
     logger.info(f"📝 Prompt: {PROMPT_FILE} ({len(RAW_SYSTEM_PROMPT)} chars)")
+    web_auth.check_config()
+    logger.info(f"🔐 [AUTH] logins configured, plivo checks={web_auth.PLIVO_SIGNATURE_CHECK}")
     if GEMINI_BACKEND == "vertex":
         import google.auth.transport.requests
         load_vertex_credentials().refresh(google.auth.transport.requests.Request())

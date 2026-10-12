@@ -1,19 +1,20 @@
 EC2 agent: start with docs/handoff1.md (bring-up checklist and live-call tasks for the Vertex backend and aec1). Active work: see docs/HANDOFF.md and docs/spec/tasks.md (tracked copy; keep .kiro/specs/bengali-grapheme-stutter-fix/tasks.md identical) before touching bargein.py, app.py, or aec.py. Standing constraints: PROMPT_FILES/prompt.txt is old Senco content that app.py no longer loads (not a code bug, don't fix), requirements.txt and .env are frozen, aec.py is unfrozen but should stay untouched unless truly necessary.
 
-Other standing rules: do not read .env or credential JSON. Tests are stdlib unittest only (no pytest/hypothesis). API_AUTH_TOKEN issue is noted in HANDOFF §10, not to be fixed. Every new call_state key must be added to the mirror in tests/harness/appctl.py (guarded by test_harness_smoke). Run the suite with `venv312/Scripts/python.exe -m unittest discover -s tests -t .` (Python 3.12 venv; 3.14 has no audioop). Don't write test code through bash heredocs: escapes like `\x00` / `\n` get mangled. Use the Edit tool or a .py script file. Printing app log lines needs `PYTHONIOENCODING=utf-8` (Windows console is cp1252).
+Other standing rules: do not read .env or credential JSON. Tests are stdlib unittest only (no pytest/hypothesis). /trigger-call needs a login session since the admin-auth step (API_AUTH_TOKEN removed). Every new call_state key must be added to the mirror in tests/harness/appctl.py (guarded by test_harness_smoke). Run the suite with `venv312/Scripts/python.exe -m unittest discover -s tests -t .` (Python 3.12 venv; 3.14 has no audioop). Don't write test code through bash heredocs: escapes like `\x00` / `\n` get mangled. Use the Edit tool or a .py script file. Printing app log lines needs `PYTHONIOENCODING=utf-8` (Windows console is cp1252).
 
 Numbering: HANDOFF uses "Redesign Task N"; docs/spec/tasks.md uses 1-10 / 5.x. Mapping in HANDOFF §3.
 
-## Current state (as of 2026-10-06)
+## Current state (as of 2026-10-12)
 
-- Suite: **632 tests run, 3 failures** (2 skipped, 1 expected failure). The 3 failures predate the transcript work and are all in `tests/test_prompt_catalog.py` (`TestAppLoadsV2.test_v2_is_the_default_prompt`, `TestPromptCatalogV2.test_language_mix_is_critical_with_examples`, `TestPromptV2Counselor.test_size_stays_close_to_v1`): the live prompt moved to `prompt_au_v3.txt`, which those v2 checks do not fit. `GEMINI_MODEL` pins in the 4_8 test re-pinned 2026-10-12 to `[87, 1700, 2220, 2230, 2647]` for the transcript wiring. Re-pin whenever app.py's line count changes.
+- Suite: **705 tests run, 3 failures** (2 skipped, 1 expected failure). The 3 failures predate the transcript work (the size check reads 14,747 chars against the 14,228 cap) and are all in `tests/test_prompt_catalog.py` (`TestAppLoadsV2.test_v2_is_the_default_prompt`, `TestPromptCatalogV2.test_language_mix_is_critical_with_examples`, `TestPromptV2Counselor.test_size_stays_close_to_v1`): the live prompt moved to `prompt_au_v3.txt`, which those v2 checks do not fit. `GEMINI_MODEL` pins in the 4_8 test re-pinned 2026-10-12 to `[102, 1840, 2362, 2372, 2789]` (transcript wiring, the EC2 costing fixes, then the admin-auth step). Re-pin whenever app.py's line count changes.
   - Skips: the retired Case C and the deferred reconnect test. Expected failure: `TestCaseDQuietCallerKnownLimitation`. The 6 `TestGoldenProfiles` run now that all rules are verified (they skip again if any UG rule goes back to `verified: false`).
   - `test_reply_language_counts_as_the_choice` fixed 2026-10-07: operator restored the TEST6 guard sentence ("If the user answers in Bengali or Hindi, that is their choice even if they never name a language: switch at once.") in `PROMPT_FILES/prompt_au.txt` call-flow step 1, replacing the `db6fe2b` wording.
-- Branch `dev`, no upstream: nothing pushed to origin. EC2 is synced by copying files (see memory / HANDOFF).
+- Branch `dev`, pushed: `origin/dev` = `891e88f` (2026-10-12). EC2 is a git clone on `dev` and syncs by `git pull` (see memory ec2-working-baseline). EC2 has committed code itself before (`a0ec061`, `891e88f`, author `Ubuntu`); `git log` before assuming local is ahead.
 - Never commit `.env`, credential JSON, `CALL_RECORDINGS/`, `TEST_FILES/`, `debug_recordings/`, `*.db` (all gitignored; never force-add them). Commit only when asked.
 
 ### Resume here
-00. **Post-call transcript files, built and tested offline (2026-10-12), uncommitted, not yet on a live call.** `call_transcript.py` writes `TRANSCRIPTS/<call_uuid>.txt` after each call (spec `docs/spec/call-transcript-design.md`, plan `docs/spec/call-transcript-plan.md`). Next: commit when asked, deploy to EC2 (git pull, restart idle), one live call, check the file and the `[TRANSCRIPT]` log line; confirm Vertex prices against `STT_PRICE_*`; extend `LATIN_TERMS` from live files. Kill switch `TRANSCRIPT_ENABLED=0`.
+000. **Admin login and protection (step 1 of the admin system), built and tested offline 2026-10-12, not yet on EC2.** `web_auth.py`, hooks and routes in app.py, `login.html`, `admin.html`. Spec `docs/spec/admin-auth-design.md`, plan `docs/spec/admin-auth-plan.md`, overview `docs/spec/admin-system-overview.md`. Next: operator adds `OPERATOR_USERNAME/PASSWORD`, `ADMIN_USERNAME/PASSWORD`, `APP_SECRET` (32+ chars) to `.env` and `/etc/au-app/common.env`, plus `PLIVO_SIGNATURE_CHECK=warn` on EC2; deploy per spec §6; one live call (and a transfer); no `[AUTH]` rejections, then `enforce`. Then step 2 (data model + Haiku NLP).
+00. **Post-call transcript files, committed (`c3b98ef`) and adjusted on EC2 (`891e88f`, 2026-10-12); not yet checked on a live call.** `call_transcript.py` writes `TRANSCRIPTS/<call_uuid>.txt` after each call (spec `docs/spec/call-transcript-design.md`, plan `docs/spec/call-transcript-plan.md`). Next: one live call, check the file and the `[TRANSCRIPT]` log line; confirm Vertex prices against `STT_PRICE_*`; extend `LATIN_TERMS` from live files. Kill switch `TRANSCRIPT_ENABLED=0`.
 0. **Course catalog tools, built and tested offline, NOT yet on a live call (2026-10-05). Summary: `docs/HANDOFF2.md`.** `course_catalog.py` + `catalog/` give Gemini `list_programs` and `get_program_details` over 87 programs (2027 session). Spec `docs/spec/course-catalog-tools-design.md`, plan `docs/spec/course-catalog-tools-plan.md`.
    - Rebuild `catalog/courses.json` with `venv312/Scripts/python.exe catalog/build_catalog.py` whenever the Excel in `AU Admission Data/` changes; `test_committed_courses_json_is_fresh` fails until you do.
    - Try tools offline: `venv312/Scripts/python.exe tests/tool_playground.py` (interactive) or `... list_programs degree=B.Tech`.
@@ -221,7 +222,7 @@ Numbering: HANDOFF uses "Redesign Task N"; docs/spec/tasks.md uses 1-10 / 5.x. M
 - **Found, not fixed (app.py, pre-existing, affects v1 too):** after app.py's `endCall` reply (`"Call will end after audio playback completes."`) the model sometimes speaks again: "This call has ended." / "The call has been ended." (about 2 of 20 closings, even with the say-nothing rule) or a repeat of the farewell. If the app plays that audio before hanging up, the caller hears it. Possible fixes: a reply that does not invite speech, or dropping model audio after the farewell already played; needs operator decision. Watch for it on live calls.
 - Harness: counselor scenarios and checks (`COUNSELOR_CHECKS`, `forward_share`, `end_summary`), the terminal reply now mirrors app.py exactly and speech after it is reported as "spoken after the terminal tool reply". Runs `TEST_FILES/_v2*.txt`.
 
-### 2026-10-12: post-call transcript files (uncommitted)
+### 2026-10-12: post-call transcript files (committed `c3b98ef`)
 - Spec `docs/spec/call-transcript-design.md`, plan `docs/spec/call-transcript-plan.md`. After each call,
   `TRANSCRIPTS/<call_uuid>.txt`: Neha from `output_transcription`, caller from one post-call
   `gemini-3.5-transcribe-preview` request on Vertex `global` (REST via httpx, word timestamps, split back
@@ -234,5 +235,26 @@ Numbering: HANDOFF uses "Redesign Task N"; docs/spec/tasks.md uses 1-10 / 5.x. M
   Bengali script, mapped by `LATIN_TERMS`.
 - Tests `tests/test_call_transcript.py` (68), `tests/test_transcript_capture.py` (10). Real-audio run on TEST8
   (`TEST_FILES/_transcript_check.py` -> `TEST_FILES/_transcripts/TEST8.txt`): status ok, 6.2 s, cost $0.0067.
-- Next: commit when asked, deploy to EC2 (git pull, restart idle), one live call, check the file and
-  the `[TRANSCRIPT]` line; confirm Vertex prices against `STT_PRICE_*`; extend `LATIN_TERMS` from live files.
+- Next: one live call, check the file and the `[TRANSCRIPT]` line; confirm Vertex prices against
+  `STT_PRICE_*`; extend `LATIN_TERMS` from live files.
+
+### 2026-10-12: EC2 commit `891e88f` ("Costing fixes", author `Ubuntu`), reviewed locally
+- Edited directly on EC2 despite the no-code-edits-on-EC2 rule; reviewed and kept. Suite after pull: 636 run, same 3 failures.
+- **Input transcription cost:** `usage_metadata` never reports it (Vertex probe), so `app.py` estimates it from characters
+  (`estimate_text_tokens`: 4.0 chars/token Latin, 2.5 Bengali, 1.8 Devanagari), bills it at `PRICE_TEXT_OUTPUT` and adds it
+  to the call total. New call_state key `tokens_input_transcription_est` (mirrored). Stats lines: "lower-bound" wording gone,
+  new "Input transcription (estimated...)" line.
+- **Transcript append:** `write_atomic` replaced by `append_segment` (one O_APPEND write). A transferred call that comes
+  back keeps its `call_uuid`, so the second leg is appended after `SEGMENT_SEPARATOR`; `start_job` chains jobs per
+  `call_uuid` (`_last_job`) so legs land in call order. `[TRANSCRIPT]` line gains an ` appended` suffix.
+- Tests: `test_call_transcript.py` gains append and job-order tests; 4_8 pins re-pinned.
+
+### 2026-10-12: admin login and protection (step 1, uncommitted)
+- Spec `docs/spec/admin-auth-design.md`, plan `docs/spec/admin-auth-plan.md`, overview `docs/spec/admin-system-overview.md`. Operator's problem: the URL goes to another team, so every route needs a login and the Plivo callbacks need proof they come from Plivo.
+- **Config (5 keys + 1 switch):** `OPERATOR_USERNAME`, `OPERATOR_PASSWORD`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `APP_SECRET` (32+ chars); `PLIVO_SIGNATURE_CHECK` = `enforce` (default) | `warn` | `off`. `web_auth.check_config()` at startup stops with `Login config missing: <name>`; log `🔐 [AUTH] logins configured, plivo checks=<mode>`.
+- **`web_auth.py` (new):** config, access table `ENDPOINT_ACCESS`, login match, throttle (5 failures per client IP in 15 min), client IP, media token (120 s), Plivo signature check, cost removal.
+- **app.py:** `enforce_access` before_request hook (default deny over `ENDPOINT_ACCESS`); `plivo_signature_gate` on the Plivo webhooks (`PLIVO_SIGNATURE_CHECK`); `enforce_media_token` before_websocket hook, with signed stream URLs in `/outbound-webhook` and `/dial-action`; routes `/login` `/logout` `/api/me` `/admin`; operator cost removal in `/api/call-history` and `/call-events` (admin sees costs); `/trigger-call` takes session + JSON only (`API_AUTH_TOKEN` and the X-API-Key header removed). The `/trigger-call` route line is byte-identical. No new call_state key.
+- **Pages:** `login.html`, `admin.html`; `index.html` has no API key, redirects to `/login` on 401, gains a Logout button and an Admin link (admin only).
+- **Deviations recorded in review:** session lifetime is absolute (12 h) with `SESSION_REFRESH_EACH_REQUEST=False` (Quart's default re-issued the cookie each request); tests patch the secret via `app.app.config["SECRET_KEY"]` (patching `app.app.secret_key` fails on cleanup).
+- **Tests (69 new):** `test_web_auth.py` 29, `test_access_control.py` 19, `test_plivo_checks.py` 11, `test_operator_view.py` 10. 4_8 pins re-pinned three times (Tasks 2-4), now `[102, 1840, 2362, 2372, 2789]`. Suite 705 run, same 3 known `test_prompt_catalog` failures, 2 skipped, 1 expected failure.
+- Next: operator's local browser check, then EC2 rollout per spec §6 (warn first, one live call incl. a transfer, then enforce). Then step 2.

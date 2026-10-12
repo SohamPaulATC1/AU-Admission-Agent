@@ -274,6 +274,7 @@ DIAGNOSTIC_LOG_TAGS = (
     "[LATCH-END]",    # how a latch episode ended (broken vs dropped)
     "[LATCH]",        # per-call latch summary in call stats
     "[TRANSCRIPT]",   # post-call transcript job (call_transcript.py)
+    "[AUTH]",         # logins, refused endpoints, Plivo signature and media-stream token checks
 )
 
 

@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign in | AU Admission Assist</title>
+    <link rel="icon" href="/atc.png?v=2" type="image/png">
+    <style>
+        :root {
+            --bg-primary: #f4f7fb;
+            --bg-card: #ffffff;
+            --text-primary: #0a1b2d;
+            --text-secondary: #4a627d;
+            --border-color: #d6e2ee;
+            --accent: #005aab;
+            --accent-hover: #004585;
+            --danger: #e11d48;
+            --focus-ring: 0 0 0 3px rgba(0, 90, 171, 0.18);
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: "Montserrat", system-ui, sans-serif;
+        }
+
+        .card {
+            width: 100%;
+            max-width: 360px;
+            padding: 32px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            box-shadow: 0 4px 18px -2px rgba(0, 35, 75, 0.06);
+        }
+
+        .card img { display: block; height: 48px; margin: 0 auto 16px; }
+        h1 { margin: 0 0 20px; font-size: 1.1rem; text-align: center; }
+        label { display: block; margin: 12px 0 6px; font-size: 0.85rem; color: var(--text-secondary); }
+
+        input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font: inherit;
+        }
+
+        input:focus { outline: none; border-color: var(--accent); box-shadow: var(--focus-ring); }
+
+        button {
+            width: 100%;
+            margin-top: 20px;
+            padding: 11px;
+            border: 0;
+            border-radius: 8px;
+            background: var(--accent);
+            color: #ffffff;
+            font: inherit;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        button:hover { background: var(--accent-hover); }
+        .error { min-height: 1.2em; margin: 12px 0 0; color: var(--danger); font-size: 0.85rem; text-align: center; }
+    </style>
+</head>
+
+<body>
+    <form class="card" method="post" action="/login">
+        <img src="/AU_Logo.png?v=2" alt="Adamas University">
+        <h1>AU Admission Assist</h1>
+        <label for="username">Username</label>
+        <input id="username" name="username" autocomplete="username" required autofocus>
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required>
+        <button type="submit">Sign in</button>
+        <p class="error" role="alert"><!--LOGIN_ERROR--></p>
+    </form>
+</body>
+
+</html>

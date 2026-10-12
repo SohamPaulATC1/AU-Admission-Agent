@@ -349,7 +349,10 @@ class TestCallStats(unittest.TestCase):
         # And again for the post-call transcript wiring (import call_transcript,
         # vertex_access_token, the transcript call_state key and its creation).
         # And again for the input-transcription cost estimate (estimate_text_tokens, its call_state key).
-        self.assertEqual(references, [99, 1715, 2237, 2247, 2664])
+        # And again for the admin login (import web_auth, session config, login routes and hook).
+        # And again for the Plivo signature gate and the media-stream token hook.
+        # And again for the operator view (API_AUTH_TOKEN removed, cost removal, /trigger-call JSON).
+        self.assertEqual(references, [102, 1840, 2362, 2372, 2789])
 
 
 if __name__ == "__main__":
