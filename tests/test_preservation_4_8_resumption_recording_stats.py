@@ -355,7 +355,8 @@ class TestCallStats(unittest.TestCase):
         # And again 2026-10-12 for step 2 (call_store / call_analysis / plivo_cost imports, call_ended numbers, catalog_found).
         # And again for the background save of the transfer's human leg (spawn_background, store_b_leg).
         # And again 2026-10-12 for step 3 (import campaigns, the WAL line in init_call_history_db).
-        self.assertEqual(references, [108, 1899, 2425, 2435, 2866])
+        # And again for prompt v4 (PROMPT_FILE switch and the nameless GREETING_EVENT constant).
+        self.assertEqual(references, [108, 1906, 2428, 2438, 2869])
 
 
 if __name__ == "__main__":

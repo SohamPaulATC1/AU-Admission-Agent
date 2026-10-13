@@ -243,9 +243,16 @@ class GeminiSessionDisconnected(Exception):
     """Raised when the Gemini Live session drops but may be resumable."""
     pass
 
-PROMPT_FILE = "PROMPT_FILES/prompt_au_v3.txt"
+PROMPT_FILE = "PROMPT_FILES/prompt_au_v4.txt"   # v4: the caller stays anonymous; v3 is the rollback
 with open(PROMPT_FILE, "r", encoding="utf-8") as f:
     RAW_SYSTEM_PROMPT = f.read()
+
+# The first turn of a fresh call. Not a template: Neha never gets the caller's name (operator, 2026-10-12).
+GREETING_EVENT = """
+            System Event: The outbound call has just connected.
+            * **Greeting:** Say a simple "Hello" (never a name) and introduce yourself per your persona instructions in the system prompt, then ask whether they'd like to continue in English or switch to another supported language.
+            * **STOP HERE:** After asking the language question, END YOUR TURN and stay silent. Do NOT mention any offers, programs, or further details yet. Wait for the user to state their language preference. Only AFTER the user replies do you continue — in their chosen language — with the rest of the flow.
+            """
 
 
 def initialize_transfer_context_store():
@@ -2335,11 +2342,7 @@ async def handle_media_stream():
                 """      
         else:
             logger.info("Loading standard greeting prompt...")
-            initial_prompt = f"""
-            System Event: The outbound call to {user_name} has just connected.
-            * **Greeting:** Greet {user_name} and introduce yourself per your persona instructions in the system prompt, then ask whether they'd like to continue in English or switch to another supported language.
-            * **STOP HERE:** After asking the language question, END YOUR TURN and stay silent. Do NOT mention any offers, programs, or further details yet. Wait for the user to state their language preference. Only AFTER the user replies do you continue — in their chosen language — with the rest of the flow.
-            """
+            initial_prompt = GREETING_EVENT
         
         # === SESSION MANAGEMENT: Reconnection Loop ===
         for _attempt in range(MAX_GEMINI_RECONNECTS + 1):

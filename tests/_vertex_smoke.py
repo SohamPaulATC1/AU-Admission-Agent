@@ -52,16 +52,13 @@ def build_config(system_instruction_text):
 
 async def main():
     print(f"[1] {app.describe_gemini_backend()} model={app.GEMINI_MODEL}")
-    user_name, phone_number = "Test Caller", "+910000000000"
+    # A real-looking name, filled the way handle_media_stream does: v4 must not let it reach Neha.
+    user_name, phone_number = "Rahul Sen", "+910000000000"
     system_instruction_text = (
         f"Current Date and Time (India IST): {app.get_indian_time()}\n\n"
-        + app.RAW_SYSTEM_PROMPT.replace("{user_name}", user_name).replace("{phone_number}", phone_number)
+        + app.RAW_SYSTEM_PROMPT.format(user_name=user_name, phone_number=phone_number)
     )
-    initial_prompt = f"""
-            System Event: The outbound call to {user_name} has just connected.
-            * **Greeting:** Greet {user_name} and introduce yourself per your persona instructions in the system prompt, then ask whether they'd like to continue in English or switch to another supported language.
-            * **STOP HERE:** After asking the language question, END YOUR TURN and stay silent. Do NOT mention any offers, programs, or further details yet. Wait for the user to state their language preference. Only AFTER the user replies do you continue — in their chosen language — with the rest of the flow.
-            """
+    initial_prompt = app.GREETING_EVENT
 
     t0 = time.monotonic()
     if app.GEMINI_BACKEND == "vertex":
