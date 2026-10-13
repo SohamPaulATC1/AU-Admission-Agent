@@ -10,7 +10,7 @@ from tests.harness.appctl import app
 from tests.test_access_control import AuthTestCase
 
 web_auth = app.web_auth
-PAGE_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "admin.html")
+PAGE_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "web", "admin.html")
 with open(PAGE_PATH, encoding="utf-8") as handle:
     PAGE = handle.read()
 

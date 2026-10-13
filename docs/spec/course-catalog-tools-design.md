@@ -574,7 +574,7 @@ as the source; EC2 needs only the JSON.
 
 ## 13. Phase 3: `find_scholarships` (approved 2026-10-06)
 
-Source: `AU Scholarship Policy AY 2026-27 Updated V2 (2).pdf` (repo root). The
+Source: `AU Scholarship Policy AY 2026-27 Updated V2 (2).pdf` (`AU Admission Data/`, untracked). The
 operator's decisions (2026-10-06):
 - The PDF is the only source of truth. Its dates (Dec 2025 to 31 Mar 2026
   windows) are ignored.

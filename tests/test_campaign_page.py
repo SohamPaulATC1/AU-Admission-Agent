@@ -13,7 +13,7 @@ ROOT = os.path.dirname(os.path.abspath(APP_PY))
 
 
 def read(name):
-    with open(os.path.join(ROOT, name), encoding="utf-8") as f:
+    with open(os.path.join(ROOT, "web", name), encoding="utf-8") as f:
         return f.read()
 
 

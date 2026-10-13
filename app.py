@@ -1367,11 +1367,11 @@ async def serve_audio(filename):
 
 @app.route('/atc.png', methods=['GET'])
 async def serve_atc_logo():
-    return await send_file('atc.png')
+    return await send_file('web/atc.png')   # pages and logos live in web/; their URLs are unchanged
 
 @app.route('/AU_Logo.png', methods=['GET'])
 async def serve_au_logo():
-    res = await send_file('AU_Logo.png')
+    res = await send_file('web/AU_Logo.png')
     res.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
     return res
 
@@ -1379,7 +1379,7 @@ async def serve_au_logo():
 async def serve_dashboard():
     """Serves the frontend dashboard."""
     logger.info("Serving the dashboard UI")
-    return await send_file("index.html")
+    return await send_file("web/index.html")
 
 
 @app.before_request
@@ -1445,7 +1445,7 @@ LOGIN_ERROR_MARK = "<!--LOGIN_ERROR-->"
 
 def login_response(message="", status=200):
     """login.html with its error line filled in (fixed texts only, never user input)."""
-    with open("login.html", encoding="utf-8") as handle:
+    with open("web/login.html", encoding="utf-8") as handle:
         html = handle.read()
     return Response(html.replace(LOGIN_ERROR_MARK, message), status=status, mimetype="text/html")
 
@@ -1487,7 +1487,7 @@ async def api_me():
 
 @app.route("/admin", methods=["GET"])
 async def admin_page():
-    return await send_file("admin.html")
+    return await send_file("web/admin.html")
 
 # FOR INCOMING CALL
 
@@ -4019,7 +4019,7 @@ def campaign_error(e):
 
 @app.route("/campaigns", methods=["GET"])
 async def campaigns_page():
-    return await send_file("campaigns.html")
+    return await send_file("web/campaigns.html")
 
 
 @app.route("/api/campaigns", methods=["GET"])
@@ -4237,7 +4237,7 @@ async def admin_rerun_api(call_uuid):
     if ANALYZER is None:
         return ANALYSIS_OFF
     # Without the transcript the worker reads empty text and saves no_conversation over a good analysis.
-    path = await call_store.run(CALL_HISTORY_DB_PATH, admin_data.transcript_file, call_uuid)
+    path = await call_store.run(CALL_HISTORY_DB_PATH, admin_data.transcript_file, call_uuid, call_transcript.TRANSCRIPT_DIR)
     if path is None:
         return {"status": "error", "message": "No transcript to analyse for this call"}, 409
     if ANALYZER.is_busy(call_uuid):
@@ -4254,7 +4254,7 @@ async def admin_rerun_failed_api():
         return error
     if ANALYZER is None:
         return ANALYSIS_OFF
-    failed = await call_store.run(CALL_HISTORY_DB_PATH, admin_data.failed_analyses)
+    failed = await call_store.run(CALL_HISTORY_DB_PATH, admin_data.failed_analyses, call_transcript.TRANSCRIPT_DIR)
     ready = [(call_uuid, path) for call_uuid, path in failed if path]   # no transcript: a re-run cannot help
     queued = busy = checked = 0
     for call_uuid, path in ready:

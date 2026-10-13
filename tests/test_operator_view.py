@@ -96,7 +96,7 @@ class TestTriggerCall(AuthTestCase):
 
 class TestDashboardPage(unittest.TestCase):
     def setUp(self):
-        with open(os.path.join(REPO_ROOT, "index.html"), encoding="utf-8") as handle:
+        with open(os.path.join(REPO_ROOT, "web", "index.html"), encoding="utf-8") as handle:
             self.html = handle.read()
 
     def test_no_browser_secret(self):

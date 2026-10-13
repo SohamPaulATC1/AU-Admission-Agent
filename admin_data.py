@@ -287,7 +287,7 @@ def call_detail(conn, call_uuid, transcript_root):
             "transcript": read_transcript(path, transcript_root)}
 
 
-def failed_analyses(conn, root=None):
+def failed_analyses(conn, root):
     """(call_uuid, transcript path or None) for every failed analysis, newest first, across all dates.
     A skipped one is not retried (its transcript is missing)."""
     rows = conn.execute(
@@ -296,17 +296,14 @@ def failed_analyses(conn, root=None):
     return [(call_uuid, _usable_transcript(path, root)) for call_uuid, path in rows]
 
 
-def _usable_transcript(path, root=None):
-    """`path` if it is a file inside the transcript folder, else None. The re-run sends the file to
-    Bedrock, so a stored path that leaves TRANSCRIPTS/ is never used (same guard as read_transcript)."""
-    if root is None:
-        import call_transcript   # read at call time: tests point TRANSCRIPT_DIR at a temp folder
-        root = call_transcript.TRANSCRIPT_DIR
+def _usable_transcript(path, root):
+    """`path` if it is a file inside `root` (the transcript folder), else None. The re-run sends the file
+    to Bedrock, so a stored path that leaves TRANSCRIPTS/ is never used (same guard as read_transcript)."""
     # An empty file is no transcript either: the worker would save no_conversation over the analysis.
     return path if _inside(path, root) and os.path.isfile(path) and os.path.getsize(path) > 0 else None
 
 
-def transcript_file(conn, call_uuid, root=None):
+def transcript_file(conn, call_uuid, root):
     """The call's stored transcript path if the file is there, else None. A re-run needs it: with no
     transcript, Analyzer.analyze reads empty text and saves no_conversation over a good analysis."""
     return _usable_transcript(call_store.transcript_path(conn, call_uuid), root)

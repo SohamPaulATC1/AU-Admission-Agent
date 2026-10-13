@@ -7,8 +7,10 @@ by id prefix only, and no name, number, transcript, summary or CSV content appea
 operator checked the panel in the browser ("the things look good"). They then had the word
 "campaign" replaced by "Bulk calls" / "call list" everywhere people see it (§2, W1-W7), deployed
 at 13:50 IST.** The finer browser checks (re-run, do-not-call add/remove, log masking on a real
-call; handoff §8 steps 6-9) were not reported item by item. Nothing is committed (branch
-`dev`, HEAD `e619921` = `origin/dev`).
+call; handoff §8 steps 6-9) were not reported item by item. ~~Nothing is committed~~ **Update
+(Windows review, 2026-10-13): committed on EC2 as `cf29926` "Step 4 done" on top of `e619921`, and
+pushed; §6 below describes the tree before that commit.** Log masking was then checked on a real
+call (§4).
 
 ## 1. Suite
 
@@ -176,7 +178,7 @@ There is no kill switch: the views are read-only apart from re-run and do-not-ca
 keeps prompt v4) plus an idle restart. The index is harmless to older code. Prompt v4 rolls back with
 `PROMPT_FILE=PROMPT_FILES/prompt_au_v3.txt` in `.env` plus an idle restart.
 
-## 6. Uncommitted
+## 6. Uncommitted (before `cf29926`; all of it is in that commit now)
 
 Modified:
 - `admin.html`, `app.py`, `call_analysis.py`, `web_auth.py`
@@ -191,3 +193,17 @@ New:
 
 The step 3 live campaigns (A, B, controls) are still not run; that report is unchanged. Commit and
 push to `origin/dev` on the operator's word.
+
+## 7. Windows review (2026-10-13, added by the Windows agent)
+
+- `cf29926` pulled; Windows suite **1108 run, only the 3 known `test_prompt_catalog` failures**, 2
+  skipped, 1 expected failure (EC2's extra failure and skips are environment-only). The scripts of
+  `admin.html`, `campaigns.html` and `index.html` pass `node --check` (not possible on EC2).
+- All 8 deviations are sound; D1, D3, D4, D5, D6 and D8 fix real bugs the plan had.
+- Follow-up (Windows, after this commit): `admin_data.failed_analyses` and `transcript_file` take the
+  transcript folder as an argument, as `read_transcript` does; app.py passes
+  `call_transcript.TRANSCRIPT_DIR` (the lazy import inside `_usable_transcript` is gone). No behaviour
+  change; app.py's line count is unchanged, so the `GEMINI_MODEL` pins hold. The wording rule is now
+  also in `docs/spec/campaigns-design.md`.
+- Still open, all in the operator's browser: re-run one call, do-not-call add/remove, the Overview
+  "All time" numbers against the DB check in §4.

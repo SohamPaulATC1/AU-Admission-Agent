@@ -4,6 +4,17 @@ Status: design approved by the operator 2026-10-12 (all five sections, in chat);
 `docs/spec/admin-system-overview.md`. Step 1 (logins) and step 2 (call analysis, full call cost)
 are live; step 4 (admin panel) adds campaign cost reports and the do-not-call UI on top of this.
 
+**Wording (operator, 2026-10-13, after step 4): people never see the word "campaign".** The agent
+has one job, calling prospective students and guardians for the 2027 admissions, so every text a
+person reads says "Bulk calls" / "call list": the `/campaigns` page is "Bulk calls" ("Upload a call
+list", "Uploaded lists"), the admin tab is "Call lists", the admin CSV column is "Call list" (file
+`call_lists_*.csv`), and operator-facing error messages say "list". The list name is optional (the page
+fills the file name plus the IST date) and the five settings sit under a closed "Advanced settings".
+"Campaign" in this spec, the URLs (`/campaigns`, `/api/campaigns`, `/api/admin/campaigns`), the
+tables, the code and the `📣 [CAMPAIGN]` log tag is unchanged on purpose. `TestPlainWords` in
+`tests/test_campaign_page.py` keeps the visible text of `index.html`, `campaigns.html` and
+`admin.html` free of the word. Details: `docs/handoff_step4_report.md` §2 (W1-W7).
+
 ## Goal
 
 The calling team (operator login) uploads an Excel of contacts (name + phone, plus any extra
