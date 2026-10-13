@@ -279,6 +279,7 @@ DIAGNOSTIC_LOG_TAGS = (
     "[ANALYSIS]",     # step 2: Haiku analysis worker (call_analysis.py)
     "[PLIVO-COST]",   # step 2: Plivo call-record cost fetch (plivo_cost.py)
     "[CAMPAIGN]",     # step 3: campaign dispatcher, uploads and hangup results (campaigns.py)
+    "[ADMIN]",        # step 4: admin panel actions (re-run analysis, do-not-call changes)
 )
 
 

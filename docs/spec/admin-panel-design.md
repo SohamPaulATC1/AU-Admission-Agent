@@ -1,7 +1,8 @@
 # Step 4: the admin panel
 
 Status: design approved by the operator 2026-10-13 (six scope answers, then four design sections, in
-chat). Spec awaiting the operator's review; no plan yet. Shared decisions:
+chat). Spec approved; plan `docs/spec/admin-panel-plan.md`. Built and deployed on EC2 2026-10-13
+(report `docs/handoff_step4_report.md`). Shared decisions:
 `docs/spec/admin-system-overview.md`. Steps 1 (logins), 2 (call analysis, full cost) and 3 (campaigns)
 are built; this step reads their data and adds the admin-only views. Resume notes:
 `docs/resume_step4.md`.
@@ -24,7 +25,9 @@ and has no new pages.
 4. **Counting:** hot lead = `lead_status = 'hot'`; warm lead = `'warm'`; visits fixed = `campus_visit_agreed = 1`
    (separate count, it overlaps with hot); calls = every call in the range; connected = `connected_at`
    set; cost per call = total cost / calls; cost per hot lead = total cost of all calls in the range /
-   hot count (shown as a dash when there is no hot lead).
+   hot count (shown as a dash when there is no hot lead). A call's cost is COALESCE(gemini_cost_usd,
+   the old cost text) + STT + Haiku + Plivo, so an old call that the step 2 catch-up analysed still
+   counts its Haiku and Plivo cost.
 5. **Re-run analysis:** one call at a time from Call detail, plus "Re-run all failed" on the Calls
    table, at most 50 per click. A re-run overwrites the analysis fields and adds the run's cost to the
    call's Haiku cost (the totals then match the Bedrock bill).
@@ -132,6 +135,7 @@ allow-lists; anything else is 400 with `{"status": "error", "message": ...}`.
 the filename. Capped at 20,000 rows; when cut, the last line says so. Formula injection: any cell
 starting with `=`, `+`, `-` or `@` gets a leading `'`, except a cell that is only an optional `+` and
 digits (a phone number). Names and extra columns come from uploaded Excel files, so this matters.
+The calls CSV is built in the thread pool with its query (8000 also carries live audio).
 
 **Re-run.**
 - `Analyzer` gets a public `is_busy(call_uuid)` (queued or running); today that state is private.
@@ -142,6 +146,10 @@ digits (a phone number). Names and extra columns come from uploaded Excel files,
   each through the same `is_busy` check. Skipped analyses are not retried (a missing transcript will
   not appear). The reply says how many were queued and how many failed calls remain.
 - The success path is `Analyzer.analyze` unchanged: fields replaced, cost added.
+- A call is re-run only when its transcript file exists (else 409 "No transcript to analyse");
+  "Re-run all failed" skips such calls and reports them as no_transcript. Without the file the worker
+  would save no_conversation over a good analysis. The queued path is the checked file, not `None`.
+  (EC2 build: the file must also lie inside `TRANSCRIPTS/` and be non-empty, report D4.)
 
 ## 3. The page: `admin.html`
 

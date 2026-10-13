@@ -44,6 +44,7 @@ Plus `/login` and `/logout`. Everything else is closed by default (step 1).
    (uncommitted; live campaigns pending; `docs/handoff_step3_report.md`).
 4. **Admin panel**: overview, calls and leads table, call detail with transcript, campaign reports,
    Excel/CSV export.
+   Step 4 built (plan docs/spec/admin-panel-plan.md); see CLAUDE.md "Resume here" for its state.
 
 ## Decisions for step 2 (to be designed there)
 

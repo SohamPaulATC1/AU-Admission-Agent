@@ -356,7 +356,8 @@ class TestCallStats(unittest.TestCase):
         # And again for the background save of the transfer's human leg (spawn_background, store_b_leg).
         # And again 2026-10-12 for step 3 (import campaigns, the WAL line in init_call_history_db).
         # And again for prompt v4 (PROMPT_FILE switch and the nameless GREETING_EVENT constant).
-        self.assertEqual(references, [108, 1906, 2428, 2438, 2869])
+        # And again 2026-10-13 for step 4 (import admin_data, its upgrade call in init_call_history_db).
+        self.assertEqual(references, [109, 1908, 2430, 2440, 2871])
 
 
 if __name__ == "__main__":

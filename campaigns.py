@@ -211,7 +211,7 @@ def check_settings(raw, require_all=False):
 def check_name(raw):
     name = str(raw or "").strip()
     if not 1 <= len(name) <= 100:
-        raise CampaignError("Campaign name must be 1-100 characters")
+        raise CampaignError("List name must be 1-100 characters")
     return name
 
 
@@ -237,7 +237,7 @@ def create_campaign(conn, name, settings, *, created_by, file_name, contacts, re
 def _state(conn, campaign_id):
     found = conn.execute("SELECT state FROM campaigns WHERE id=?", (campaign_id,)).fetchone()
     if found is None:
-        raise NotFound("No such campaign")
+        raise NotFound("No such call list")
     return found[0]
 
 
@@ -248,7 +248,7 @@ def apply_action(conn, campaign_id, action, now):
     state = _state(conn, campaign_id)
     target = MOVES.get((state, action))
     if target is None:
-        raise BadMove(f"Cannot {action} a {state} campaign")
+        raise BadMove(f"Cannot {action} a {state} list")
     stamp = _stamp(now)
     # "AND state=?": the state read above is outside the write transaction; a request (or the
     # dispatcher) that moved the campaign in between makes this a 409, not a forbidden move.
@@ -262,7 +262,7 @@ def apply_action(conn, campaign_id, action, now):
         moved = conn.execute("UPDATE campaigns SET state=?, state_reason=NULL, dial_errors=0 WHERE id=? AND state=?",
                              (target, campaign_id, state))
     if moved.rowcount != 1:
-        raise BadMove(f"Cannot {action}: the campaign changed meanwhile")
+        raise BadMove(f"Cannot {action}: the list changed meanwhile")
     if action == "stop":
         # Live calls finish and get their hangup result; nothing new is dialled.
         conn.execute("UPDATE campaign_contacts SET status='cancelled', last_cause='stopped', finished_at=? "
@@ -273,12 +273,12 @@ def apply_action(conn, campaign_id, action, now):
 def update_settings(conn, campaign_id, settings):
     state = _state(conn, campaign_id)
     if state not in EDITABLE_STATES:
-        raise BadMove(f"Settings can only change while the campaign is draft or paused, not {state}")
+        raise BadMove(f"Settings can only change while the list is draft or paused, not {state}")
     moved = conn.execute("UPDATE campaigns SET concurrency=?, hours_start=?, hours_end=?, max_retries=?, "
                          "retry_gap_min=? WHERE id=? AND state=?",
                          (*(settings[k] for k in SETTING_KEYS), campaign_id, state))
     if moved.rowcount != 1:
-        raise BadMove("Cannot change settings: the campaign changed meanwhile")
+        raise BadMove("Cannot change settings: the list changed meanwhile")
 
 
 # --- reads (no cost anywhere: spec §4) ---
@@ -299,7 +299,7 @@ def list_campaigns(conn):
 def campaign_detail(conn, campaign_id, page=1, status=None):
     found = conn.execute(f"SELECT {', '.join(SUMMARY_FIELDS)} FROM campaigns WHERE id=?", (campaign_id,)).fetchone()
     if found is None:
-        raise NotFound("No such campaign")
+        raise NotFound("No such call list")
     if status is not None and status not in CONTACT_STATUSES:
         raise CampaignError("Unknown status filter")
     campaign = dict(zip(SUMMARY_FIELDS, found), counts=_counts(conn, campaign_id))

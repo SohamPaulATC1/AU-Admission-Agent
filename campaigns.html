@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Campaigns | AU Admission Assist</title>
+    <title>Bulk calls | AU Admission Assist</title>
     <link rel="icon" href="/atc.png?v=2" type="image/png">
     <style>
         :root {
@@ -75,6 +75,8 @@
 
         .grid { display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: flex-end; }
         label { display: flex; flex-direction: column; gap: 4px; font-size: 0.8rem; font-weight: 600; }
+        .advanced { flex-basis: 100%; }
+        .advanced summary { cursor: pointer; font-size: 0.85rem; margin-bottom: 8px; }
         input { height: 36px; padding: 0 10px; border: 1px solid var(--border-color); border-radius: 8px; font: inherit; }
         input[type=number] { width: 90px; }
         select { height: 36px; border: 1px solid var(--border-color); border-radius: 8px; font: inherit; }
@@ -101,22 +103,28 @@
     </nav>
 
     <main>
-        <h1>Campaigns</h1>
+        <h1>Bulk calls</h1>
 
         <section>
-            <h2>New campaign</h2>
+            <h2>Upload a call list</h2>
             <p>Excel (.xlsx), first sheet. The first row needs a name column (Name / Student Name / Full Name) and a
                 phone column (Phone / Mobile / Phone Number / Mobile Number / Contact). Other columns are kept and shown
-                with each contact. Calling hours are IST.</p>
+                with each contact. Nothing is dialled until you press Start.</p>
             <form id="uploadForm" class="grid">
-                <label>Campaign name <input name="campaign_name" required maxlength="100"></label>
+                <label>List name (optional) <input name="campaign_name" maxlength="100"
+                    placeholder="Filled from the file name if empty"></label>
                 <label>Excel file <input name="file" type="file" accept=".xlsx" required></label>
-                <label>Calls at once <input name="concurrency" type="number" required></label>
-                <label>From <input name="hours_start" type="time" required></label>
-                <label>To <input name="hours_end" type="time" required></label>
-                <label>Retries <input name="max_retries" type="number" required></label>
-                <label>Minutes between tries <input name="retry_gap_min" type="number" required></label>
                 <button class="btn primary" type="submit">Upload</button>
+                <details class="advanced">
+                    <summary>Advanced settings</summary>
+                    <div class="grid">
+                        <label>Calls at once <input name="concurrency" type="number" required></label>
+                        <label>From (IST) <input name="hours_start" type="time" required></label>
+                        <label>To (IST) <input name="hours_end" type="time" required></label>
+                        <label>Retries <input name="max_retries" type="number" required></label>
+                        <label>Minutes between tries <input name="retry_gap_min" type="number" required></label>
+                    </div>
+                </details>
             </form>
             <p id="uploadStatus"></p>
             <div id="rejectedBox" hidden>
@@ -134,8 +142,8 @@
         </section>
 
         <section>
-            <h2>All campaigns</h2>
-            <p id="noCampaigns" hidden>No campaigns yet.</p>
+            <h2>Uploaded lists</h2>
+            <p id="noCampaigns" hidden>No lists uploaded yet.</p>
             <div class="table-wrap">
                 <table>
                     <thead><tr><th>Name</th><th>State</th><th>Finished / total</th><th>On call now</th><th>Created</th><th></th></tr></thead>
@@ -294,6 +302,20 @@
             URL.revokeObjectURL(link.href);
         });
 
+        // An empty list name becomes "<file name without .xlsx> <date, IST>", e.g. "Kolkata schools 2026-10-13".
+        function listName(typed, fileName) {
+            const name = typed.trim();
+            if (name) return name;
+            const stem = fileName.replace(/\.xlsx$/i, "").trim() || "Call list";
+            const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+            return (stem.slice(0, 88) + " " + today).trim();
+        }
+
+        // A setting the browser refuses is inside the closed "Advanced settings": open it so it can be seen.
+        $("uploadForm").addEventListener("invalid", () => {
+            $("uploadForm").querySelector("details.advanced").open = true;
+        }, true);
+
         $("uploadForm").addEventListener("submit", async (event) => {
             event.preventDefault();
             const form = event.target, file = form.elements.file.files[0], status = $("uploadStatus");
@@ -304,7 +326,7 @@
             status.textContent = "Uploading...";
             try {
                 const body = await post("/api/campaigns", Object.assign({
-                    name: form.elements.campaign_name.value, file_name: file.name,
+                    name: listName(form.elements.campaign_name.value, file.name), file_name: file.name,
                     file_b64: await fileToBase64(file) }, readSettings(form)));
                 status.textContent = "Saved as a draft: " + body.accepted + " contacts, " + body.rejected.length +
                     " rows rejected" + (body.extras_dropped ? ", " + body.extras_dropped + " extra columns dropped (20 kept)" : "") +
@@ -396,7 +418,7 @@
 
         for (const [id, [action]] of Object.entries(ACTION_BUTTONS)) {
             $(id).addEventListener("click", async () => {
-                if (action === "stop" && !confirm("Stop this campaign? Contacts not called yet are cancelled. This cannot be undone.")) return;
+                if (action === "stop" && !confirm("Stop this list? Contacts not called yet are cancelled. This cannot be undone.")) return;
                 $("actionStatus").textContent = "";
                 try {
                     await post("/api/campaigns/" + openId + "/action", { action: action });

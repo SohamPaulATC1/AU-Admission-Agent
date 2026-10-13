@@ -289,6 +289,10 @@ class Analyzer:
         self._queue.put_nowait((call_uuid, path))
         return True
 
+    def is_busy(self, call_uuid):
+        """True while the call waits in the queue or a worker is analysing it (the admin panel's re-run check)."""
+        return call_uuid in self._queued or call_uuid in self._running
+
     def start(self, backfill_dir=None):
         if not (os.getenv("AWS_ACCESS_KEY_ID") or os.getenv("AWS_PROFILE")):
             # spec §3: one error at start; runs then end failed with error="aws credentials".

@@ -58,6 +58,7 @@ import call_store
 import call_analysis
 import plivo_cost
 import campaigns
+import admin_data   # step 4: the admin panel's queries
 
 # Multi-process: a media-only process sends its dashboard events to the main process
 # (e.g. EVENT_FORWARD_URL=http://127.0.0.1:5001/internal/call-event). Empty = this is the main process.
@@ -1088,6 +1089,7 @@ def init_call_history_db():
         """)
         call_store.upgrade(conn)   # step 2 columns and call_analysis; every process, race-safe
         campaigns.upgrade(conn)    # step 3 campaign tables; every process, safe on every start
+        admin_data.upgrade(conn)   # step 4 index on calls.created_at; same
         conn.commit()
 
 init_call_history_db()
@@ -1520,7 +1522,7 @@ async def outbound_webhook():
     user_name = request.args.get("user_name", "Unknown")
     phone_number = request.args.get("phone_number", "Unknown")
     
-    logger.info(f"📞 Outbound call answered by: {phone_number} ({user_name})")
+    logger.info(f"📞 Outbound call answered by: {campaigns.masked(phone_number)}")
     
     stream_query = web_auth.media_stream_query({"user_name": user_name, "phone_number": phone_number})
 
@@ -2023,7 +2025,7 @@ async def handle_media_stream():
             logger.warning("Could not parse transfer summary as JSON. Falling back to raw string.")
             call_summary = transfer_summary_raw
     
-    logger.info(f'Client connected to Quart WebSocket. Caller: {phone_number}')
+    logger.info(f'Client connected to Quart WebSocket. Caller: {campaigns.masked(phone_number)}')
     plivo_ws = websocket
     
      # Dictionary to maintain state without using Python global variables
@@ -3896,7 +3898,7 @@ async def trigger_call():
         return {"status": "error", "message": "Phone number is required"}, 400
 
     try:
-        logger.info(f"Initiating outbound call to {target_phone_number} via Dashboard...")
+        logger.info(f"Initiating outbound call to {campaigns.masked(target_phone_number)} via Dashboard...")
         call_id = await place_call(target_user_name, target_phone_number)
         return {"status": "success", "message": "Call queued", "call_uuid": call_id}, 200
     except Exception as e:
@@ -4090,6 +4092,186 @@ async def campaign_settings_api(campaign_id):
         return campaign_error(e)
     logger.info(f"📣 [CAMPAIGN] campaign={campaign_id} settings changed by={session.get('role')}")
     return {"status": "success", "settings": settings}
+
+# --- Step 4: admin panel (docs/spec/admin-panel-design.md). Every route is ADMIN_API in web_auth. ---
+
+def admin_range():
+    """(from, to) of the request: ?from=&to= (IST dates), ?all=1, or the last 7 days."""
+    args = request.args
+    return admin_data.parse_range(args.get("from"), args.get("to"), args.get("all") == "1",
+                                  datetime.now(ist_tz).date())
+
+
+def admin_page_number():
+    try:
+        return min(max(1, int(request.args.get("page", "1"))), 10**6)   # a huge OFFSET overflows SQLite
+    except ValueError:
+        raise admin_data.AdminError("page must be a number") from None
+
+
+def admin_error(e):
+    return {"status": "error", "message": str(e)}, 404 if isinstance(e, admin_data.NotFound) else 400
+
+
+def csv_reply(body, prefix, start, end):
+    name = f"{prefix}_all.csv" if start is None else f"{prefix}_{start}_{end}.csv"
+    return Response(body, content_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": f'attachment; filename="{name}"'})
+
+
+@app.route("/api/admin/overview", methods=["GET"])
+async def admin_overview_api():
+    try:
+        start, end = admin_range()
+    except admin_data.AdminError as e:
+        return admin_error(e)
+    data = await call_store.run(CALL_HISTORY_DB_PATH, admin_data.overview, start, end)
+    return {"range": {"from": start, "to": end}, **data}
+
+
+@app.route("/api/admin/calls", methods=["GET"])
+async def admin_calls_api():
+    try:
+        start, end = admin_range()
+        filters = admin_data.check_filters(request.args)
+        page = admin_page_number()
+    except admin_data.AdminError as e:
+        return admin_error(e)
+    data = await call_store.run(CALL_HISTORY_DB_PATH, admin_data.list_calls, start, end, filters, page)
+    return {"range": {"from": start, "to": end}, **data}
+
+
+@app.route("/api/admin/calls.csv", methods=["GET"])
+async def admin_calls_csv():
+    try:
+        start, end = admin_range()
+        filters = admin_data.check_filters(request.args)
+    except admin_data.AdminError as e:
+        return admin_error(e)
+    body = await call_store.run(CALL_HISTORY_DB_PATH, admin_data.export_calls_csv, start, end, filters)
+    return csv_reply(body, "calls", start, end)
+
+
+@app.route("/api/admin/calls/<call_uuid>", methods=["GET"])
+async def admin_call_detail_api(call_uuid):
+    found = await call_store.run(CALL_HISTORY_DB_PATH, admin_data.call_detail, call_uuid,
+                                 call_transcript.TRANSCRIPT_DIR)
+    if found is None:
+        return admin_error(admin_data.NotFound("No such call"))
+    return found
+
+
+@app.route("/api/admin/campaigns", methods=["GET"])
+async def admin_campaigns_api():
+    try:
+        start, end = admin_range()
+    except admin_data.AdminError as e:
+        return admin_error(e)
+    rows = await call_store.run(CALL_HISTORY_DB_PATH, admin_data.campaign_reports, start, end)
+    return {"range": {"from": start, "to": end}, "campaigns": rows}
+
+
+@app.route("/api/admin/campaigns.csv", methods=["GET"])
+async def admin_campaigns_csv():
+    try:
+        start, end = admin_range()
+    except admin_data.AdminError as e:
+        return admin_error(e)
+    body = await call_store.run(CALL_HISTORY_DB_PATH,   # query and CSV both off the event loop
+                                lambda conn: admin_data.campaigns_csv(admin_data.campaign_reports(conn, start, end)))
+    return csv_reply(body, "call_lists", start, end)
+
+
+@app.route("/api/admin/dnc", methods=["GET"])
+async def admin_dnc_api():
+    try:
+        q = admin_data.check_search(request.args)
+    except admin_data.AdminError as e:
+        return admin_error(e)
+    return {"numbers": await call_store.run(CALL_HISTORY_DB_PATH, admin_data.list_dnc, q)}
+
+
+@app.route("/api/admin/dnc.csv", methods=["GET"])
+async def admin_dnc_csv():
+    body = await call_store.run(CALL_HISTORY_DB_PATH,   # the list has no limit: build it off the event loop
+                                lambda conn: admin_data.dnc_csv(admin_data.list_dnc(conn, None)))
+    return csv_reply(body, "do_not_call", None, None)
+
+
+@app.route("/api/admin/dnc", methods=["POST"])
+async def admin_dnc_add_api():
+    data, error = await json_body()
+    if error:
+        return error
+    try:
+        number = await call_store.run(CALL_HISTORY_DB_PATH, admin_data.add_dnc, data.get("phone"), data.get("note"))
+    except admin_data.AdminError as e:
+        return admin_error(e)
+    logger.info(f"🛠️ [ADMIN] do-not-call added {campaigns.masked(number)}")
+    return {"status": "success", "phone": number}
+
+
+@app.route("/api/admin/dnc/remove", methods=["POST"])
+async def admin_dnc_remove_api():
+    data, error = await json_body()
+    if error:
+        return error
+    try:
+        number = await call_store.run(CALL_HISTORY_DB_PATH, admin_data.remove_dnc, data.get("phone"))
+    except admin_data.AdminError as e:
+        return admin_error(e)
+    logger.info(f"🛠️ [ADMIN] do-not-call removed {campaigns.masked(number)}")
+    return {"status": "success", "phone": number}
+
+
+ANALYSIS_OFF = ({"status": "error", "message": "Analysis is switched off on this server"}, 503)
+
+
+@app.route("/api/admin/calls/<call_uuid>/rerun", methods=["POST"])
+async def admin_rerun_api(call_uuid):
+    _, error = await json_body()
+    if error:
+        return error
+    if not await call_store.run(CALL_HISTORY_DB_PATH, admin_data.call_exists, call_uuid):
+        return admin_error(admin_data.NotFound("No such call"))
+    if ANALYZER is None:
+        return ANALYSIS_OFF
+    # Without the transcript the worker reads empty text and saves no_conversation over a good analysis.
+    path = await call_store.run(CALL_HISTORY_DB_PATH, admin_data.transcript_file, call_uuid)
+    if path is None:
+        return {"status": "error", "message": "No transcript to analyse for this call"}, 409
+    if ANALYZER.is_busy(call_uuid):
+        return {"status": "error", "message": "An analysis for this call is already queued or running"}, 409
+    ANALYZER.enqueue(call_uuid, path)
+    logger.info(f"🛠️ [ADMIN] analysis re-run queued call={call_uuid[:8]}")
+    return {"status": "queued"}, 202
+
+
+@app.route("/api/admin/rerun-failed", methods=["POST"])
+async def admin_rerun_failed_api():
+    _, error = await json_body()
+    if error:
+        return error
+    if ANALYZER is None:
+        return ANALYSIS_OFF
+    failed = await call_store.run(CALL_HISTORY_DB_PATH, admin_data.failed_analyses)
+    ready = [(call_uuid, path) for call_uuid, path in failed if path]   # no transcript: a re-run cannot help
+    queued = busy = checked = 0
+    for call_uuid, path in ready:
+        if queued >= admin_data.RERUN_MAX:
+            break
+        checked += 1
+        if ANALYZER.is_busy(call_uuid):
+            busy += 1
+        else:
+            ANALYZER.enqueue(call_uuid, path)
+            queued += 1
+    remaining, no_transcript = len(ready) - checked, len(failed) - len(ready)
+    logger.info(f"🛠️ [ADMIN] re-run of failed analyses queued={queued} busy={busy} remaining={remaining} "
+                f"no_transcript={no_transcript}")
+    return {"status": "queued", "queued": queued, "busy": busy, "remaining": remaining,
+            "no_transcript": no_transcript}, 202
+
 
 @app.before_serving
 async def start_background_work():
