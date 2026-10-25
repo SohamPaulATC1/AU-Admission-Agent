@@ -1189,7 +1189,9 @@ def forward_call_event(call_id, event_type, data):
             _forward_loop, _forward_queue = loop, asyncio.Queue(maxsize=1000)
             # Empty context: the sender's own log lines must not carry the first call's tag.
             loop.create_task(_forward_call_events(_forward_queue), context=contextvars.Context())
-        _forward_queue.put_nowait({"call_id": str(call_id) if call_id else "", "type": event_type, "data": data or {}})
+        # event_id lets the main process drop a copy when a retry re-sends one it already handled.
+        _forward_queue.put_nowait({"call_id": str(call_id) if call_id else "", "type": event_type, "data": data or {},
+                                   "event_id": os.urandom(8).hex()})
     except (RuntimeError, asyncio.QueueFull) as e:
         logger.warning(f"⚠️ [EVENT-FWD] {event_type} dropped: {e!r}")
 
@@ -1199,12 +1201,50 @@ async def _forward_call_events(queue):
     async with httpx.AsyncClient(timeout=5.0) as client:
         while True:
             event = await queue.get()
-            try:
-                resp = await client.post(EVENT_FORWARD_URL, json=event, headers=headers)
-                if resp.status_code != 200:
-                    logger.warning(f"⚠️ [EVENT-FWD] {event['type']} for {event['call_id']} rejected: HTTP {resp.status_code}")
-            except Exception as e:
-                logger.warning(f"⚠️ [EVENT-FWD] {event['type']} for {event['call_id']} not delivered: {e!r}")
+            await _deliver_event(client, event, headers)
+
+
+# A connection error (e.g. ReadError on a keep-alive connection the main process had closed) is retried
+# after these pauses. A lost call_ended left a call "live" for ever with no Gemini cost (2026-10-13).
+EVENT_FORWARD_RETRY_DELAYS_S = (0.5, 2.0)
+
+
+async def _deliver_event(client, event, headers, sleep=asyncio.sleep):
+    for attempt in range(len(EVENT_FORWARD_RETRY_DELAYS_S) + 1):
+        try:
+            resp = await client.post(EVENT_FORWARD_URL, json=event, headers=headers)
+        except httpx.TransportError as e:
+            if attempt < len(EVENT_FORWARD_RETRY_DELAYS_S):
+                logger.info(f"🔁 [EVENT-FWD] {event['type']} for {event['call_id']} retry {attempt + 1}: {e!r}")
+                await sleep(EVENT_FORWARD_RETRY_DELAYS_S[attempt])
+                continue
+            logger.warning(f"⚠️ [EVENT-FWD] {event['type']} for {event['call_id']} not delivered: {e!r}")
+            return False
+        except Exception as e:   # not a connection problem: a retry would not help
+            logger.warning(f"⚠️ [EVENT-FWD] {event['type']} for {event['call_id']} not delivered: {e!r}")
+            return False
+        if resp.status_code != 200:   # the main process answered: refused, not lost; no retry
+            logger.warning(f"⚠️ [EVENT-FWD] {event['type']} for {event['call_id']} rejected: HTTP {resp.status_code}")
+            return False
+        return True
+    return False
+
+
+# Main process: the event_ids it has handled lately, so a retried copy is not applied twice
+# (a second call_ended would add the call's Gemini cost and leg again).
+_seen_event_ids = collections.OrderedDict()
+SEEN_EVENT_IDS_MAX = 5000
+
+
+def _already_seen(event_id):
+    if not isinstance(event_id, str) or not event_id:
+        return False   # an older media process sends no id: handle it as before
+    if event_id in _seen_event_ids:
+        return True
+    _seen_event_ids[event_id] = None
+    if len(_seen_event_ids) > SEEN_EVENT_IDS_MAX:
+        _seen_event_ids.popitem(last=False)
+    return False
 
 
 def emit_call_event_local(call_id, event_type, data=None):
@@ -1252,6 +1292,8 @@ async def internal_call_event():
     if (not isinstance(event, dict) or not isinstance(event.get("type"), str)
             or not isinstance(event.get("data", {}), dict)):
         return {"status": "error", "message": "bad event"}, 400
+    if _already_seen(event.get("event_id")):
+        return {"status": "ok", "duplicate": True}, 200
     # Always local: a forwarded event is never forwarded again.
     emit_call_event_local(event.get("call_id") or "", event["type"], event.get("data"))
     return {"status": "ok"}, 200
@@ -1891,7 +1933,9 @@ async def coordinate_call_tasks(task_map, call_state):
     return completed_names
 
 
-def log_call_stats(call_state):
+def gemini_cost(call_state):
+    """The Gemini Live cost of the call so far, from its running token counters (USD).
+    Shared by the end-of-call stats and the per-minute cost trace, so the two cannot disagree."""
     cost_text_in = (call_state["tokens_text_in"] / 1_000_000) * PRICE_TEXT_INPUT
     cost_text_out = (call_state["tokens_text_out"] / 1_000_000) * PRICE_TEXT_OUTPUT
     cost_audio_in = (call_state["tokens_audio_in"] / 1_000_000) * PRICE_AUDIO_INPUT
@@ -1899,7 +1943,54 @@ def log_call_stats(call_state):
     # tokens_text_out already holds the output transcription (reported by the API).
     input_tx_tokens = round(call_state.get("tokens_input_transcription_est", 0))
     cost_input_tx = (input_tx_tokens / 1_000_000) * PRICE_TEXT_OUTPUT
-    total_cost = cost_text_in + cost_text_out + cost_audio_in + cost_audio_out + cost_input_tx
+    total = cost_text_in + cost_text_out + cost_audio_in + cost_audio_out + cost_input_tx
+    return {"total": total, "input_tx_tokens": input_tx_tokens, "input_tx": cost_input_tx}
+
+
+# R&D only (operator, 2026-10-13): COST_TRACE_SECONDS=60 in .env logs the call's Gemini cost so far
+# every 60 s, until the call ends. Missing or 0 = off (the default): nothing is started.
+def _cost_trace_seconds():
+    text = os.getenv("COST_TRACE_SECONDS", "0").strip() or "0"
+    try:
+        value = int(text)
+    except ValueError:
+        logger.warning(f"⚠️ COST_TRACE_SECONDS={text!r} is not a whole number: cost trace off")
+        return 0
+    return value if value > 0 else 0
+
+
+COST_TRACE_SECONDS = _cost_trace_seconds()
+
+
+def cost_trace_line(call_state, elapsed_s, label):
+    cost = gemini_cost(call_state)
+    return (f"💸 [COST-TRACE] {label} t={elapsed_s:.0f}s gemini=${cost['total']:.6f} "
+            f"text_in={call_state['tokens_text_in']} audio_in={call_state['tokens_audio_in']} "
+            f"text_out={call_state['tokens_text_out']} audio_out={call_state['tokens_audio_out']} "
+            f"input_tx_est={cost['input_tx_tokens']} usage_updates={call_state.get('usage_total_updates', 0)}")
+
+
+async def run_cost_trace(call_state, interval_s, sleep=asyncio.sleep, clock=time.monotonic):
+    """One cost line every interval_s, and a last one when the call ends (the task is cancelled).
+    Logging only: it reads the counters and never writes anything or ends a call."""
+    started, minute = clock(), 0
+    try:
+        while True:
+            await sleep(interval_s)
+            minute += 1
+            try:
+                logger.info(cost_trace_line(call_state, clock() - started, f"sample={minute}"))
+            except Exception as e:   # never let R&D logging touch the call
+                logger.warning(f"⚠️ [COST-TRACE] sample failed: {type(e).__name__}")
+    except asyncio.CancelledError:
+        with contextlib.suppress(Exception):
+            logger.info(cost_trace_line(call_state, clock() - started, "end"))
+        raise
+
+
+def log_call_stats(call_state):
+    cost = gemini_cost(call_state)
+    input_tx_tokens, cost_input_tx, total_cost = cost["input_tx_tokens"], cost["input_tx"], cost["total"]
 
     logger.info("=== CALL ENDED : STATS & PRICING ===")
     # Task 5.2 / defect 1.8: without this the next affected call is as
@@ -2202,11 +2293,14 @@ async def handle_media_stream():
 
     disclaimer_finished = asyncio.Event()
     disclaimer_task = None
+    cost_trace_task = None   # R&D cost trace (COST_TRACE_SECONDS); a local, not a call_state key
 
     try:
         await wait_for_plivo_start(plivo_ws, call_state)
         # Every task created from here on (the four stream tasks, disclaimer, timers) inherits the tag.
         call_log_tag.set(f"[{(call_state.get('call_uuid') or 'no-uuid')[:8]}] ")
+        if COST_TRACE_SECONDS:
+            cost_trace_task = asyncio.create_task(run_cost_trace(call_state, COST_TRACE_SECONDS))
         if call_transcript.TRANSCRIPT_ENABLED:
             call_state["transcript"] = call_transcript.CallTranscript()
 
@@ -2516,6 +2610,10 @@ async def handle_media_stream():
         logger.error(traceback.format_exc())
         await terminate_plivo_call(plivo_client, call_state, "live call lifecycle failure")
     finally:
+        if cost_trace_task is not None and not cost_trace_task.done():
+            cost_trace_task.cancel()   # logs its "end" line
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await cost_trace_task
         call_state["playing_disclaimer"] = False
         if disclaimer_task is not None and not disclaimer_task.done():
             disclaimer_task.cancel()
@@ -4092,6 +4190,30 @@ async def campaign_settings_api(campaign_id):
         return campaign_error(e)
     logger.info(f"📣 [CAMPAIGN] campaign={campaign_id} settings changed by={session.get('role')}")
     return {"status": "success", "settings": settings}
+
+
+@app.route("/api/campaigns/<int:campaign_id>/select", methods=["POST"])
+async def campaign_select_api(campaign_id):
+    """Tick / untick contacts (operator, 2026-10-13): {"selected": true|false, "ids": [..]} or {"all": true}."""
+    data, error = await json_body()
+    if error:
+        return error
+    selected, ids = data.get("selected"), data.get("ids")
+    if not isinstance(selected, bool):
+        return campaign_error(campaigns.CampaignError("selected must be true or false"))
+    if data.get("all") is True:
+        ids = None
+    elif not (isinstance(ids, list) and len(ids) <= campaigns.MAX_ROWS
+              and all(isinstance(i, int) and not isinstance(i, bool) for i in ids)):
+        return campaign_error(campaigns.CampaignError("ids must be a list of contact ids, or all must be true"))
+    try:
+        changed, ticked, total = await call_store.run(CALL_HISTORY_DB_PATH, campaigns.set_selected, campaign_id,
+                                                      selected, ids)
+    except campaigns.CampaignError as e:
+        return campaign_error(e)
+    logger.info(f"📣 [CAMPAIGN] campaign={campaign_id} selection changed={changed} selected={ticked} of {total} "
+                f"by={session.get('role')}")
+    return {"status": "success", "changed": changed, "selected": ticked, "selectable": total}
 
 # --- Step 4: admin panel (docs/spec/admin-panel-design.md). Every route is ADMIN_API in web_auth. ---
 

@@ -154,20 +154,109 @@ class TestForwarding(unittest.TestCase):
 
         receiver, subscriber = asyncio.run(scenario())
         self.assertEqual([e["type"] for e in receiver.events], ["call_connected", "ai_transcript", "call_ended"])
-        self.assertEqual(receiver.events[0], {"call_id": "uuid-1", "type": "call_connected", "data": {"phone": "99"}})
+        first = dict(receiver.events[0])
+        event_id = first.pop("event_id")   # 2026-10-13: lets the main process drop a retried copy
+        self.assertEqual(first, {"call_id": "uuid-1", "type": "call_connected", "data": {"phone": "99"}})
+        self.assertRegex(event_id, r"^[0-9a-f]{16}$")
+        self.assertEqual(len({e["event_id"] for e in receiver.events}), 3)
         self.assertEqual(receiver.tokens, [TOKEN] * 3)
         self.assertTrue(subscriber.empty(), "a media-only process must not emit locally")
 
     def test_an_unreachable_main_process_only_logs_a_warning(self):
         async def scenario():
             with mock.patch.object(app, "EVENT_FORWARD_URL", "http://127.0.0.1:9/internal/call-event"), \
-                    mock.patch.object(app, "INTERNAL_EVENT_TOKEN", TOKEN), LogCapture() as log:
+                    mock.patch.object(app, "INTERNAL_EVENT_TOKEN", TOKEN), \
+                    mock.patch.object(app, "EVENT_FORWARD_RETRY_DELAYS_S", (0, 0)), LogCapture() as log:
                 app.emit_call_event("uuid-2", "ai_transcript", {"text": "x"})
-                await _wait_for(lambda: any("[EVENT-FWD]" in line for line in log.lines))
+                await _wait_for(lambda: any("not delivered" in line for line in log.lines))
             return log.lines
 
         lines = asyncio.run(scenario())
         self.assertTrue(any("ai_transcript for uuid-2 not delivered" in line for line in lines), lines)
+        self.assertEqual(sum("retry" in line for line in lines), 2, lines)   # retried twice, then given up
+
+
+class _FlakyClient:
+    """Answers post() with the given outcomes in turn: an exception is raised, an int is a status code."""
+
+    def __init__(self, *outcomes):
+        self.outcomes, self.posts = list(outcomes), []
+
+    async def post(self, url, json=None, headers=None):
+        self.posts.append(json)
+        outcome = self.outcomes.pop(0)
+        if isinstance(outcome, Exception):
+            raise outcome
+        return mock.Mock(status_code=outcome)
+
+
+class TestForwardRetry(unittest.TestCase):
+    EVENT = {"call_id": "uuid-9", "type": "call_ended", "data": {"cost_usd": 0.1}, "event_id": "ab" * 8}
+
+    def deliver(self, client):
+        delays = []
+
+        async def sleep(seconds):
+            delays.append(seconds)
+
+        with mock.patch.object(app, "EVENT_FORWARD_URL", "http://127.0.0.1:9/internal/call-event"), LogCapture() as log:
+            ok = asyncio.run(app._deliver_event(client, dict(self.EVENT), {}, sleep=sleep))
+        return ok, delays, log.lines
+
+    def test_a_dropped_connection_is_retried_with_the_same_event(self):
+        import httpx
+        client = _FlakyClient(httpx.ReadError(""), 200)
+        ok, delays, _ = self.deliver(client)
+        self.assertTrue(ok)
+        self.assertEqual(delays, [0.5])
+        self.assertEqual(client.posts[0], client.posts[1])   # same event_id both times
+
+    def test_it_gives_up_after_two_retries(self):
+        import httpx
+        client = _FlakyClient(httpx.ReadError(""), httpx.ConnectError("x"), httpx.RemoteProtocolError("y"))
+        ok, delays, lines = self.deliver(client)
+        self.assertFalse(ok)
+        self.assertEqual(delays, [0.5, 2.0])
+        self.assertTrue(any("call_ended for uuid-9 not delivered" in line for line in lines), lines)
+
+    def test_a_refusal_is_not_retried(self):
+        client = _FlakyClient(403)
+        ok, delays, lines = self.deliver(client)
+        self.assertEqual((ok, delays, len(client.posts)), (False, [], 1))
+        self.assertTrue(any("rejected: HTTP 403" in line for line in lines), lines)
+
+
+class TestDuplicateEvents(unittest.TestCase):
+    def setUp(self):
+        patcher = mock.patch.object(app, "_seen_event_ids", app.collections.OrderedDict())
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def post(self, event):
+        async def go():
+            with mock.patch.object(app, "INTERNAL_EVENT_TOKEN", TOKEN), \
+                    mock.patch.object(app, "emit_call_event_local") as local:
+                client = app.app.test_client()
+                response = await client.post("/internal/call-event", json=event, headers={"X-Internal-Token": TOKEN})
+                return response.status_code, await response.get_json(), local.call_count
+        return asyncio.run(go())
+
+    def test_a_retried_copy_is_applied_once(self):
+        event = {"call_id": "uuid-9", "type": "call_ended", "data": {"cost_usd": 0.1}, "event_id": "cd" * 8}
+        self.assertEqual(self.post(event), (200, {"status": "ok"}, 1))
+        self.assertEqual(self.post(event), (200, {"status": "ok", "duplicate": True}, 0))
+
+    def test_events_without_an_id_are_still_handled(self):   # a media process not yet restarted
+        event = {"call_id": "uuid-9", "type": "call_ended", "data": {}}
+        self.assertEqual(self.post(event)[2], 1)
+        self.assertEqual(self.post(event)[2], 1)
+
+    def test_the_memory_is_bounded(self):
+        with mock.patch.object(app, "SEEN_EVENT_IDS_MAX", 3):
+            for i in range(5):
+                app._already_seen(f"id-{i}")
+            self.assertEqual(list(app._seen_event_ids), ["id-2", "id-3", "id-4"])
+            self.assertFalse(app._already_seen("id-0"))   # forgotten: only the last few are kept
 
     def test_the_main_process_emits_locally(self):
         async def scenario():

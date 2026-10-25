@@ -73,6 +73,12 @@
         h2 { font-size: 1.05rem; margin: 0 0 12px; }
         p, .muted { color: var(--text-secondary); font-size: 0.9rem; }
 
+        /* .btn sets display, which beat the hidden attribute: Start/Pause/Resume/Stop all showed at once. */
+        [hidden] { display: none !important; }
+        .pick { width: 1%; white-space: nowrap; }
+        .pick input { width: 18px; height: 18px; cursor: pointer; }
+        .pick input:disabled { cursor: default; }
+        tr.unselected td:not(.pick) { opacity: 0.45; }
         .grid { display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: flex-end; }
         label { display: flex; flex-direction: column; gap: 4px; font-size: 0.8rem; font-weight: 600; }
         .advanced { flex-basis: 100%; }
@@ -212,6 +218,9 @@
 
         const $ = (id) => document.getElementById(id);
         let limits = null, openId = null, page = 1, lastRejected = [];
+        let detailSelection = { selected: 0, selectable: 0 };
+        const CAUSES = { not_selected: "Not selected", stopped: "Stopped", dnc: "Do-not-call list",
+                         no_hangup_event: "No hangup received" };
 
         function el(tag, text, cls) {
             const node = document.createElement(tag);
@@ -273,13 +282,16 @@
             });
         }
 
+        // The server counts the header as row 1; people count the first contact as 1.
+        function rowNumber(sheetRow) { return Number(sheetRow) - 1; }
+
         function showRejected(rows) {
             lastRejected = rows || [];
             const body = $("rejectedRows");
             body.replaceChildren();
             for (const r of lastRejected) {
                 const tr = el("tr");
-                tr.append(el("td", r.sheet_row), el("td", r.name), el("td", r.phone), el("td", REASONS[r.reason] || r.reason));
+                tr.append(el("td", rowNumber(r.sheet_row)), el("td", r.name), el("td", r.phone), el("td", REASONS[r.reason] || r.reason));
                 body.append(tr);
             }
             $("rejectedBox").hidden = lastRejected.length === 0;
@@ -293,7 +305,7 @@
 
         $("downloadRejected").addEventListener("click", () => {
             const lines = [["Row", "Name", "Phone", "Reason"]].concat(
-                lastRejected.map((r) => [r.sheet_row, r.name, r.phone, REASONS[r.reason] || r.reason]));
+                lastRejected.map((r) => [rowNumber(r.sheet_row), r.name, r.phone, REASONS[r.reason] || r.reason]));
             const blob = new Blob([lines.map((line) => line.map(csvCell).join(",")).join("\r\n")], { type: "text/csv" });
             const link = el("a");
             link.href = URL.createObjectURL(blob);
@@ -389,24 +401,53 @@
             $("detailSettings").textContent = c.concurrency + " at once, " + c.hours_start + "-" + c.hours_end +
                 " IST, " + c.max_retries + " retries " + c.retry_gap_min + " min apart · file " + (c.file_name || "") +
                 " · " + c.rejected_count + " rows rejected at upload";
-            $("detailCounts").textContent = STATUSES.map((s) => LABELS[s] + " " + c.counts[s]).join(" · ");
+            const editable = ["draft", "paused"].includes(c.state);
+            detailSelection = { selected: c.selected, selectable: c.selectable };
+            $("detailCounts").textContent = "Selected to call " + c.selected + " of " + c.selectable + " not called yet · " +
+                STATUSES.map((s) => LABELS[s] + " " + c.counts[s]).join(" · ");
             for (const [id, [, states]] of Object.entries(ACTION_BUTTONS)) $(id).hidden = !states.includes(c.state);
+            $("startBtn").disabled = c.selected === 0;   // nobody ticked: nothing to call
+            $("resumeBtn").disabled = c.selected === 0;
             const settingsForm = $("settingsForm");
             settingsForm.hidden = !["draft", "paused"].includes(c.state);
             if (!settingsForm.contains(document.activeElement)) fillSettings(settingsForm, c);   // not while typing
 
+            // Tick boxes: who gets called. Every contact starts ticked; they change only in draft or paused,
+            // and only for contacts not dialled yet. "All" ticks or unticks the whole list (every page).
             const head = $("contactHead"), headRow = el("tr");
+            const allCell = el("th", null, "pick"), allLabel = el("label"), allBox = el("input");
+            allBox.type = "checkbox";
+            allBox.id = "selectAll";
+            allBox.title = "Select or unselect every contact in this list";
+            allBox.checked = c.selectable > 0 && c.selected === c.selectable;
+            allBox.indeterminate = c.selected > 0 && c.selected < c.selectable;
+            allBox.disabled = !editable || c.selectable === 0;
+            allBox.addEventListener("change", () => changeSelection({ all: true, selected: allBox.checked }));
+            allLabel.append(allBox, el("span", "All"));
+            allCell.append(allLabel);
+            headRow.append(allCell);
             ["Row", "Name", "Phone"].concat(body.extra_columns, ["Status", "Tries", "Last result", "Next try", "Lead",
                 "Visit day", "Summary"]).forEach((title) => headRow.append(el("th", title)));
             head.replaceChildren(headRow);
             const rows = $("contactRows");
             rows.replaceChildren();
             for (const k of body.contacts) {
-                const tr = el("tr");
-                tr.append(el("td", k.sheet_row), el("td", k.name), el("td", k.phone));
+                const open = k.status === "pending" || k.status === "retry_wait";
+                const tr = el("tr", null, open && !k.selected ? "unselected" : "");
+                const pick = el("td", null, "pick"), box = el("input");
+                box.type = "checkbox";
+                box.checked = k.selected;
+                box.disabled = !editable || !open;
+                box.title = open ? (k.selected ? "Will be called: untick to skip" : "Will not be called: tick to call")
+                                 : "Already called or closed";
+                box.addEventListener("change", () => changeSelection({ ids: [k.id], selected: box.checked }));
+                pick.append(box);
+                const status = open && !k.selected ? LABELS[k.status] + " (not selected)" : (LABELS[k.status] || k.status);
+                tr.append(pick, el("td", rowNumber(k.sheet_row)), el("td", k.name), el("td", k.phone));
                 for (const column of body.extra_columns) tr.append(el("td", k.extra[column] ?? ""));
-                tr.append(el("td", LABELS[k.status] || k.status, "status-" + k.status), el("td", k.attempts),
-                          el("td", k.last_cause ?? ""), el("td", k.next_attempt_at ?? ""), el("td", k.lead_status ?? ""),
+                tr.append(el("td", status, "status-" + k.status), el("td", k.attempts),
+                          el("td", CAUSES[k.last_cause] ?? k.last_cause ?? ""), el("td", k.next_attempt_at ?? ""),
+                          el("td", k.lead_status ?? ""),
                           el("td", k.campus_visit_day ?? ""), el("td", k.summary ?? "", "summary"));
                 rows.append(tr);
             }
@@ -416,8 +457,25 @@
             $("nextPage").disabled = page >= pages;
         }
 
+        async function changeSelection(change) {
+            $("actionStatus").textContent = "";
+            try {
+                await post("/api/campaigns/" + openId + "/select", change);
+            } catch (error) {
+                $("actionStatus").textContent = error.message;
+            }
+            await loadDetail().catch(showDetailError);
+        }
+
         for (const [id, [action]] of Object.entries(ACTION_BUTTONS)) {
             $(id).addEventListener("click", async () => {
+                if (action === "start") {
+                    const n = detailSelection.selected, skipped = detailSelection.selectable - n;
+                    const text = "Start calling " + n + " selected contact" + (n === 1 ? "" : "s") + "?" +
+                        (skipped ? " " + skipped + " unticked contact" + (skipped === 1 ? " is" : "s are") + " not called." : "") +
+                        " Calls go out only inside the list's calling hours.";
+                    if (!confirm(text)) return;
+                }
                 if (action === "stop" && !confirm("Stop this list? Contacts not called yet are cancelled. This cannot be undone.")) return;
                 $("actionStatus").textContent = "";
                 try {

@@ -102,16 +102,117 @@ Startup lines seen:
 - `PRAGMA journal_mode` gives `('wal',)`.
 - Logged out: `/campaigns` returns 302 (to `/login`) and `/api/campaigns` returns 401.
 
-## 5. Campaigns A and B, controls: NOT DONE YET
+## 5. Live lists
 
-These are waiting for calling hours (from 09:00 IST) and the operator's test numbers. Plan (handoff §8):
-- **A:** 3 internal numbers, concurrency 2, one extra column. Check: dials capped at 2 and at
-  least 1 s apart, masked numbers, `status=done` hangups, the `hangup fields: [...]` line (names
-  only; also confirms `To` for D8), the campaign done, lead results shown, no cost for the operator.
+### List A ("Admission 2027"): done, 2026-10-13 14:37-14:40 IST
+
+The operator uploaded 5 of the team's own numbers, with one extra column (City), concurrency 5,
+default hours and retries, then pressed Start. For this test the operator set
+`CAMPAIGN_RECENT_DAYS=0` in `.env`: these numbers had been called during the week and were rejected
+as "called recently". Remove that line after the tests.
+
+- **Dials:** 5, spaced about 1.1-1.3 s apart (14:37:32 to 14:37:37). Never more than 5 at once.
+  Numbers were masked in every line.
+- **Answered:** all 5, 6-11 s after the dial.
+- **Hangups:** all 5 `status=done cause=NORMAL_CLEARING attempt=1`. The list moved to
+  `done ... done=5 failed=0 cancelled=0` at 14:40:24.
+- **Hangup field names** (the first hangup, names only): `ALegRequestUUID, ALegUUID, AnswerTime,
+  BillDuration, BillRate, CallStatus, CallUUID, ComplianceApplicationId, ComplianceStatus, Direction,
+  Duration, EndTime, Event, From, HangupCause, HangupCauseCode, HangupCauseName, HangupSource,
+  ParentAuthID, RequestUUID, STIRAttestation, STIRVerification, SessionStart, StartTime, To,
+  TotalCost`. `To` is there, so the early-hangup number fallback (D8) has what it needs. Plivo also
+  sends `TotalCost` in the hangup; it isn't used (the cost comes from the call record a minute later).
+- **Analyses:** all 5 `status=ok` within 4-8 s of hangup, one at 59 s.
+  - Leads: callback_requested, cold, no_conversation, not_interested, wrong_number.
+  - 7.5-9.3k input tokens and $0.0004-0.0012 each.
+  - The prompt cache worked: the first analysis wrote the cache (`cache_write`), the next four read
+    it, at about half the cost.
+- **Plivo costs:** all 5 `ok`, $0.00475-$0.01425.
+- **Lead results on the page:** shown. The operator's own check was that it worked.
+
+**Defect found (open, not fixed): one lost `call_ended`.** For call `f7eef765` the media process
+logged `⚠ [EVENT-FWD] call_ended ... not delivered: ReadError('')` when it forwarded the event to
+8000. The forwarder does not retry, so that call's `calls` row is stuck at `connected`:
+- the calls page shows it as live;
+- it has no duration and no Gemini cost (about $0.10 missing from the totals);
+- the analysis, the transcript cost, the Plivo cost and the contact's `done` all arrived, because
+  they travel separately.
+
+**Fixed 2026-10-13, at the operator's go-ahead (live since 15:33 IST):**
+- **Retry:** a forwarded event that fails with a connection error (`httpx.TransportError`: ReadError,
+  ConnectError, RemoteProtocolError and similar) is sent again after 0.5 s and then 2 s. After that it
+  gives up with the old `not delivered` warning. Each retry logs `🔁 [EVENT-FWD] <type> for <call>
+  retry <n>`.
+- **No retry on a reply:** an HTTP answer from 8000 that is not 200 is a refusal, not a loss, so it
+  is not retried.
+- **No double-counting:** a connection can drop after 8000 has already handled the event, and a
+  second `call_ended` would add the call's Gemini cost and leg again. So each forwarded event now
+  carries a random `event_id`:
+  - `/internal/call-event` remembers the last 5,000 ids and answers a copy with
+    `{"status": "ok", "duplicate": true}` without applying it;
+  - events without an id are still applied, so a media process that hasn't restarted yet keeps working.
+- **Code:** `app.py`: `forward_call_event` (the id), `_deliver_event` (the retry), `_already_seen`
+  plus `internal_call_event` (the duplicate check).
+- **Tests** in `tests/test_multiprocess_events.py`: 6 new (retry then success with the same event,
+  give up after two retries, no retry on 403, a duplicate applied once, events without an id, the
+  bounded memory); 2 existing tests updated (the event now has an `event_id`; an unreachable main
+  process is retried twice before the warning).
+- **Suite:** 1132 run, the same 4 known failures. `GEMINI_MODEL` pins `[109, 1950, 2472, 2482, 2913]`.
+
+The row of `f7eef765` itself was not repaired: its lost event's numbers (duration, Gemini cost) are
+only in the log. It still shows as `connected`. Repairing it is a manual database edit, so it waits
+for the operator's word.
+
+### Still to run
+
 - **B:** 1 unanswered number, 1 retry, 30 min gap. Check `retry_wait`, then `attempt=2`, then
   `failed`; record the causes Plivo sends for a ring-out and for a reject.
-- **Controls:** pause with a live call, resume, stop; settings editable while paused, not while running.
-- DB check: the one-liner in handoff §8 step 7.
+- **Controls:** pause with a live call, resume, stop; settings editable while paused, not while
+  running. Also the new tick boxes (§8).
+
+## 8. Tick box per contact (operator, 2026-10-13, after list A)
+
+The operator asked for a safety check: the person running the list chooses who gets called.
+
+| Decision (operator) | Built |
+|---|---|
+| Every contact starts **ticked**; the operator unticks the ones not to call | new column `campaign_contacts.selected INTEGER NOT NULL DEFAULT 1`, added to the existing table on start (race-safe like the other upgrades; existing contacts became ticked) |
+| A **Select / unselect all** option | an "All" tick box in the table header; it acts on the whole list, every page; it shows partly ticked when only some are |
+| Can untick while paused | the boxes change only in **draft** or **paused**, and only for contacts not dialled yet (`pending`, `retry_wait`); otherwise they are locked (a call already made cannot be undone). The server enforces it too (409) |
+| **Confirm on Start** | "Start calling N selected contacts? M unticked contacts are not called. ..." |
+| Rows numbered **from 1** | the page shows the contact's position (the stored `sheet_row` minus the header row) in the contact table, the rejected-rows table and its CSV download |
+
+Behaviour:
+- The dispatcher dials only ticked contacts.
+- Start and Resume are refused (409, "No contact is selected") when nobody is ticked. The buttons
+  are greyed out in that case.
+- An unticked contact shows "Waiting (not selected)", greyed.
+- When a **running** list has no ticked contact left to dial and nobody on a call, it moves to
+  `done`, and its unticked contacts become Cancelled with last result "Not selected".
+- A **paused** list with only unticked contacts left stays paused, so the operator can still tick
+  someone.
+- The counts line starts with "Selected to call N of M not called yet".
+
+New route `POST /api/campaigns/<id>/select`, JSON only:
+- the body is `{"selected": true|false, "ids": [...]}` or `{"selected": ..., "all": true}`;
+- it is open to both logins (`OPERATOR_API` in `web_auth.ENDPOINT_ACCESS`);
+- it logs `📣 [CAMPAIGN] campaign=<id> selection changed=<n> selected=<n> of <n>`.
+
+Also fixed: **all four buttons (Start, Pause, Resume, Stop) showed whatever the list's state.**
+`.btn`'s `display` rule beat the `hidden` attribute (it was visible in the operator's screenshots,
+not a browser cache issue). Fix: `[hidden] { display: none !important; }`.
+
+Tests: `tests/test_campaign_selection.py`, 18 tests:
+- the column added to an old table;
+- tick / untick / all, other lists untouched, locked while running, called contacts locked;
+- Start and Resume need a ticked contact;
+- only the ticked are dialled, the list still finishes, a paused list stays paused;
+- the API: both roles, 400 / 404 / 409 / 415 / 401;
+- the tick-driven dispatcher;
+- the page: boxes, All, confirm, numbering from 1, the hidden fix.
+
+Suite: 1126 run, the same 4 known failures. `GEMINI_MODEL` pins are unchanged: the new route sits
+below every pinned line. Restarted idle at 15:24 IST: startup lines unchanged, no error.
 
 ## 6. Rollback
 
@@ -131,3 +232,8 @@ New: `campaigns.py`, `campaigns.html`, `tests/test_campaigns_store.py`, `tests/t
 this report.
 
 Commit and push to `origin/dev` on the operator's word.
+
+Note (2026-10-13): steps 3 and 4 were committed by the operator (`4e08359`, `cf29926`, then
+`0b0a912` moved the pages into `web/`). The tick-box change in §8 is uncommitted on top of `0b0a912`:
+`campaigns.py`, `app.py`, `web_auth.py`, `web/campaigns.html`, the new
+`tests/test_campaign_selection.py`, this report and `CLAUDE.md`.

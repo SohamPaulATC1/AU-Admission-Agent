@@ -357,7 +357,9 @@ class TestCallStats(unittest.TestCase):
         # And again 2026-10-12 for step 3 (import campaigns, the WAL line in init_call_history_db).
         # And again for prompt v4 (PROMPT_FILE switch and the nameless GREETING_EVENT constant).
         # And again 2026-10-13 for step 4 (import admin_data, its upgrade call in init_call_history_db).
-        self.assertEqual(references, [109, 1908, 2430, 2440, 2871])
+        # And again 2026-10-13 for the event-forward retry and the duplicate check (EVENT-FWD).
+        # And again 2026-10-13 for the R&D cost trace (gemini_cost helper, COST_TRACE_SECONDS, run_cost_trace).
+        self.assertEqual(references, [109, 1999, 2524, 2534, 2969])
 
 
 if __name__ == "__main__":

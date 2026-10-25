@@ -280,6 +280,7 @@ DIAGNOSTIC_LOG_TAGS = (
     "[PLIVO-COST]",   # step 2: Plivo call-record cost fetch (plivo_cost.py)
     "[CAMPAIGN]",     # step 3: campaign dispatcher, uploads and hangup results (campaigns.py)
     "[ADMIN]",        # step 4: admin panel actions (re-run analysis, do-not-call changes)
+    "[COST-TRACE]",   # R&D: Gemini cost so far, every COST_TRACE_SECONDS (off by default)
 )
 
 

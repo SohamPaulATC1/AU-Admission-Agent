@@ -9,6 +9,7 @@ import io
 import json
 import os
 import re
+import sqlite3
 from datetime import timedelta
 from decimal import Decimal, InvalidOperation
 import xml.etree.ElementTree as ET
@@ -112,17 +113,34 @@ CONTACT_COLUMNS = (
     ("last_cause", "TEXT"),
     ("dialed_at", "TEXT"),
     ("finished_at", "TEXT"),
+    # Operator's tick box (2026-10-13): only selected contacts are dialled. Every contact starts ticked.
+    ("selected", "INTEGER NOT NULL DEFAULT 1"),
 )
+SELECTABLE_STATUSES = ("pending", "retry_wait")   # not dialled yet: the tick box can still change
 
 
 def _create(conn, table, columns):
     conn.execute(f"CREATE TABLE IF NOT EXISTS {table} ({', '.join(f'{n} {k}' for n, k in columns)})")
 
 
+def _add_missing_columns(conn, table, columns):
+    """Columns added after the table was first created (existing rows get the default)."""
+    have = {r[1] for r in conn.execute(f"PRAGMA table_info({table})")}
+    for name, kind in columns:
+        if name in have:
+            continue
+        try:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {kind}")
+        except sqlite3.OperationalError as e:   # four processes upgrade at once; one loses the race
+            if "duplicate column" not in str(e).lower():
+                raise
+
+
 def upgrade(conn):
     """The campaign tables and indexes. Safe on every start, in every process."""
     _create(conn, "campaigns", CAMPAIGN_COLUMNS)
     _create(conn, "campaign_contacts", CONTACT_COLUMNS)
+    _add_missing_columns(conn, "campaign_contacts", CONTACT_COLUMNS)
     conn.execute("CREATE TABLE IF NOT EXISTS do_not_call (phone TEXT PRIMARY KEY, added_at TEXT, note TEXT)")
     conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS campaign_contacts_phone ON campaign_contacts (campaign_id, phone)")
     conn.execute("CREATE INDEX IF NOT EXISTS campaign_contacts_status ON campaign_contacts (status, campaign_id)")
@@ -150,6 +168,15 @@ def _counts(conn, campaign_id):
                                   "GROUP BY status", (campaign_id,)):
         counts[status] = n
     return counts
+
+
+def _selection(conn, campaign_id):
+    """(selected, selectable): contacts not dialled yet, and how many of them are ticked."""
+    marks = ", ".join("?" * len(SELECTABLE_STATUSES))
+    total, ticked = conn.execute(
+        f"SELECT COUNT(*), COALESCE(SUM(selected = 1), 0) FROM campaign_contacts WHERE campaign_id=? "
+        f"AND status IN ({marks})", (campaign_id, *SELECTABLE_STATUSES)).fetchone()
+    return int(ticked), int(total)
 
 
 # --- settings ---
@@ -249,6 +276,8 @@ def apply_action(conn, campaign_id, action, now):
     target = MOVES.get((state, action))
     if target is None:
         raise BadMove(f"Cannot {action} a {state} list")
+    if action in ("start", "resume") and _selection(conn, campaign_id)[0] == 0:
+        raise BadMove("No contact is selected: tick at least one contact to call")
     stamp = _stamp(now)
     # "AND state=?": the state read above is outside the write transaction; a request (or the
     # dispatcher) that moved the campaign in between makes this a 409, not a forbidden move.
@@ -281,19 +310,47 @@ def update_settings(conn, campaign_id, settings):
         raise BadMove("Cannot change settings: the list changed meanwhile")
 
 
+def set_selected(conn, campaign_id, selected, contact_ids=None):
+    """Tick or untick contacts (all of the list when contact_ids is None). Only in draft or paused, and
+    only contacts not dialled yet (pending / retry_wait). Returns (changed, selected, selectable)."""
+    state = _state(conn, campaign_id)
+    if state not in EDITABLE_STATES:
+        raise BadMove(f"Contacts can only be ticked or unticked while the list is draft or paused, not {state}")
+    marks = ", ".join("?" * len(SELECTABLE_STATUSES))
+    # The state guard sits in the UPDATE: a Start between our read and this write makes it a 409.
+    sql = (f"UPDATE campaign_contacts SET selected=? WHERE campaign_id=? AND status IN ({marks}) "
+           "AND (SELECT state FROM campaigns WHERE id=?)=?")
+    args = [int(bool(selected)), campaign_id, *SELECTABLE_STATUSES, campaign_id, state]
+    if contact_ids is not None:
+        if not contact_ids:
+            return (0, *_selection(conn, campaign_id))
+        sql += f" AND id IN ({', '.join('?' * len(contact_ids))})"
+        args += list(contact_ids)
+    changed = conn.execute(sql, args).rowcount
+    if _state(conn, campaign_id) != state:
+        raise BadMove("Cannot change the selection: the list changed meanwhile")
+    return (changed, *_selection(conn, campaign_id))
+
+
 # --- reads (no cost anywhere: spec §4) ---
 
 SUMMARY_FIELDS = ("id", "name", "state", "state_reason", "created_by", "created_at", "started_at", "finished_at",
                   "concurrency", "hours_start", "hours_end", "max_retries", "retry_gap_min", "file_name",
                   "rejected_count")
 CONTACT_FIELDS = ("id", "sheet_row", "name", "phone", "extra", "status", "attempts", "last_cause",
-                  "next_attempt_at", "dialed_at", "finished_at")
+                  "next_attempt_at", "dialed_at", "finished_at", "selected")
 LEAD_FIELDS = ("lead_status", "campus_visit_day", "summary")   # all the operator sees of the analysis
 
 
 def list_campaigns(conn):
     rows = conn.execute(f"SELECT {', '.join(SUMMARY_FIELDS)} FROM campaigns ORDER BY id DESC").fetchall()
-    return [dict(zip(SUMMARY_FIELDS, row), counts=_counts(conn, row[0])) for row in rows]
+    return [_summary(conn, row) for row in rows]
+
+
+def _summary(conn, row):
+    item = dict(zip(SUMMARY_FIELDS, row), counts=_counts(conn, row[0]))
+    item["selected"], item["selectable"] = _selection(conn, row[0])
+    return item
 
 
 def campaign_detail(conn, campaign_id, page=1, status=None):
@@ -302,7 +359,7 @@ def campaign_detail(conn, campaign_id, page=1, status=None):
         raise NotFound("No such call list")
     if status is not None and status not in CONTACT_STATUSES:
         raise CampaignError("Unknown status filter")
-    campaign = dict(zip(SUMMARY_FIELDS, found), counts=_counts(conn, campaign_id))
+    campaign = _summary(conn, found)
     where, args = "c.campaign_id=?", [campaign_id]
     if status:
         where += " AND c.status=?"
@@ -317,6 +374,7 @@ def campaign_detail(conn, campaign_id, page=1, status=None):
     for row in rows:
         item = dict(zip(CONTACT_FIELDS + LEAD_FIELDS, row))
         item["extra"] = json.loads(item["extra"] or "{}")
+        item["selected"] = bool(item["selected"])
         contacts.append(item)
     first = conn.execute("SELECT extra FROM campaign_contacts WHERE campaign_id=? ORDER BY id LIMIT 1",
                          (campaign_id,)).fetchone()
@@ -601,7 +659,7 @@ def due_contacts(conn, now):
             if slots[campaign_id] <= 0:
                 continue
             found = conn.execute(
-                "SELECT id, name, phone, attempts FROM campaign_contacts WHERE campaign_id=? AND "
+                "SELECT id, name, phone, attempts FROM campaign_contacts WHERE campaign_id=? AND selected=1 AND "
                 "(status='pending' OR (status='retry_wait' AND next_attempt_at <= ?)) ORDER BY id LIMIT 1",
                 (campaign_id, stamp)).fetchone()
             if found is None:
@@ -737,11 +795,18 @@ def expire_stuck(conn, now):
 
 
 def finish_done(conn, now):
-    """Running or paused campaigns with nothing left to call become done. Returns [{id, counts}]."""
+    """Campaigns with nothing left to call become done. Returns [{id, counts}].
+
+    Running: nobody on a call and no ticked contact left to dial; the unticked ones are then closed as
+    cancelled / not_selected. Paused: nothing open at all (the operator may still tick someone)."""
     ids = [r[0] for r in conn.execute(
-        "SELECT id FROM campaigns k WHERE state IN ('running', 'paused') AND NOT EXISTS "
-        "(SELECT 1 FROM campaign_contacts c WHERE c.campaign_id = k.id "
-        "AND c.status IN ('pending', 'calling', 'retry_wait')) ORDER BY id")]
+        "SELECT id FROM campaigns k WHERE ("
+        "state = 'running' AND NOT EXISTS (SELECT 1 FROM campaign_contacts c WHERE c.campaign_id = k.id "
+        "AND (c.status = 'calling' OR (c.selected = 1 AND c.status IN ('pending', 'retry_wait'))))"
+        ") OR (state = 'paused' AND NOT EXISTS (SELECT 1 FROM campaign_contacts c WHERE c.campaign_id = k.id "
+        "AND c.status IN ('pending', 'calling', 'retry_wait'))) ORDER BY id")]
     for campaign_id in ids:
+        conn.execute("UPDATE campaign_contacts SET status='cancelled', last_cause='not_selected', finished_at=? "
+                     "WHERE campaign_id=? AND status IN ('pending', 'retry_wait')", (_stamp(now), campaign_id))
         conn.execute("UPDATE campaigns SET state='done', finished_at=? WHERE id=?", (_stamp(now), campaign_id))
     return [{"id": campaign_id, "counts": _counts(conn, campaign_id)} for campaign_id in ids]

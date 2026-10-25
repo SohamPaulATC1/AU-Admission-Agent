@@ -54,6 +54,7 @@ ENDPOINT_ACCESS = {
     "campaign_detail_api": OPERATOR_API,
     "campaign_action_api": OPERATOR_API,
     "campaign_settings_api": OPERATOR_API,
+    "campaign_select_api": OPERATOR_API,
     "admin_overview_api": ADMIN_API,
     "admin_calls_api": ADMIN_API,
     "admin_calls_csv": ADMIN_API,
