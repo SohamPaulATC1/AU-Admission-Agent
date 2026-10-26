@@ -102,7 +102,12 @@ class TestFactsNote(unittest.TestCase):
 
     def test_wiring(self):
         self.assertIn("note_facts(call_state, args_dict)", inspect.getsource(app.stream_gemini_to_plivo))
-        self.assertIn("await send_facts_note(session, call_state)", inspect.getsource(app.stream_gemini_to_plivo))
+        source = inspect.getsource(app.stream_gemini_to_plivo)
+        self.assertIn("previous_total - total_token_count >= COMPRESSION_MIN_DROP", source)
+        self.assertIn("await send_facts_note(session, call_state)", source)
+
+    def test_startup_logs_the_cap(self):
+        self.assertIn("[CONTEXT-CAP]", inspect.getsource(app).split('if __name__ == "__main__":')[1])
 
 
 if __name__ == "__main__":

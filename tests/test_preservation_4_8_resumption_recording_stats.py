@@ -359,7 +359,7 @@ class TestCallStats(unittest.TestCase):
         # And again 2026-10-13 for step 4 (import admin_data, its upgrade call in init_call_history_db).
         # And again 2026-10-13 for the event-forward retry and the duplicate check (EVENT-FWD).
         # And again 2026-10-13 for the R&D cost trace (gemini_cost helper, COST_TRACE_SECONDS, run_cost_trace).
-        self.assertEqual(references, [109, 2064, 2586, 2596, 3031])
+        self.assertEqual(references, [109, 2066, 2588, 2598, 3033])
 
 
 if __name__ == "__main__":

@@ -1993,6 +1993,8 @@ CONTEXT_CAP = _context_cap()
 
 # Facts the caller gave, taken from the arguments of the catalog tools (no extra tool call, which
 # would be a billed turn). When Gemini drops old turns, the note puts them back as one short text.
+# An interrupted turn makes the count dip by 26-356 tokens (TEST9); a real trim drops thousands.
+COMPRESSION_MIN_DROP = 1500
 FACT_ARGS = ("aggregate_pct", "qualifying_pct", "auat_pct", "cat_pct", "mat_pct", "clat_score",
              "aujet_rank", "jee_main_rank", "wbjee_rank", "subjects", "degree", "program", "situations")
 
@@ -3481,10 +3483,11 @@ async def stream_gemini_to_plivo(session, plivo_ws, call_state,plivo_client):
                             logger.warning(
                                 f"📉 usage_metadata.total_token_count decreased: prev={previous_total}, current={total_token_count}"
                             )
-                            try:
-                                await send_facts_note(session, call_state)
-                            except Exception as e:
-                                logger.warning(f"⚠️ [FACTS-NOTE] not sent: {e}")
+                            if previous_total - total_token_count >= COMPRESSION_MIN_DROP:
+                                try:
+                                    await send_facts_note(session, call_state)
+                                except Exception as e:
+                                    logger.warning(f"⚠️ [FACTS-NOTE] not sent: {e}")
                         else:
                             delta = total_token_count - previous_total if previous_total is not None else None
                             logger.info(
@@ -4499,6 +4502,7 @@ if __name__ == "__main__":
     logger.info(f'Starting the Quart Server on Port {PORT} with Hypercorn (Waiting for Dashboard trigger...)')
     logger.info(f"🧬 [MODEL] Gemini {describe_gemini_backend()}")
     logger.info(f"📝 Prompt: {PROMPT_FILE} ({len(RAW_SYSTEM_PROMPT)} chars)")
+    logger.info(f"✂️ [CONTEXT-CAP] {'trigger=%d target=%d' % CONTEXT_CAP if CONTEXT_CAP else 'off'}")
     web_auth.check_config()
     logger.info(f"🔐 [AUTH] logins configured, plivo checks={web_auth.PLIVO_SIGNATURE_CHECK}")
     if GEMINI_BACKEND == "vertex":
