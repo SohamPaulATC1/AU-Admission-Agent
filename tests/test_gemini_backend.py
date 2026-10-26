@@ -72,7 +72,7 @@ class TestVertexEndpoint(unittest.TestCase):
         self.assertIsNone(app.vertex_base_url("us-central1"))
 
     def test_defaults(self):
-        self.assertEqual(app.VERTEX_PROJECT, "silver-shift-490819-k0")
+        self.assertEqual(app.VERTEX_PROJECT, "project-7d9da3ed-97a6-42cd-b13")
         self.assertEqual(app.VERTEX_LOCATION, "us-central1")  # TEST6: eu stalled mid-turn
         self.assertEqual(os.path.dirname(app.VERTEX_CREDENTIALS_PATH), REPO_ROOT)
 
@@ -204,8 +204,8 @@ class TestKeyFileIsNotCommittable(unittest.TestCase):
     def test_gitignored(self):
         with open(os.path.join(REPO_ROOT, ".gitignore"), "r", encoding="utf-8") as handle:
             ignored = handle.read().splitlines()
-        self.assertIn("silver-shift-*.json", ignored)
-        self.assertTrue(os.path.basename(app.VERTEX_CREDENTIALS_PATH).startswith("silver-shift-"))
+        self.assertIn("project-*.json", ignored)
+        self.assertTrue(os.path.basename(app.VERTEX_CREDENTIALS_PATH).startswith("project-"))
 
 
 if __name__ == "__main__":
