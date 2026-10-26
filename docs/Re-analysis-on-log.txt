@@ -1,0 +1,87 @@
+call.log exposes the exact mechanics of this 9-minute 38-second call (578s, UUID 81f2327c). More importantly, it reveals a major acoustic self-interruption bug that could not be seen from static code inspection alone—one where your echo canceller (aec1.py) silently stayed disabled for 100% of the call (promotions=0) and Neha repeatedly interrupted herself with her own voice.
+
+1. Ground-Truth Accounting of Your ₹180 ($1.984 USD) Call
+From the final telemetry lines of call.log (13:02:53 to 13:03:55), your total call cost was $1.9839 USD (~₹169–₹180 INR with taxes), broken down as follows:
+
+#,Cost Bucket,Exact Metric from call.log,Rate (app.py),Exact Cost (USD),Share of Gemini Bill
+1,Gemini Audio Input,"456,525 tokens across 73 updates",$3.00 / 1M,1.369575,71.5%
+2,Gemini Text Input,"546,178 tokens across 73 updates",$0.75 / 1M,0.409634,21.4%
+3,Gemini Audio Output,"9,687 tokens (~6.4 mins generated)",$12.00 / 1M,0.116244,6.1%
+4,Gemini Text Output (Transcript),"3,429 tokens",$4.50 / 1M,0.015431,0.8%
+5,Input Transcription (Est.),"~1,213 tokens",$4.50 / 1M,0.005459,0.3%
+,Subtotal: Gemini Live API,"23,046 peak context, 73 updates",,1.916342,100%
+6,Plivo Outbound Telephony,legs=1 (578s),Plivo tariff,0.047500,(External)
+7,Post-Call Batch STT,gemini-3.5-transcribe-preview (227s),Vertex REST,0.017700,(External)
+8,Post-Call Lead Analysis,"claude-haiku-5-5 (16,848/719 tok)",AWS Bedrock,0.002400,(External)
+,GRAND TOTAL,,,1.983942,
+
+Key takeaway from the numbers: 92.9% ($1.779 out of $1.916) of your Gemini cost came purely from re-billing input tokens (456,525 Audio In + 546,178 Text In = 1,002,703 input tokens) across 73 usage_metadata updates.
+
+2. The 4 Root Causes Proven by call.logRoot Cause #1 (The Biggest Smoking Gun): aec1.py Had promotions=0 (Zero Echo Cancellation) $\rightarrow$ Neha Interrupted Herself 21 Times!Look at the AEC summary line at the bottom of call.log (13:02:53,978):   Plaintext🎛️ 🎛️ [AEC] impl=aec1 blocks=28914 far_active_blocks=15451 adapted_blocks=13441 doubletalk_blocks=698 near_silent_blocks=1312 promotions=0 foreground_resets=0 background_resets=120
+
+Now look at how aec1.py works:   _PFDKF initializes the foreground filter self.H_fg (which produces the echo-cancelled output e = d - y_fg) to all zeros (np.zeros).   H_fg only receives weights when _two_path() calls self._filter.promote(), which increments self.stats["promotions"].   Because promotions=0 and background_resets=120, the background filter diverged and reset 120 times and never promoted weights to the foreground filter once during the entire 9-minute call!   Even worse, _suppress_residual() in aec1.py uses y (y_fg = 0) to calculate residual suppression gain (gain = e_energy / (e_energy + 0) = 1.0), so the nonlinear residual echo suppressor was also completely inert.   What this did to your call in call.log:
+Because 100% of Neha's speakerphone echo passed through aec1.py untouched, and because mobile network acoustic round-trip delay exceeded your ECHO_LAG_SEARCH_MS = 80 window (bargein.py line 23), the echo correlation landed between 0.599 and 0.863—just below ECHO_CORR_THRESHOLD = 0.88. As a result, Neha's own echoed voice triggered false barge-ins ([TRIGGER] verdict=fired) and was transcribed as [USER] speech 10+ times:   At 12:55:04, 🤖 [GEMINI] says: "...আমি কি আপনার জন্য চেক করব আপনি কতটা স্কলারশিপ পেতে পারেন?"
+$\rightarrow$ At 12:55:15, 🗣️ [USER] is transcribed saying Neha's exact words: "আমি কি আপনার জন্য চেক করব আপনি কতটা স্কলারশিপ পেতে পারেন?"   At 12:55:59, 🤖 [GEMINI] says the filler: "একটু সময় দিন, আমি বি.টেক-এর প্রোগ্রামগুলো চেক করে দেখছি।"
+$\rightarrow$ Between 12:56:12 and 12:56:31, echo barge-ins cut Neha off 4 times in a row (corr=0.773 at -56.7 dB, corr=0.645, corr=0.857 at -44.9 dB, corr=0.715), and Gemini transcribes 🗣️ [USER]: একটু সময় দিন, আমি বি.টেক-এর প্রোগ্রামগুলো চেক করে দেখছি। four separate times (12:56:16, 12:56:18, 12:56:25, 12:56:30) while Neha restarts the same sentence over and over!   The exact same self-echo loop repeats at 12:56:52 & 12:56:54 ("একটু সময় দিন, আমি বি.টেক সিএসই এআইএমএল..."), 12:58:10, 12:58:30, 12:59:24, 13:00:41, and 13:01:39.   Look at the cost explosion during that 60-second echo loop (t=180s to t=240s): usage_updates jumped from 23 to 35 (+12 billed updates in 1 minute) and cost jumped from $0.27 to $0.52 (+$0.25 in 60 seconds) just from Neha interrupting and talking to herself!   It also broke the end of the call (13:02:36): When the caller asked for a callback at 13:02:31, Neha spoke her closing line ("ঠিক আছে সোহম, আমাদের অ্যাডমিশন টিম আপনাকে কিছু সময় পরে ফোন করে নেবে। ধন্যবাদ!"). At 13:02:36.030, a false barge-in (corr=0.199) cut her off before she could emit the endCall tool call, throwing Gemini into a broken <no speech>{pause} loop (13:02:38, 13:02:42, 13:02:45, 13:02:51) that burned $0.28 USD (~₹24) in the final 38 seconds while the caller said "হ্যালো" three times and hung up manually! 
+
+
+Root Cause #2: SlidingWindow() Never Compressed the Context Window OnceIn call.log, usage_metadata.total_token_count grew steadily from 4,822 tokens on Turn 1 (12:53:25) to 23,344 tokens at 13:02:42 (Last usage_metadata.total_token_count seen: 23046).   What about non-monotonic transitions: 4? Inspecting the 4 📉 usage_metadata.total_token_count decreased warnings in call.log shows what they actually were:   12:55:52,569: prev=9954, current=9847 (-107 tokens, right after 🛑 Gemini confirmed interruption)   12:56:52,876: prev=12180, current=12154 (-26 tokens, right after 🛑 Gemini confirmed interruption)   13:02:36,438: prev=22800, current=22700 (-100 tokens, right after 🛑 Gemini confirmed interruption)   13:02:45,479: prev=23344, current=22988 (-356 tokens)   Those 4 tiny drops were simply Vertex AI rolling back unplayed audio tokens from interrupted turns—sliding window compression never fired once because SlidingWindow() was left at its default threshold (80% of 131k = ~104k tokens). By minute 7–9, every single false echo blip was re-billing 18,000 to 23,000 tokens (~$0.04 to $0.05 per blip). 
+
+Root Cause #3: VAD_SILENCE_OFFSET_FRAMES = 10 (200 ms) Split Single User Sentences Into 2–3 TurnsEven when Neha was silent and the caller was speaking normally, VAD_SILENCE_OFFSET_FRAMES = 10 (200 ms in app.py line 175) chopped the caller's natural speech pauses into multiple activityStart / activityEnd pairs. Look at 12:54:04 to 12:54:12 in call.log, when you said your 12th board, 92% marks, and PCM subjects:   12:54:04.810: ▶️ Sent activityStart $\rightarrow$ 12:54:09.950: ⏹️ Sent activityEnd   12:54:10.290 (340 ms later): ▶️ Sent activityStart $\rightarrow$ 12:54:11.549: ⏹️ Sent activityEnd   12:54:11.749 (200 ms later): ▶️ Sent activityStart $\rightarrow$ 12:54:12.029: ⏹️ Sent activityEnd   One single answer from the caller sent 3 separate activityEnd signals to Gemini (and overall, 15 real user answers produced 39 activityStart events and user_turns=70 in the transcript job).
+
+Root Cause #4: Two-Step Tool Chaining & Filler Re-Turns (calls=13, chars=9548)In call.log, Gemini executed 13 catalog tool calls injecting 9,548 characters of JSON. Look at two patterns in the log:   Filler + Tool Call Double Billing: On tool calls like 12:55:59 (list_programs), 12:56:40 (get_program_details), 12:58:01 (list_programs), and 13:00:22 (get_program_details), Gemini first generated a 3–5 second spoken filler ("একটু সময় দিন, আমি ... চেক করে দেখছি"), emitted the tool call at the end of the turn (billing the full context window), and then billed the full context window a second time 0.2 ms later when send_tool_response returned.   Chaining list_programs $\rightarrow$ get_program_details $\rightarrow$ find_scholarships Across Separate Turns:
+When you asked about M.Tech fees at 13:00:16 ("বি.টেক করার পর এম.টেক করলে কেমন কি ফি পড়বে?"), Gemini:Called list_programs(degree='M.Tech') at 13:00:17 (18,634 tokens billed),   Spoke a filler and called get_program_details for the 2 M.Tech programs at 13:00:22 (18,800 tokens billed),   Spoke the fee and asked if you wanted to check scholarships at 13:00:31 (19,108 tokens billed),   Called find_scholarships at 13:00:35 (19,317 tokens billed),   Spoke the M.Tech scholarship at 13:00:50 (20,123 tokens billed).
+That single M.Tech tangent consumed ~96,000 billed tokens (~$0.20 USD) across 5 turns.
+
+3. Exact Fixes Grounded in call.log (Fixes Both Cost AND the Self-Interruption Bug)
+Fix 1: Stop False Echo Barge-Ins in app.py & aec1.py (Cuts ~35–40 Wasted Turns)
+Add a Minimum RMS Energy Floor for Barge-In (app.py line 1235):
+In call.log, genuine speech from your mic had inbound_rms_db between -12.3 dB and -32.6 dB, whereas many false echo/noise barge-ins fired at -41.2 dB to -64.0 dB (e.g., -56.7 dB at 12:56:12, -44.9 dB at 12:56:22, -52.1 dB at 12:57:05, -64.0 dB at 12:58:24) because RNNoise outputs high speech_prob even on very quiet residual speech.
+In app.py (line 1235), require rms_db to be above -38.0 dB when assistant_speaking is True:
+
+# In app.py around line 1228:
+if call_state["assistant_speaking"] and not call_state["is_speaking"]:
+    active_threshold = VAD_THRESHOLD_WHILE_SPEAKING
+    active_onset_frames = VAD_SPEECH_ONSET_FRAMES_WHILE_SPEAKING
+    min_speech_rms_db = -38.0  # Reject faint -40dB to -64dB echo/noise while AI speaks
+else:
+    active_threshold = VAD_THRESHOLD
+    active_onset_frames = VAD_SPEECH_ONSET_FRAMES
+    min_speech_rms_db = -50.0  # Reject near-silent line noise when idle
+
+if avg_prob > active_threshold and rms_db > min_speech_rms_db:
+    call_state["rnnoise_speech_count"] += 1
+
+Widen ECHO_LAG_SEARCH_MS from 80 to 160 and Lower ECHO_CORR_THRESHOLD from 0.88 to 0.62 (app.py lines 136–138):
+In call.log, every single echo leak while Neha was speaking had corr between 0.60 and 0.863 at lags pinned against the $\pm 80\text{ ms}$ boundary (lag_ms=60, 70, 80). Widening the search window to 160 ms and lowering ECHO_CORR_THRESHOLD to 0.62 catches those mobile network echo delays (120–240 ms). 
+
+# In app.py lines 136-138:
+ECHO_CORR_THRESHOLD = float(os.getenv("ECHO_CORR_THRESHOLD", "0.62")) # Was 0.88
+ECHO_CORR_WINDOW_MS = 180
+ECHO_LAG_SEARCH_MS = 160 # Was 80 (mobile echo in call.log peaked at lag_ms=60..80+)
+
+Fix aec1.py Never Promoting (promotions=0) (aec1.py lines 53–55):
+In aec1.py, PROMOTE_BELOW_INPUT = 0.5 requires the background filter to immediately achieve a 3 dB (50% energy) reduction before H_fg ever moves off zero, while MU_MAX = 1.0 causes the un-promoted background filter to diverge 120 times (background_resets=120) on mobile codecs. Lowering MU_MAX = 0.5 and setting PROMOTE_BELOW_INPUT = 0.85 allows aec1.py to actually promote weights and enables _suppress_residual().
+
+Fix 2: Increase VAD_SILENCE_OFFSET_FRAMES from 10 (200 ms) to 25 (500 ms) (app.py line 175)In call.log, the caller paused for 200 ms to 340 ms between clauses (12:54:09.950 $\rightarrow$ 12:54:10.290 and 12:54:11.549 $\rightarrow$ 12:54:11.748). Raising VAD_SILENCE_OFFSET_FRAMES to 25 (500 ms) keeps those clauses inside a single activityStart / activityEnd envelope: 
+
+# In app.py lines 174-175:
+VAD_SPEECH_ONSET_FRAMES = 6
+VAD_SILENCE_OFFSET_FRAMES = 25   # ~500 ms trailing silence before end-of-turn (was 10 = 200 ms)
+
+Fix 3: Configure SlidingWindow(target_tokens=6000) + trigger_tokens=10000 (app.py line 1072)
+In call.log, the session started at 4,822 tokens (System Prompt + Tools + Greeting) and compounded to 23,344 tokens. Capping trigger_tokens=10000 and target_tokens=6000 ensures the context window never exceeds 10,000 tokens (cutting the per-turn cost in minutes 4–9 by 60%+):
+
+# In app.py lines 1072-1076:
+context_window_compression=(
+    types.ContextWindowCompressionConfig(
+        trigger_tokens=10000,
+        sliding_window=types.SlidingWindow(
+            target_tokens=6000,
+        ),
+    )
+)
+
+Fix 4: Prevent Barge-In From Aborting Closing Farewell & endCall (app.py line 1272 & prompt_au_v4.txt)In call.log at 13:02:36, Neha spoke her farewell first (per prompt_au_v4.txt step 8: "speak the farewell FIRST, and ONLY THEN call endCall"), and a false barge-in at delivered_ms=4113 cut her off before she emitted the endCall tool call, causing the $0.28 <no speech>{pause} hang at the end of the call.   Update Step 8 of prompt_au_v4.txt so Neha calls endCall in the same turn right as she speaks the farewell (since app.py lines 1268–1286 already wait for closing_audio_phase playback to drain completely before hanging up Plivo!). Once endCall is invoked, call_state["closing_audio_phase"] = True (line 1269) automatically ignores all incoming mic frames (line 1164: if call_state.get("closing_audio_phase") ... continue), making it impossible for echo or noise to abort the goodbye.
+
+4. Recalculated Savings on This Exact Call (81f2327c)Applying those 4 fixes directly to the metrics recorded in call.log:   Eliminating the 21 false echo barge-ins + 200ms mid-sentence splits reduces the 73 usage_metadata updates down to the ~24 actual conversational & tool turns (15 caller turns + 9 catalog tool turns).   Capping SlidingWindow at trigger_tokens=10000 / target_tokens=6000 keeps the average billed context per turn at ~7,200 tokens (down from the uncapped ~13,800-token average across the 73 turns).   Total Billed Tokens Drop From 1,002,703 Input Tokens to ~175,000 Input Tokens:Audio Input: Drops from 456,525 tokens ($1.37) $\rightarrow$ ~75,000 tokens (~$0.225)Text Input: Drops from 546,178 tokens ($0.41) $\rightarrow$ ~100,000 tokens (~$0.075)Audio + Text Output: Drops from $0.137 $\rightarrow$ ~$0.095 (no wasted re-generations of interrupted sentences)Total Gemini Live Cost for this 9.6-minute call: Drops from $1.916 (₹165) to ~$0.395 (~₹34)—while also fixing Neha cutting herself off and fixing the <no speech>{pause} hang at the end of the call.

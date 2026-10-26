@@ -1,0 +1,181 @@
+Q. Hey Senior Dev , if I access the gemini 3.8 live model from vertex ai then on a conversation how is the cost gets calculate with token consumption ?Is the tokens re-billed every turn ?
+
+Ans. Yes, past tokens in the session are re-billed on every turn. Because the Gemini Live API maintains a stateful, persistent WebSocket session on the server side, its billing follows a compounding model based on the active Session Context Window.
+
+Every time a turn completes (defined as one user input and the model's corresponding response), you are billed for the new output generated plus all accumulated tokens currently sitting in the session context window as input for that turn.
+
+1. How Per-Turn Compounding WorksIn a Live API WebSocket session, you don't manually re-send the conversation history array on every request like you do in standard REST calls—the server holds that state for you. However, under the hood, the model still has to process the entire active history to generate the next response.For any given Turn N, your billed token consumption is:Billed Input Tokens for Turn N: System instructions + tool definitions + all previous user inputs and model outputs from Turns 1 through N-1 + current Turn N user input. (Note: Previous model responses are re-billed at the input token rate on subsequent turns, not the output rate).Billed Output Tokens for Turn N: Only the newly generated model response (audio/text) and any internal thinking/reasoning tokens for Turn N.
+
+Worked Example (Audio-to-Audio Conversation)Audio in gemini-3.8-live is tokenized at 25 tokens per second ($1,500\text{ tokens/minute}$). Suppose you have a 500-token system prompt, and on each turn, the user speaks for 10 seconds (250 audio tokens) and the model replies for 10 seconds (250 audio tokens):  
+
+Turn,What sits in the Session Context Window (Billed as Input),New Model Reply (Billed as Output),Total Tokens Billed This Turn
+Turn 1,500 (System) + 250 (User 1) = 750 input tokens,250 output tokens,"1,000 tokens"
+Turn 2,"500 (System) + 500 (Turn 1 history) + 250 (User 2) = 1,250 input tokens",250 output tokens,"1,500 tokens"
+Turn 3,"500 (System) + 1,000 (Turns 1–2 history) + 250 (User 3) = 1,750 input tokens",250 output tokens,"2,000 tokens"
+Turn 10,"500 (System) + 4,500 (Turns 1–9 history) + 250 (User 10) = 5,250 input tokens",250 output tokens,"5,500 tokens"
+
+As the session lengthens, the cost per turn grows linearly unless you cap the context window.
+
+2. Vertex AI Pricing for gemini-3.8-live
+On Vertex AI (Non-global endpoints), gemini-3.8-live is priced per 1 million tokens based on the modality:
+
+Modality,Direction,Price per 1M Tokens,Effective Rate (at 25 tok/sec for audio)
+Audio,Input,$3.00,~$0.0045 per minute of audio
+Audio,Output,$12.00,~$0.0180 per minute of audio
+Text,Input,$0.75,Standard text tokenization (~4 chars/token)
+Text (Response & Reasoning),Output,$4.50,Includes thinking tokens & transcriptions
+Video / Image,Input,$1.00,~258 tokens per frame (at 1 FPS)
+Video (Avatar),Output,$1.00,Used when Live Avatar rendering is enabled
+
+3. Three Watch-Outs That Inflate Live API Bills
+
+Proactive Audio is Always On in gemini-3.8-live:
+Unlike older 3.1 preview models that only billed when you actively streamed input, Proactive Audio is permanently enabled in gemini-3.8-live and gemini-3.8-live-extended-thinking. If you continuously stream dead air or background silence over the WebSocket so the model can decide when to chime in, those audio frames still accumulate at 25 tokens/sec in the context window. Using client-side VAD (like Silero VAD) to gate noise or only streaming active speech segments when you don't need proactive listening can save substantial input tokens.
+
+Transcription Surcharges: If you enable input_audio_transcription or output_audio_transcription in your session config, Vertex AI bills for all generated transcript text tokens at the text output rate ($4.50 / 1M tokens) on top of the standard audio token costs.
+
+Unbounded Sessions: Without compression, an audio-only session hits the hard 15-minute session limit (or 2 minutes with video), and by minute 12, every single short exchange is re-billing 18,000+ audio tokens of history.
+
+4. How to Stop the Re-Billing Snowball: Context Window Compression
+
+To prevent later turns in a long voice call from becoming expensive, configure ContextWindowCompressionConfig in your initial LiveConnectConfig.   By setting a trigger_tokens threshold and a sliding_window target, the Vertex AI server automatically truncates/evicts older conversational turns from the middle of the history (while preserving your initial system instructions) once the context crosses your threshold.
+
+from google.genai import types
+
+config = types.LiveConnectConfig(
+    response_modalities=[types.LiveModality.AUDIO],
+    context_window_compression=types.ContextWindowCompressionConfig(
+        trigger_tokens=16000,  # When total session context hits 16k tokens...
+        sliding_window=types.SlidingWindow(
+            target_tokens=8000 # ...prune older turns down to the most recent 8k tokens
+        )
+    )
+)
+
+With this enabled:   Subsequent turns are only billed for the retained target_tokens window plus new tokens, putting a hard ceiling on your maximum per-turn cost.   It unlocks unlimited session duration, bypassing the 15-minute audio-only / 2-minute audio-video connection cutoff.   You can inspect the exact token count billed on every turn in real time by reading message.usage_metadata (prompt_token_count, candidates_token_count, and total_token_count) emitted alongside the server's turn_complete event.
+
+
+Q. But if I do context window compression , won't the model forget things that user said at some previous time in the session ?
+
+Ans. Yes, it will. Despite the word "compression" in ContextWindowCompressionConfig, the Live API does not semantically summarize older turns—it uses a FIFO (First-In, First-Out) sliding window (SlidingWindow) that permanently drops the oldest conversational turns once trigger_tokens is reached.   However, it does not wipe the entire slate clean. Understanding exactly what stays and what gets evicted lets you architect around this so the model never forgets critical user facts.
+
+1. What Stays vs. What Gets Dropped
+When the total session context hits trigger_tokens and shrinks down to target_tokens, the server slices the context window selectively:
+
+Context Component,Survives Compression?,How It's Handled
+System Instructions (system_instruction),Yes (100% Preserved),Pinned at the top of the context window for the entire life of the session.
+Tool Definitions (tools),Yes (100% Preserved),Pinned alongside the system prompt; the model never forgets how to call your functions.
+Recent Turns (Up to target_tokens),Yes (Preserved),Kept intact so the immediate flow of conversation feels natural.
+"Oldest Turns (Turn 1, Turn 2, etc.)",No (Evicted),Permanently truncated from the middle of the context window (in whole-turn increments) to get total tokens down to target_tokens.
+
+For example, if the user tells the voice agent their account ID, name, or preference in Turn 1, and 15 minutes later (after compression has triggered) asks, "Can you check the status on that account I gave you earlier?", the model will have no memory of Turn 1 and will ask for the account ID again.
+
+
+2. Three Ways to Prevent "Amnesia" While Keeping Costs Low
+In production voice agents, you rarely need the model to remember the raw verbatim audio of a greeting or small talk from 10 minutes ago—you only need it to remember key extracted facts (user name, customer ID, preferences, docket number, or current workflow state). You can preserve those facts for a fraction of the token cost using three patterns:
+
+Pattern A: Tool-Based State Extraction + Dynamic Context Injection (Best Practice)
+Instead of paying to re-bill raw audio tokens (at 25 tokens/sec) for 20 turns just so the model remembers a 10-token fact, instruct the model to extract and save key entities via tool calls (or extract them asynchronously on your backend from the transcript).
+
+How it works:
+
+Give the model a lightweight tool (e.g., update_session_memory(key, value)) or capture arguments when it runs business tools (like lookup_customer(customer_id="98412")).
+
+Store those key-value facts in your backend state (in-memory dict or Redis) for that WebSocket connection.
+
+Periodically—or whenever you detect usage_metadata.total_token_count just dropped (meaning sliding-window truncation just fired)—send a brief, invisible text update into the session via session.send_client_content() containing a compact summary:
+
+# Injecting a 40-token text summary costs almost nothing compared to 8,000 audio tokens
+await session.send_client_content(
+    turns=types.Content(
+        role="user",
+        parts=[types.Part.from_text(
+            text="[SYSTEM MEMORY SYNC: User Name=Rahul, Customer_ID=98412, Issue=Router LOS blinking red]"
+        )]
+    ),
+    turn_complete=False # Appends to context without forcing the model to speak out loud
+)
+
+Why this wins: A 40-token text note costs $0.00003 per million-token scale ($0.75/1M text input tokens) and sits at the newest end of the sliding window, whereas keeping 10 minutes of raw audio in context costs 15,000 audio tokens on every single turn.
+
+Pattern B: Background Transcript SummarizationIf the conversation is open-ended (e.g., an interview, counseling session, or long troubleshooting flow) where structured tool parameters aren't enough:Enable input_audio_transcription and output_audio_transcription (or log the text equivalents on your server).Every $K$ turns (or right after compression triggers), have a fast, cheap background model (gemini-2.5-flash-lite or gemini-3.1-flash-lite) summarize the older turns into a 100-word bulleted recap.Push that text recap into the Live API session with turn_complete=False. You compress 10,000 audio tokens into ~130 text tokens while retaining 99% of the semantic memory.
+
+Pattern C: Right-Sizing trigger_tokens and target_tokens
+If your average voice call is 3 to 6 minutes long, you often don't want compression to trigger during normal calls at all—you only want it as a safety net against runaway 20-minute calls or the 15-minute hard disconnect limit.
+
+At 25 tokens/sec, 1 minute of continuous back-and-forth audio is 1,500 tokens.
+
+A typical 5-minute call is only ~7,500 audio tokens plus your system prompt.
+
+If you set trigger_tokens=24000 and target_tokens=16000 (~10.5 minutes of retained audio memory), normal 5–10 minute calls will never lose a single turn of memory, while unusually long calls stay protected from runaway compounding costs and hard session timeouts.
+
+Q. 9 mins of a call for me is going up to 185 rs for a admission counselling agent , which is very expensive for me
+
+Ans. ₹185 (~$2.20 USD) for a 9-minute call is roughly 6x to 8x higher than what a standard 9-minute audio-only session should cost.
+
+Even with zero compression, 9 minutes of pure audio-to-audio conversation (13,500 total audio tokens) across ~18 turns should only cost around ₹25 to ₹35 ($0.30–$0.40 USD). Hitting ₹185 in 9 minutes means massive text or media payloads are sitting in your context window and getting re-billed on every single turn (and on every single tool call).
+
+1. The Math: Why Your Bill Hit ₹185 ($2.20)To burn $2.20 in 9 minutes at $0.75 / 1M text input tokens (or $3.00 / 1M audio input tokens), your session is accumulating and re-billing ~2.5M to 3M total input tokens across the call. In an admissions counseling agent, three culprits cause this exact spike:Full Brochure / Fee Structure Dumps in System Prompt or RAG Tool Responses (The #1 Culprit):If your system prompt contains a huge university knowledge base (e.g., 25,000 tokens of course lists, eligibility criteria, hostel fees, and scholarship rules), OR if your RAG/PDF retrieval tool returns 5,000+ tokens of raw document chunks per query, that text sits permanently in the session history.Tool Calls Double-Trigger Turn Billing:In the Live API, every tool execution is a separate billed model turn.User asks about B.Tech CSE fees $\rightarrow$ Turn 1A billed (Model decides to call search_admissions_docs).Your server sends back 4,000 tokens of PDF chunks via send_tool_response $\rightarrow$ Turn 1B billed (Model reads the entire history + the 4,000 new tokens to speak the answer).If a student asks 8 questions in 9 minutes and each triggers a tool call, your conversation actually executes 25 to 35 billed turns, not 9!Continuous Duplex Audio Streaming + High Turn Count:If the student interrupts ("barge-in"), background noise triggers false server-side VAD turns, or thinking tokens are running uncapped on gemini-3.8-live, every tiny 1-second noisy false trigger re-bills your entire 30,000-token context window.How a 9-Minute Admissions Call Silently Reaches ₹185:
+
+Component,Token Size,Billed Across 30 Effective Turns (15 Q&A + 15 Tool Turns),Approximate Cost
+System Prompt + Tool Schemas,"15,000 text tokens","15,000×30=450,000 tokens",~$0.34 (₹28)
+Accumulated RAG / PDF Tool Outputs,"~6,000 text tokens per lookup","Compounds up to ~1,200,000 text tokens",~$0.90 (₹76)
+Accumulated Raw Audio History,"13,500 audio tokens","Compounds across 30 turns = ~220,000 audio tokens",~$0.66 (₹56)
+Audio Output + Transcriptions + Thinking,9 mins reply + reasoning,Audio out ($12/1M) + Text/Thinking out ($4.50/1M),~$0.30 (₹25)
+Total for 9-Min Call,,,~$2.20 (₹185)
+
+. How to Drop Your 9-Minute Call Cost from ₹185 to ~₹18–₹25
+You can cut this cost by 85%+ immediately without losing any student details from early in the call by separating Knowledge Retrieval from Conversation Memory:
+
+Fix 1: Cap RAG / Tool Responses to Under 300 Tokens
+Never return raw multi-page PDF chunks from ChromaDB/FAISS directly into the Live API's FunctionResponse.
+
+Once a FunctionResponse enters the Live API WebSocket, you cannot delete it until the sliding window evicts it.
+
+The Fix: In your Python tool handler, either return only the exact matching snippet (top 2 chunks, max 250–300 words) or format structured database rows (e.g., {"course": "B.Tech CSE", "semester_fee": "85000", "eligibility": "60% in PCM"}). Shrinking tool outputs from 4,000 tokens to 250 tokens alone cuts your compounding text bill by 90%.
+
+Fix 2: Move Static University Data Out of the System Prompt into Tools
+Keep your system_instruction strictly for persona, language tone, and conversation rules (under 800–1,000 tokens). Do not paste the entire admissions prospectus into the system prompt—let the model fetch specific course/fee details on demand via a tool.
+
+Fix 3: Enable Aggressive Sliding Window + Local Lead State Dict
+Set trigger_tokens=6000 and target_tokens=3000 in ContextWindowCompressionConfig.
+To make sure the counselor never forgets what the student said in Minute 1 (like their name, 12th-grade percentage, desired stream, or hostel preference):
+
+Give the model a tool called save_student_profile(name, stream_interest, marks_12th, city, needs_hostel).
+
+Instruct the model in the system prompt: "Whenever the student shares their name, marks, or course interest, immediately call save_student_profile."
+
+When your sliding window prunes old audio turns + bulky old RAG tool responses, inject a 50-token silent text note (turn_complete=False) with the student's profile dict.
+
+Python
+# In your LiveConnectConfig:
+config = types.LiveConnectConfig(
+    response_modalities=[types.LiveModality.AUDIO],
+    context_window_compression=types.ContextWindowCompressionConfig(
+        trigger_tokens=6000,   # Caps maximum per-turn input billing at 6k tokens!
+        sliding_window=types.SlidingWindow(target_tokens=3000)
+    ),
+    # Optional: lower thinking budget if using extended thinking so it doesn't burn $4.50/1M output tokens on every turn
+)
+Fix 4: Prevent False VAD Triggers from Re-Billing Your Context
+If a student is in a noisy environment, every cough or background voice can trigger a micro-turn that re-bills the entire context window.
+
+Gate your incoming audio stream with client-side/server-side Silero VAD before forwarding frames to session.send_realtime_input(), or tune RealtimeInputConfig.automatic_activity_detection (silence_duration_ms and prefix_padding_ms) so the model only processes complete student sentences rather than firing twice per sentence.
+
+3. How to Pinpoint the Exact Token Leak Today
+Add these 4 lines inside your WebSocket receive loop right now and run a 2-minute test call:
+
+Python
+async for response in session.receive():
+    if response.usage_metadata:
+        u = response.usage_metadata
+        print(
+            f"[TURN BILLING] Prompt (Input): {u.prompt_token_count} | "
+            f"Response (Output): {u.candidates_token_count} | "
+            f"Total: {u.total_token_count}"
+        )
+        # Also inspect modality breakdown (TEXT vs AUDIO)
+        if u.prompt_tokens_details:
+            for detail in u.prompt_tokens_details:
+                print(f"   -> Input Modality {detail.modality}: {detail.token_count} tokens")
+Look at the Input Modality TEXT vs Input Modality AUDIO numbers on Turn 3 and Turn 4. If TEXT is jumping by thousands of tokens per turn, your system prompt and RAG tool payloads are the culprit; if AUDIO is firing 40+ times in a 9-minute call, hyperactive VAD turn-splitting is multiplying your turns. Which of those two is showing up larger in your setup right now?
