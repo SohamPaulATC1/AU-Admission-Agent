@@ -47,7 +47,7 @@ Thumbs.db
 .vscode/
 .idea/
 *.swp
-
+.agents
 # Kiro
 .kiro/
 
@@ -61,3 +61,8 @@ venv312/
 TEST_FILES/
 *.pdf
 TRANSCRIPTS/
+
+docs/Backend_Audit1.txt
+docs/Conversations.txt
+docs/Cross_Check_against_doc.txt
+docs/Re-analysis-on-log.txt
