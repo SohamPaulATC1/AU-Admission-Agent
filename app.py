@@ -2025,6 +2025,17 @@ async def send_facts_note(session, call_state):
         logger.info(f"🧾 [FACTS-NOTE] resent after the history shrank ({len(note)} chars)")
 
 
+# Runaway guard (operator, 2026-10-26): after an interruption Gemini sometimes answers every
+# "Hello?" with the literal text "<no speech>{pause}" (TEST9: 4 in a row, each a billed turn on a
+# 23k context). This many empty turns in a row end the call.
+EMPTY_TURN_LIMIT = 2
+
+
+def is_empty_model_turn(text):
+    stripped = text.replace("<no speech>", "").replace("{pause}", "")
+    return stripped != text and not stripped.strip()
+
+
 def context_compression_config():
     window = types.SlidingWindow()
     if CONTEXT_CAP:
@@ -2339,6 +2350,7 @@ async def handle_media_stream():
         # Catalog names get_program_details found on this call (step 2: school fallback for the analysis).
         "catalog_found": [],
         "facts": {},
+        "empty_model_turns": 0,
 
         # Per-delta trace and byte counters — task 5.1. Observability only.
         "delta_trace": [],
@@ -3360,6 +3372,8 @@ async def stream_gemini_to_plivo(session, plivo_ws, call_state,plivo_client):
                         if call_state["ai_text_buffer"].strip():
                             logger.info(f"🤖 [GEMINI] (Interrupted): {call_state['ai_text_buffer'].strip()}")
                             if call_state["transcript"]: call_state["transcript"].agent_text(call_state["ai_text_buffer"].strip(), interrupted=True)
+                            if not is_empty_model_turn(call_state["ai_text_buffer"]):
+                                call_state["empty_model_turns"] = 0
                             call_state["ai_text_buffer"] = ""
                             
                         call_state["assistant_speaking"] = False
@@ -3403,6 +3417,14 @@ async def stream_gemini_to_plivo(session, plivo_ws, call_state,plivo_client):
                             emit_call_event(call_state.get("call_uuid"), "ai_transcript", {"text": ai_transcript})
                             if call_state["transcript"]: call_state["transcript"].agent_text(ai_transcript)
                             call_state["ai_text_buffer"] = ""
+                            if is_empty_model_turn(ai_transcript):
+                                call_state["empty_model_turns"] += 1
+                                if call_state["empty_model_turns"] >= EMPTY_TURN_LIMIT:
+                                    await terminate_plivo_call(
+                                        plivo_client, call_state,
+                                        f"model sent {call_state['empty_model_turns']} empty turns in a row")
+                            else:
+                                call_state["empty_model_turns"] = 0
 
                         logger.debug(f"🧾 [DELTA] turn summary {delta_trace_verdict(call_state)}")
                         reset_delta_trace(call_state, "turn-complete")

@@ -185,6 +185,7 @@ def new_call_state(
         "catalog_chars": 0,
         "catalog_found": [],
         "facts": {},
+        "empty_model_turns": 0,
 
         # --- task 5.1: per-delta trace and the three per-turn byte counters.
         "delta_trace": [],
