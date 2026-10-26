@@ -115,13 +115,19 @@ PLIVO_PHONE_NUMBER = os.getenv('FROM_NUMBER')
 GEMINI_BACKEND = os.getenv("GEMINI_BACKEND", "vertex").strip().lower()
 if GEMINI_BACKEND not in ("vertex", "studio"):
     raise ValueError(f"GEMINI_BACKEND must be 'vertex' or 'studio', got {GEMINI_BACKEND!r}")
-VERTEX_PROJECT = os.getenv("VERTEX_PROJECT", "silver-shift-490819-k0")
+# VERTEX_PROJECT = os.getenv("VERTEX_PROJECT", "silver-shift-490819-k0")
+VERTEX_PROJECT = os.getenv("VERTEX_PROJECT", "project-7d9da3ed-97a6-42cd-b13")
 # Vertex location. us-central1: eu stalled mid-turn on live calls (TEST6, 2026-10-05); eu stays available via env.
 VERTEX_LOCATION = os.getenv("VERTEX_LOCATION", "us-central1").strip().lower()
+# VERTEX_CREDENTIALS_PATH = os.getenv(
+#     "VERTEX_CREDENTIALS_PATH",
+#     os.path.join(os.path.dirname(os.path.abspath(__file__)),
+#                  "silver-shift-490819-k0-1b9ed54b2663.json"),
+# )
 VERTEX_CREDENTIALS_PATH = os.getenv(
     "VERTEX_CREDENTIALS_PATH",
     os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                 "silver-shift-490819-k0-1b9ed54b2663.json"),
+                 "project-7d9da3ed-97a6-42cd-b13-17147616d472 1.json"),
 )
 # Refresh the access token (1 h lifetime) when less than this much is left.
 VERTEX_TOKEN_REFRESH_MARGIN_SECONDS = 300
