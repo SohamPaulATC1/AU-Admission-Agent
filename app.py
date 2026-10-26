@@ -1962,6 +1962,71 @@ def _cost_trace_seconds():
 COST_TRACE_SECONDS = _cost_trace_seconds()
 
 
+# Context cap (operator, 2026-10-26): every agent turn re-bills the whole history, so a long call
+# costs more per turn. GEMINI_TRIGGER_TOKENS=14000 and GEMINI_TARGET_TOKENS=9000 in .env make
+# Gemini drop the oldest turns once the history passes 14k, down to about 9k. Both missing = off
+# (the default: Gemini's own 80% trigger, which a call never reaches). A bad pair only warns.
+def _context_cap():
+    names = ("GEMINI_TRIGGER_TOKENS", "GEMINI_TARGET_TOKENS")
+    texts = [os.getenv(name, "").strip() for name in names]
+    if not any(texts):
+        return None
+    try:
+        trigger, target = (int(text) for text in texts)
+    except ValueError:
+        logger.warning(f"⚠️ {names[0]}/{names[1]}={texts!r}: both must be whole numbers: context cap off")
+        return None
+    if not 5000 <= trigger <= 128000 or not 0 < target < trigger:
+        logger.warning(f"⚠️ context cap {trigger}/{target}: need 5000 <= trigger <= 128000 and 0 < target < trigger: off")
+        return None
+    return trigger, target
+
+
+CONTEXT_CAP = _context_cap()
+
+
+# Facts the caller gave, taken from the arguments of the catalog tools (no extra tool call, which
+# would be a billed turn). When Gemini drops old turns, the note puts them back as one short text.
+FACT_ARGS = ("aggregate_pct", "qualifying_pct", "auat_pct", "cat_pct", "mat_pct", "clat_score",
+             "aujet_rank", "jee_main_rank", "wbjee_rank", "subjects", "degree", "program", "situations")
+
+
+def note_facts(call_state, args):
+    for key in FACT_ARGS:
+        value = args.get(key)
+        if value not in (None, "", []):
+            call_state["facts"][key] = value
+
+
+def facts_note(call_state):
+    facts = [f"{key.replace('_', ' ')} {', '.join(map(str, v)) if isinstance(v, (list, tuple)) else v}"
+             for key, v in call_state["facts"].items()]
+    if call_state["catalog_found"]:
+        facts.append("programs looked up: " + ", ".join(call_state["catalog_found"]))
+    if not facts:
+        return None
+    return ("Internal note, not spoken by the caller: do not read it aloud and do not reply to it. "
+            "Facts from earlier in this call: " + "; ".join(facts) + ".")
+
+
+async def send_facts_note(session, call_state):
+    note = facts_note(call_state)
+    if note:
+        await session.send_client_content(
+            turns=types.Content(role="user", parts=[types.Part.from_text(text=note)]), turn_complete=False)
+        logger.info(f"🧾 [FACTS-NOTE] resent after the history shrank ({len(note)} chars)")
+
+
+def context_compression_config():
+    window = types.SlidingWindow()
+    if CONTEXT_CAP:
+        window = types.SlidingWindow(target_tokens=CONTEXT_CAP[1])
+    return types.ContextWindowCompressionConfig(
+        trigger_tokens=CONTEXT_CAP[0] if CONTEXT_CAP else None,
+        sliding_window=window,
+    )
+
+
 def cost_trace_line(call_state, elapsed_s, label):
     cost = gemini_cost(call_state)
     return (f"💸 [COST-TRACE] {label} t={elapsed_s:.0f}s gemini=${cost['total']:.6f} "
@@ -2265,6 +2330,7 @@ async def handle_media_stream():
         "catalog_chars": 0,
         # Catalog names get_program_details found on this call (step 2: school fallback for the analysis).
         "catalog_found": [],
+        "facts": {},
 
         # Per-delta trace and byte counters — task 5.1. Observability only.
         "delta_trace": [],
@@ -2492,11 +2558,7 @@ async def handle_media_stream():
                     ),
                     activity_handling=types.ActivityHandling.START_OF_ACTIVITY_INTERRUPTS,
                 ),
-                context_window_compression=(
-                    types.ContextWindowCompressionConfig(
-                        sliding_window=types.SlidingWindow(),
-                    )
-                )
+                context_window_compression=context_compression_config(),
             )
 
             # Reset transient state for the new connection
@@ -3178,6 +3240,7 @@ async def stream_gemini_to_plivo(session, plivo_ws, call_state,plivo_client):
                                     chars = course_catalog.response_chars(result)
                                     call_state["catalog_calls"] += 1
                                     call_state["catalog_chars"] += chars
+                                    note_facts(call_state, args_dict)
                                     if call.name == "get_program_details":
                                         for entry in result.get("results", []):
                                             name = entry.get("name")
@@ -3412,6 +3475,10 @@ async def stream_gemini_to_plivo(session, plivo_ws, call_state,plivo_client):
                             logger.warning(
                                 f"📉 usage_metadata.total_token_count decreased: prev={previous_total}, current={total_token_count}"
                             )
+                            try:
+                                await send_facts_note(session, call_state)
+                            except Exception as e:
+                                logger.warning(f"⚠️ [FACTS-NOTE] not sent: {e}")
                         else:
                             delta = total_token_count - previous_total if previous_total is not None else None
                             logger.info(
